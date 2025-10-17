@@ -4,7 +4,6 @@ import {
   Container, 
   Typography, 
   Paper, 
-  Grid, 
   Button, 
   IconButton, 
   Tabs, 
@@ -32,9 +31,10 @@ import {
   DialogContent,
   DialogActions,
   Tooltip,
-  Badge
+  Badge,
+  Grid
 } from '@mui/material';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useHistory } from 'react-router-dom';
 import { 
   Add as AddIcon,
   ArrowBack as ArrowBackIcon,
@@ -61,7 +61,6 @@ import {
   format, 
   startOfMonth, 
   endOfMonth, 
-  eachDayOfInterval, 
   isSameMonth, 
   isSameDay, 
   addMonths, 
@@ -72,13 +71,28 @@ import {
   endOfDay,
   startOfWeek,
   endOfWeek,
-  getDay
+  getDay,
+  addDays
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Header from '../components/Header';
 import { clientService, postService } from '../services/supabaseClient';
 import { Client, Post, Story } from '../types';
 import StoryPreview from '../components/StoryPreview';
+
+// Implementação personalizada da função eachDayOfInterval para evitar problemas
+function eachDayOfInterval({ start, end }: { start: Date; end: Date }): Date[] {
+  const days = [];
+  let currentDate = startOfDay(new Date(start));
+  const endDate = startOfDay(new Date(end));
+
+  while (currentDate <= endDate) {
+    days.push(new Date(currentDate));
+    currentDate = addDays(currentDate, 1);
+  }
+
+  return days;
+}
 
 // Tipo para representar qualquer conteúdo agendado (post, carrossel, reels ou story)
 interface ScheduledContent {
@@ -95,7 +109,7 @@ interface ScheduledContent {
 
 const ContentCalendar: React.FC = () => {
   const theme = useTheme();
-  const navigate = useNavigate();
+  const history = useHistory();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
   
@@ -235,12 +249,12 @@ const ContentCalendar: React.FC = () => {
     // Redirecionar para a página de edição apropriada com base no tipo de conteúdo
     switch (selectedContent.type) {
       case 'story':
-        navigate(`/edit-story/${selectedContent.id}`);
+        history.push(`/edit-story/${selectedContent.id}`);
         break;
       case 'post':
       case 'carousel':
       case 'reels':
-        navigate(`/edit-post/${selectedContent.id}`);
+        history.push(`/edit-post/${selectedContent.id}`);
         break;
     }
   };
@@ -431,12 +445,6 @@ const ContentCalendar: React.FC = () => {
     }
   };
   
-  // Estilo para os itens de dia do calendário
-  const dayItemStyle = {
-    width: 'calc(100% / 7)',
-    padding: '4px'
-  };
-  
   return (
     <>
       <Header />
@@ -448,10 +456,19 @@ const ContentCalendar: React.FC = () => {
           aria-label="breadcrumb"
           sx={{ mb: 3 }}
         >
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', color: theme.palette.text.secondary, textDecoration: 'none' }}>
+          <Box 
+            component={Link} 
+            to="/" 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              color: theme.palette.text.secondary, 
+              textDecoration: 'none' 
+            }}
+          >
             <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
             Início
-          </Link>
+          </Box>
           <Typography
             sx={{ display: 'flex', alignItems: 'center' }}
             color="text.primary"
@@ -560,7 +577,7 @@ const ContentCalendar: React.FC = () => {
               <Button 
                 variant="contained" 
                 startIcon={<AddIcon />}
-                onClick={() => navigate('/create-story')}
+                onClick={() => history.push('/create-story')}
                 sx={{ whiteSpace: 'nowrap' }}
               >
                 Novo Conteúdo
@@ -632,18 +649,23 @@ const ContentCalendar: React.FC = () => {
               </IconButton>
             </Box>
             
-            {/* Calendário - usando Box em vez de Grid para evitar problemas de tipagem */}
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', mx: -0.5 }}>
+            {/* Calendário - usando Box com display grid em vez de Grid para evitar problemas */}
+            <Box sx={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(7, 1fr)', 
+              gap: 1 
+            }}>
               {/* Cabeçalho dos dias da semana */}
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
-                <Box key={day} sx={dayItemStyle}>
-                  <Box sx={{ 
+                <Box 
+                  key={day} 
+                  sx={{ 
                     textAlign: 'center', 
                     fontWeight: 'bold',
                     p: 1
-                  }}>
-                    {day}
-                  </Box>
+                  }}
+                >
+                  {day}
                 </Box>
               ))}
               
@@ -654,92 +676,91 @@ const ContentCalendar: React.FC = () => {
                 const isCurrentMonth = isSameMonth(day, currentDate);
                 
                 return (
-                  <Box key={index} sx={dayItemStyle}>
-                    <Paper 
-                      elevation={0} 
+                  <Paper 
+                    key={index}
+                    elevation={0} 
+                    sx={{ 
+                      p: 1, 
+                      height: '100%', 
+                      minHeight: 120,
+                      bgcolor: isToday ? 'rgba(25, 118, 210, 0.08)' : 
+                               !isCurrentMonth ? 'rgba(0, 0, 0, 0.03)' : 'background.paper',
+                      border: isToday ? `1px solid ${theme.palette.primary.main}` : '1px solid #eee',
+                      borderRadius: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      opacity: isCurrentMonth ? 1 : 0.6
+                    }}
+                  >
+                    <Typography 
+                      variant="body2" 
                       sx={{ 
-                        p: 1, 
-                        height: '100%', 
-                        minHeight: 120,
-                        bgcolor: isToday ? 'rgba(25, 118, 210, 0.08)' : 
-                                 !isCurrentMonth ? 'rgba(0, 0, 0, 0.03)' : 'background.paper',
-                        border: isToday ? `1px solid ${theme.palette.primary.main}` : '1px solid #eee',
-                        borderRadius: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        opacity: isCurrentMonth ? 1 : 0.6
+                        fontWeight: isToday ? 'bold' : 'normal',
+                        color: isToday ? 'primary.main' : 'text.primary',
+                        mb: 1
                       }}
                     >
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
-                          fontWeight: isToday ? 'bold' : 'normal',
-                          color: isToday ? 'primary.main' : 'text.primary',
-                          mb: 1
-                        }}
-                      >
-                        {format(day, 'd')}
-                      </Typography>
-                      
-                      {dayContent.length > 0 ? (
-                        <Box sx={{ overflowY: 'auto', flex: 1 }}>
-                          {dayContent.map((content) => {
-                            const client = content.client || getClientById(content.clientId);
-                            const contentDate = parseISO(content.scheduledDate);
-                            
-                            return (
-                              <Box 
-                                key={content.id} 
-                                sx={{ 
-                                  p: 0.5, 
-                                  mb: 0.5, 
-                                  bgcolor: getContentTypeColor(content.type),
-                                  color: '#fff',
-                                  borderRadius: 1,
-                                  fontSize: '0.75rem',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between'
-                                }}
-                              >
-                                <Box sx={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
-                                  <Tooltip title={client?.name || 'Cliente'}>
-                                    <Avatar 
-                                      src={client?.logoUrl} 
-                                      sx={{ width: 16, height: 16, mr: 0.5 }}
-                                    >
-                                      {client?.name?.charAt(0)}
-                                    </Avatar>
-                                  </Tooltip>
-                                  <Tooltip title={format(contentDate, "HH:mm")}>
-                                    <Typography 
-                                      variant="caption" 
-                                      noWrap 
-                                      sx={{ fontWeight: 'medium', mr: 0.5 }}
-                                    >
-                                      {format(contentDate, "HH:mm")}
-                                    </Typography>
-                                  </Tooltip>
-                                  <Tooltip title={content.type}>
-                                    {getContentTypeIcon(content.type)}
-                                  </Tooltip>
-                                </Box>
-                                <IconButton 
-                                  size="small" 
-                                  sx={{ color: 'inherit', p: 0.25 }}
-                                  onClick={(e) => handleMenuOpen(e, content)}
-                                >
-                                  <MoreVertIcon fontSize="small" />
-                                </IconButton>
+                      {format(day, 'd')}
+                    </Typography>
+                    
+                    {dayContent.length > 0 ? (
+                      <Box sx={{ overflowY: 'auto', flex: 1 }}>
+                        {dayContent.map((content) => {
+                          const client = content.client || getClientById(content.clientId);
+                          const contentDate = parseISO(content.scheduledDate);
+                          
+                          return (
+                            <Box 
+                              key={content.id} 
+                              sx={{ 
+                                p: 0.5, 
+                                mb: 0.5, 
+                                bgcolor: getContentTypeColor(content.type),
+                                color: '#fff',
+                                borderRadius: 1,
+                                fontSize: '0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
+                              }}
+                            >
+                              <Box sx={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+                                <Tooltip title={client?.name || 'Cliente'}>
+                                  <Avatar 
+                                    src={client?.logoUrl} 
+                                    sx={{ width: 16, height: 16, mr: 0.5 }}
+                                  >
+                                    {client?.name?.charAt(0)}
+                                  </Avatar>
+                                </Tooltip>
+                                <Tooltip title={format(contentDate, "HH:mm")}>
+                                  <Typography 
+                                    variant="caption" 
+                                    noWrap 
+                                    sx={{ fontWeight: 'medium', mr: 0.5 }}
+                                  >
+                                    {format(contentDate, "HH:mm")}
+                                  </Typography>
+                                </Tooltip>
+                                <Tooltip title={content.type}>
+                                  {getContentTypeIcon(content.type)}
+                                </Tooltip>
                               </Box>
-                            );
-                          })}
-                        </Box>
-                      ) : (
-                        <Box sx={{ flex: 1 }} />
-                      )}
-                    </Paper>
-                  </Box>
+                              <IconButton 
+                                size="small" 
+                                sx={{ color: 'inherit', p: 0.25 }}
+                                onClick={(e) => handleMenuOpen(e, content)}
+                              >
+                                <MoreVertIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    ) : (
+                      <Box sx={{ flex: 1 }} />
+                    )}
+                  </Paper>
                 );
               })}
             </Box>
@@ -792,8 +813,7 @@ const ContentCalendar: React.FC = () => {
                 <Button 
                   variant="contained" 
                   startIcon={<AddIcon />}
-                  component={Link}
-                  to="/create-story"
+                  onClick={() => history.push('/create-story')}
                 >
                   Criar Novo Conteúdo
                 </Button>
