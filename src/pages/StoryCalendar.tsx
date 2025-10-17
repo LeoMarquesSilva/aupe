@@ -34,7 +34,8 @@ import {
   Badge,
   Grid
 } from '@mui/material';
-import { Link, useHistory } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useHistory } from 'react-router-dom'; // Substituído useNavigate por useHistory
 import { 
   Add as AddIcon,
   ArrowBack as ArrowBackIcon,
@@ -65,8 +66,6 @@ import {
   isSameDay, 
   addMonths, 
   subMonths,
-  parseISO,
-  isWithinInterval,
   startOfDay,
   endOfDay,
   startOfWeek,
@@ -74,11 +73,14 @@ import {
   getDay,
   addDays
 } from 'date-fns';
+import { parseISO } from 'date-fns/parseISO'; // Importação correta como named export
+import { isWithinInterval } from 'date-fns/isWithinInterval'; // Importação correta como named export
 import { ptBR } from 'date-fns/locale';
 import Header from '../components/Header';
 import { clientService, postService } from '../services/supabaseClient';
 import { Client, Post, Story } from '../types';
 import StoryPreview from '../components/StoryPreview';
+
 
 // Implementação personalizada da função eachDayOfInterval para evitar problemas
 function eachDayOfInterval({ start, end }: { start: Date; end: Date }): Date[] {
