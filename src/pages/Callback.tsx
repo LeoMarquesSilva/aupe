@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, CircularProgress, Alert } from '@mui/material';
-import { completeInstagramAuth } from '../services/instagramAuthService';
+import axios from 'axios';
+
+// Constantes para autenticação
+const META_APP_ID = '1087259016929287';
+const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873'; // Não é ideal expor o segredo no cliente
+const META_REDIRECT_URI = 'https://aupe.vercel.app/callback';
 
 const Callback: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
@@ -35,13 +40,90 @@ const Callback: React.FC = () => {
         console.log('Código de autorização obtido:', code);
         
         try {
-          // Chamar a API para processar a autenticação no servidor
-          const authData = await completeInstagramAuth(code);
+          // Implementação direta no cliente
+          console.log('Processando autenticação diretamente no cliente...');
           
-          console.log('Autenticação concluída com sucesso:', authData.username);
-          console.log('Token expira em:', new Date(authData.tokenExpiry));
+          // 1. Trocar o código por um token de acesso de curta duração
+          console.log('Trocando código por token...');
+          const tokenResponse = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
+            params: {
+              client_id: META_APP_ID,
+              client_secret: META_APP_SECRET,
+              redirect_uri: META_REDIRECT_URI,
+              code
+            }
+          });
+          
+          const shortLivedToken = tokenResponse.data.access_token;
+          console.log('Token de curta duração obtido');
+          
+          // 2. Converter para token de longa duração (60 dias)
+          const longLivedTokenResponse = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
+            params: {
+              grant_type: 'fb_exchange_token',
+              client_id: META_APP_ID,
+              client_secret: META_APP_SECRET,
+              fb_exchange_token: shortLivedToken
+            }
+          });
+          
+          const accessToken = longLivedTokenResponse.data.access_token;
+          const expiresIn = longLivedTokenResponse.data.expires_in;
+          console.log('Token de longa duração obtido, expira em:', expiresIn, 'segundos');
+          
+          // 3. Buscar as páginas do Facebook vinculadas
+          const pagesResponse = await axios.get('https://graph.facebook.com/v21.0/me/accounts', {
+            params: {
+              access_token: accessToken,
+              fields: 'instagram_business_account,name,id,access_token'
+            }
+          });
+          
+          const pages = pagesResponse.data.data || [];
+          console.log('Páginas do Facebook obtidas:', pages.length);
+          
+          if (pages.length === 0) {
+            throw new Error('Nenhuma página do Facebook encontrada. Você precisa ter uma página do Facebook vinculada à sua conta.');
+          }
+          
+          // Encontrar a primeira página com uma conta do Instagram vinculada
+          const pageWithInstagram = pages.find(page => page.instagram_business_account);
+          
+          if (!pageWithInstagram) {
+            throw new Error('Nenhuma conta do Instagram Business encontrada. Você precisa vincular uma conta do Instagram à sua página do Facebook.');
+          }
+          
+          console.log('Página com Instagram encontrada:', pageWithInstagram.name);
+          console.log('Token da página obtido, este token não expira a menos que as permissões sejam revogadas');
+          
+          // 4. Buscar dados da conta do Instagram
+          const instagramAccountId = pageWithInstagram.instagram_business_account.id;
+          const instagramResponse = await axios.get(`https://graph.facebook.com/v21.0/${instagramAccountId}`, {
+            params: {
+              access_token: pageWithInstagram.access_token,
+              fields: 'username,profile_picture_url,followers_count,media_count'
+            }
+          });
+          
+          const instagramData = instagramResponse.data;
+          console.log('Dados da conta do Instagram obtidos:', instagramData.username);
+          
+          // Calcular data de expiração do token
+          // Para tokens de página, definimos uma data bem no futuro, pois eles não expiram automaticamente
+          const tokenExpiry = new Date();
+          tokenExpiry.setFullYear(tokenExpiry.getFullYear() + 1); // Definir para 1 ano no futuro
           
           // Salvar dados no localStorage para que possam ser acessados pelo componente ConnectInstagram
+          const authData = {
+            instagramAccountId,
+            accessToken: pageWithInstagram.access_token, // Usamos o token da página, não o token do usuário
+            username: instagramData.username,
+            profilePicture: instagramData.profile_picture_url,
+            tokenExpiry: tokenExpiry.toISOString(),
+            pageId: pageWithInstagram.id,
+            pageName: pageWithInstagram.name
+          };
+          
           localStorage.setItem('instagram_auth_temp_data', JSON.stringify(authData));
           
           setSuccess(true);
