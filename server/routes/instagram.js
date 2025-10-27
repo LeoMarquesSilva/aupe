@@ -2,30 +2,10 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 
-// Constantes para autenticação - USE VARIÁVEIS DE AMBIENTE!
-const META_APP_ID = process.env.META_APP_ID;
-const META_APP_SECRET = process.env.META_APP_SECRET;
-const META_REDIRECT_URI = process.env.META_REDIRECT_URI || 'https://aupe.vercel.app/auth/callback';
-
-// Endpoint para gerar URL de autorização (evita expor APP_ID no frontend)
-router.get('/auth-url', (req, res) => {
-  try {
-    const { state, scopes } = req.query;
-    
-    if (!state || !scopes) {
-      return res.status(400).json({ message: 'Parâmetros state e scopes são obrigatórios' });
-    }
-    
-    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(META_REDIRECT_URI)}&scope=${scopes}&response_type=code&state=${state}`;
-    
-    return res.json({ authUrl });
-  } catch (error) {
-    console.error('Erro ao gerar URL de autorização:', error);
-    return res.status(500).json({ 
-      message: error.message || 'Erro ao gerar URL de autorização' 
-    });
-  }
-});
+// Constantes para autenticação
+const META_APP_ID = '1087259016929287';
+const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873';
+const META_REDIRECT_URI = 'https://aupe.vercel.app/auth/callback';
 
 // Endpoint para trocar o código por tokens e completar o fluxo de autenticação
 router.post('/auth', async (req, res) => {

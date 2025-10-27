@@ -11,6 +11,10 @@ export interface InstagramAuthData {
   pageName: string;
 }
 
+// Constantes para autenticação
+const META_APP_ID = '1087259016929287';
+const META_REDIRECT_URI = 'https://aupe.vercel.app/auth/callback';
+
 // Função para gerar a URL de autorização
 export const getAuthorizationUrl = (): string => {
   const scopes = [
@@ -23,8 +27,7 @@ export const getAuthorizationUrl = (): string => {
   
   const state = generateRandomState();
   
-  // Usamos a API para gerar a URL de autorização, sem expor o APP_ID no frontend
-  return `/api/instagram/auth-url?state=${state}&scopes=${encodeURIComponent(scopes)}`;
+  return `https://www.facebook.com/v21.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(META_REDIRECT_URI)}&scope=${scopes}&response_type=code&state=${state}`;
 };
 
 // Gera state aleatório para proteção CSRF

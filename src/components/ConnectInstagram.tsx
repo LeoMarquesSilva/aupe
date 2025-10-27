@@ -19,6 +19,7 @@ import {
 } from '@mui/icons-material';
 import { getAuthorizationUrl, InstagramAuthData, verifyToken } from '../services/instagramAuthService';
 import { Client } from '../types';
+import axios from 'axios';
 
 interface ConnectInstagramProps {
   client: Client;
@@ -75,13 +76,8 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     setError(null);
     
     try {
-      // Gerar URL de autorização através da API
-      const response = await fetch(getAuthorizationUrl());
-      const data = await response.json();
-      
-      if (!data.authUrl) {
-        throw new Error('Não foi possível gerar URL de autorização');
-      }
+      // Obter a URL de autorização diretamente
+      const authUrl = getAuthorizationUrl();
       
       // Abrir popup para autenticação
       const width = 600;
@@ -90,7 +86,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       const top = window.innerHeight / 2 - height / 2;
       
       const popup = window.open(
-        data.authUrl,
+        authUrl,
         'instagram-auth',
         `width=${width},height=${height},top=${top},left=${left}`
       );
