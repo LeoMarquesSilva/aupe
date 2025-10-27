@@ -4,7 +4,7 @@ import { CssBaseline, Box } from '@mui/material';
 import CreatePost from './pages/CreatePost';
 import CreateStory from './pages/CreateStory';
 import InstagramCallback from './pages/InstagramCallback';
-import AuthCallback from './pages/AuthCallback'; // Importando o novo componente
+import Callback from './pages/Callback'; // Importando o componente de callback
 import StoryCalendar from './pages/StoryCalendar';
 import EditStory from './pages/EditStory';
 import ClientDashboard from './pages/ClientDashboard';
@@ -88,10 +88,10 @@ const router = createBrowserRouter(
       path: "/api/instagram-auth/callback",
       element: <CallbackLayout><InstagramCallback /></CallbackLayout>,
     },
-    // Adicionando a nova rota para o callback do Instagram
+    // Adicionando a rota /callback que já está validada no Facebook Developer
     {
-      path: "/auth/callback",
-      element: <CallbackLayout><AuthCallback /></CallbackLayout>,
+      path: "/callback",
+      element: <CallbackLayout><Callback /></CallbackLayout>,
     },
   ]
 );

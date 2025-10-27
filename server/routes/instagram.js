@@ -5,7 +5,7 @@ const router = express.Router();
 // Constantes para autenticação
 const META_APP_ID = '1087259016929287';
 const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873';
-const META_REDIRECT_URI = 'https://aupe.vercel.app/auth/callback';
+const META_REDIRECT_URI = 'https://aupe.vercel.app/callback';
 
 // Endpoint para trocar o código por tokens e completar o fluxo de autenticação
 router.post('/auth', async (req, res) => {
