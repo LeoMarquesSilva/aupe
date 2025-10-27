@@ -74,10 +74,15 @@ export const getInstagramAccountData = async (instagramAccountId: string, access
 // Função que completa o fluxo de autenticação chamando nossa API segura
 export const completeInstagramAuth = async (code: string): Promise<InstagramAuthData> => {
   try {
+    console.log('Enviando código para o servidor:', code);
+    console.log('URL de redirecionamento:', META_REDIRECT_URI);
+    
     const response = await axios.post('/api/instagram/auth', { 
       code,
       redirectUri: META_REDIRECT_URI
     });
+    
+    console.log('Resposta do servidor:', response.data);
     
     // Converter a string de data para um objeto Date
     const data = response.data;
@@ -85,11 +90,9 @@ export const completeInstagramAuth = async (code: string): Promise<InstagramAuth
     
     return data;
   } catch (error: any) {
-    console.error('Erro no fluxo de autenticação do Instagram:', error.response?.data || error);
-    throw new Error(
-      error.response?.data?.message || 
-      'Falha na autenticação do Instagram. Por favor, tente novamente.'
-    );
+    console.error('Erro no fluxo de autenticação do Instagram:', error);
+    console.error('Detalhes da resposta:', error.response?.data);
+    throw error;
   }
 };
 

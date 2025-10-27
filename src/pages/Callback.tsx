@@ -5,6 +5,7 @@ import { completeInstagramAuth, validateState } from '../services/instagramAuthS
 const Callback: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [detailedError, setDetailedError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
 
   useEffect(() => {
@@ -29,19 +30,27 @@ const Callback: React.FC = () => {
           throw new Error('Validação de segurança falhou. Por favor, tente novamente.');
         }
         
+        console.log('Código de autorização obtido:', code);
+        
         // Completar o fluxo de autenticação
-        const instagramData = await completeInstagramAuth(code);
-        
-        // Salvar dados no localStorage para que possam ser acessados pelo componente ConnectInstagram
-        localStorage.setItem('instagram_auth_temp_data', JSON.stringify(instagramData));
-        
-        setSuccess(true);
-        
-        // Fechar a janela de popup após um breve atraso
-        setTimeout(() => {
-          window.close();
-        }, 2000);
-      } catch (err) {
+        try {
+          const instagramData = await completeInstagramAuth(code);
+          
+          // Salvar dados no localStorage para que possam ser acessados pelo componente ConnectInstagram
+          localStorage.setItem('instagram_auth_temp_data', JSON.stringify(instagramData));
+          
+          setSuccess(true);
+          
+          // Fechar a janela de popup após um breve atraso
+          setTimeout(() => {
+            window.close();
+          }, 2000);
+        } catch (authError: any) {
+          console.error('Erro detalhado na autenticação:', authError);
+          setDetailedError(JSON.stringify(authError.response?.data || authError.message));
+          throw authError;
+        }
+      } catch (err: any) {
         console.error('Erro no callback do Instagram:', err);
         const errorMessage = (err as Error).message || 'Erro desconhecido durante a autenticação';
         setError(errorMessage);
@@ -52,7 +61,7 @@ const Callback: React.FC = () => {
         // Fechar a janela de popup após um breve atraso
         setTimeout(() => {
           window.close();
-        }, 3000);
+        }, 10000); // Aumentando o tempo para 10 segundos para poder ver o erro detalhado
       } finally {
         setLoading(false);
       }
@@ -90,6 +99,12 @@ const Callback: React.FC = () => {
           <Alert severity="error" sx={{ mb: 2, width: '100%', maxWidth: 500 }}>
             {error}
           </Alert>
+          {detailedError && (
+            <Alert severity="warning" sx={{ mb: 2, width: '100%', maxWidth: 500, textAlign: 'left', overflowX: 'auto' }}>
+              <Typography variant="subtitle2">Detalhes do erro:</Typography>
+              <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem' }}>{detailedError}</pre>
+            </Alert>
+          )}
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 3 }}>
             Não foi possível conectar sua conta do Instagram.
           </Typography>
