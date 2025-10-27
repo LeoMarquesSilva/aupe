@@ -29,7 +29,7 @@ router.post('/auth', async (req, res) => {
       
       // 2. Converter para token de longa duração (60 dias)
       const { accessToken, expiresIn } = await getLongLivedToken(shortLivedToken);
-      console.log('Token de longa duração obtido');
+      console.log('Token de longa duração obtido, expira em:', expiresIn, 'segundos');
       
       // 3. Buscar as páginas do Facebook vinculadas
       const pages = await getFacebookPages(accessToken);
@@ -51,6 +51,7 @@ router.post('/auth', async (req, res) => {
       }
       
       console.log('Página com Instagram encontrada:', pageWithInstagram.name);
+      console.log('Token da página obtido, este token não expira a menos que as permissões sejam revogadas');
       
       // 4. Buscar dados da conta do Instagram
       const instagramAccountId = pageWithInstagram.instagram_business_account.id;
@@ -58,8 +59,9 @@ router.post('/auth', async (req, res) => {
       console.log('Dados da conta do Instagram obtidos:', instagramData.username);
       
       // Calcular data de expiração do token
+      // Para tokens de página, definimos uma data bem no futuro, pois eles não expiram automaticamente
       const tokenExpiry = new Date();
-      tokenExpiry.setSeconds(tokenExpiry.getSeconds() + expiresIn);
+      tokenExpiry.setFullYear(tokenExpiry.getFullYear() + 1); // Definir para 1 ano no futuro
       
       // Retornar todos os dados necessários
       return res.json({
@@ -67,9 +69,10 @@ router.post('/auth', async (req, res) => {
         accessToken: pageWithInstagram.access_token, // Usamos o token da página, não o token do usuário
         username: instagramData.username,
         profilePicture: instagramData.profile_picture_url,
-        tokenExpiry,
+        tokenExpiry: tokenExpiry.toISOString(), // Convertendo para string para transmissão JSON
         pageId: pageWithInstagram.id,
-        pageName: pageWithInstagram.name
+        pageName: pageWithInstagram.name,
+        expiresIn: 31536000 // Aproximadamente 1 ano em segundos
       });
     } catch (error) {
       console.error('Erro detalhado no fluxo de autenticação:', error);
@@ -219,16 +222,49 @@ async function getInstagramAccountData(instagramAccountId, accessToken) {
 // Função para verificar se um token ainda é válido
 async function verifyToken(accessToken) {
   try {
-    const response = await axios.get(`https://graph.facebook.com/debug_token`, {
+    // Método melhorado para verificar token
+    // Primeiro tentamos fazer uma chamada simples para a API
+    const response = await axios.get('https://graph.facebook.com/v21.0/me', {
       params: {
-        input_token: accessToken,
-        access_token: `${META_APP_ID}|${META_APP_SECRET}`
+        access_token: accessToken,
+        fields: 'id,name'
       }
     });
-    return response.data.data.is_valid;
+    
+    // Se chegou aqui, o token é válido
+    return true;
   } catch (error) {
     console.error('Erro ao verificar token:', error.response?.data || error);
-    return false;
+    
+    // Verificar se o erro é devido a token inválido
+    if (error.response && 
+        (error.response.status === 400 || error.response.status === 401) && 
+        error.response.data && 
+        error.response.data.error) {
+      
+      // Verificar código de erro específico
+      const errorCode = error.response.data.error.code;
+      const errorType = error.response.data.error.type;
+      
+      if (errorCode === 190 || errorType === 'OAuthException') {
+        console.log('Token inválido ou expirado');
+        return false;
+      }
+    }
+    
+    // Para outros tipos de erro, vamos tentar o método de debug_token
+    try {
+      const debugResponse = await axios.get(`https://graph.facebook.com/debug_token`, {
+        params: {
+          input_token: accessToken,
+          access_token: `${META_APP_ID}|${META_APP_SECRET}`
+        }
+      });
+      return debugResponse.data.data.is_valid;
+    } catch (debugError) {
+      console.error('Erro ao verificar token via debug_token:', debugError.response?.data || debugError);
+      return false;
+    }
   }
 }
 
