@@ -68,7 +68,8 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     setError(null);
     
     try {
-      // Verificar token usando o endpoint debug_token
+      // Verificar token diretamente com a API do Facebook
+      // Não depender de um endpoint intermediário que pode não estar disponível
       const response = await axios.get('https://graph.facebook.com/debug_token', {
         params: {
           input_token: token,
@@ -109,13 +110,15 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       
       // Testar o token fazendo uma chamada simples
       try {
-        const testResponse = await axios.get(`https://graph.facebook.com/v21.0/${instagramData?.instagramAccountId}`, {
-          params: {
-            access_token: token,
-            fields: 'username'
-          }
-        });
-        console.log('Teste do token bem-sucedido:', testResponse.data);
+        if (instagramData?.instagramAccountId) {
+          const testResponse = await axios.get(`https://graph.facebook.com/v21.0/${instagramData.instagramAccountId}`, {
+            params: {
+              access_token: token,
+              fields: 'username'
+            }
+          });
+          console.log('Teste do token bem-sucedido:', testResponse.data);
+        }
       } catch (testError) {
         console.error('Erro ao testar token:', testError);
         setError('O token parece ser válido, mas falhou em um teste prático. Recomendamos reconectar sua conta.');
