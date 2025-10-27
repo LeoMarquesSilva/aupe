@@ -5,23 +5,19 @@ const router = express.Router();
 // Constantes para autenticação
 const META_APP_ID = '1087259016929287';
 const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873';
-// Não definimos um valor padrão aqui, pois receberemos do cliente
+const META_REDIRECT_URI = 'https://aupe.vercel.app/auth/callback';
 
 // Endpoint para trocar o código por tokens e completar o fluxo de autenticação
 router.post('/auth', async (req, res) => {
   try {
-    const { code, redirectUri } = req.body;
+    const { code } = req.body;
     
     if (!code) {
       return res.status(400).json({ message: 'Código de autorização não fornecido' });
     }
     
-    if (!redirectUri) {
-      return res.status(400).json({ message: 'URL de redirecionamento não fornecida' });
-    }
-    
     // 1. Trocar o código por um token de acesso de curta duração
-    const shortLivedToken = await exchangeCodeForToken(code, redirectUri);
+    const shortLivedToken = await exchangeCodeForToken(code);
     
     // 2. Converter para token de longa duração (60 dias)
     const { accessToken, expiresIn } = await getLongLivedToken(shortLivedToken);
@@ -128,13 +124,13 @@ router.post('/verify-token', async (req, res) => {
 });
 
 // Função para trocar o código por um token de acesso de curta duração
-async function exchangeCodeForToken(code, redirectUri) {
+async function exchangeCodeForToken(code) {
   try {
     const response = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
       params: {
         client_id: META_APP_ID,
         client_secret: META_APP_SECRET,
-        redirect_uri: redirectUri,
+        redirect_uri: META_REDIRECT_URI,
         code
       }
     });

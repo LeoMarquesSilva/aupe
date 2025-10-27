@@ -4,6 +4,7 @@ import { CssBaseline, Box } from '@mui/material';
 import CreatePost from './pages/CreatePost';
 import CreateStory from './pages/CreateStory';
 import InstagramCallback from './pages/InstagramCallback';
+import AuthCallback from './pages/AuthCallback'; // Importando o novo componente
 import StoryCalendar from './pages/StoryCalendar';
 import EditStory from './pages/EditStory';
 import ClientDashboard from './pages/ClientDashboard';
@@ -34,6 +35,21 @@ const PageLayout = ({ children }: { children: React.ReactNode }) => (
     >
       {children}
     </Box>
+  </Box>
+);
+
+// Layout sem cabeçalho para páginas de callback
+const CallbackLayout = ({ children }: { children: React.ReactNode }) => (
+  <Box 
+    sx={{ 
+      minHeight: '100vh', 
+      bgcolor: 'background.default', 
+      display: 'flex', 
+      flexDirection: 'column',
+      color: 'text.primary'
+    }}
+  >
+    {children}
   </Box>
 );
 
@@ -70,7 +86,12 @@ const router = createBrowserRouter(
     },
     {
       path: "/api/instagram-auth/callback",
-      element: <PageLayout><InstagramCallback /></PageLayout>,
+      element: <CallbackLayout><InstagramCallback /></CallbackLayout>,
+    },
+    // Adicionando a nova rota para o callback do Instagram
+    {
+      path: "/auth/callback",
+      element: <CallbackLayout><AuthCallback /></CallbackLayout>,
     },
   ]
 );
