@@ -9,15 +9,20 @@ import {
   Chip,
   Alert,
   IconButton,
-  Tooltip
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import { 
   Instagram as InstagramIcon,
   Refresh as RefreshIcon,
   LinkOff as LinkOffIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  Info as InfoIcon
 } from '@mui/icons-material';
-import { getAuthorizationUrl, InstagramAuthData, verifyToken } from '../services/instagramAuthService';
+import { getAuthorizationUrl, InstagramAuthData } from '../services/instagramAuthService';
 import { Client } from '../types';
 import axios from 'axios';
 
@@ -32,6 +37,12 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
   const [connected, setConnected] = useState<boolean>(false);
   const [instagramData, setInstagramData] = useState<InstagramAuthData | null>(null);
   const [verifying, setVerifying] = useState<boolean>(false);
+  const [tokenInfo, setTokenInfo] = useState<any>(null);
+  const [showTokenInfo, setShowTokenInfo] = useState<boolean>(false);
+
+  // Constantes para autenticação
+  const META_APP_ID = '1087259016929287';
+  const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873';
 
   // Verificar se já existe uma conexão salva para este cliente
   useEffect(() => {
@@ -54,17 +65,68 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
   // Função para verificar se o token ainda é válido
   const verifyTokenValidity = async (token: string) => {
     setVerifying(true);
+    setError(null);
+    
     try {
-      const isValid = await verifyToken(token);
-      if (!isValid) {
-        setError('O token de acesso expirou. Por favor, reconecte sua conta.');
+      // Verificar token usando o endpoint debug_token
+      const response = await axios.get('https://graph.facebook.com/debug_token', {
+        params: {
+          input_token: token,
+          access_token: `${META_APP_ID}|${META_APP_SECRET}`
+        }
+      });
+      
+      const tokenData = response.data.data;
+      console.log('Dados do token:', tokenData);
+      
+      // Salvar informações do token para exibição
+      setTokenInfo(tokenData);
+      
+      if (!tokenData.is_valid) {
+        setError('O token de acesso não é mais válido. Por favor, reconecte sua conta.');
         setConnected(false);
         localStorage.removeItem(`instagram_connection_${client.id}`);
         setInstagramData(null);
         onConnectionUpdate(client.id, null);
+        return;
       }
-    } catch (err) {
+      
+      // Verificar se o token é do tipo esperado (PAGE)
+      if (tokenData.type !== 'PAGE') {
+        console.warn('O token não é do tipo PAGE, pode expirar:', tokenData.type);
+      }
+      
+      // Verificar se o token tem data de expiração
+      if (tokenData.expires_at) {
+        const expiryDate = new Date(tokenData.expires_at * 1000);
+        const now = new Date();
+        
+        // Se o token expira em menos de 7 dias, mostrar aviso
+        if (expiryDate.getTime() - now.getTime() < 7 * 24 * 60 * 60 * 1000) {
+          setError(`O token expirará em ${Math.ceil((expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))} dias. Recomendamos reconectar sua conta.`);
+        }
+      }
+      
+      // Testar o token fazendo uma chamada simples
+      try {
+        const testResponse = await axios.get(`https://graph.facebook.com/v21.0/${instagramData?.instagramAccountId}`, {
+          params: {
+            access_token: token,
+            fields: 'username'
+          }
+        });
+        console.log('Teste do token bem-sucedido:', testResponse.data);
+      } catch (testError) {
+        console.error('Erro ao testar token:', testError);
+        setError('O token parece ser válido, mas falhou em um teste prático. Recomendamos reconectar sua conta.');
+      }
+    } catch (err: any) {
       console.error('Erro ao verificar token:', err);
+      setError('Não foi possível verificar o token. Por favor, reconecte sua conta.');
+      setConnected(false);
+      localStorage.removeItem(`instagram_connection_${client.id}`);
+      setInstagramData(null);
+      onConnectionUpdate(client.id, null);
     } finally {
       setVerifying(false);
     }
@@ -228,6 +290,15 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
           </Box>
           
           <Box>
+            <Tooltip title="Informações do token">
+              <IconButton 
+                size="small" 
+                onClick={() => setShowTokenInfo(true)}
+                sx={{ mr: 1 }}
+              >
+                <InfoIcon />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="Verificar conexão">
               <IconButton 
                 size="small" 
@@ -250,6 +321,64 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
           </Box>
         </Paper>
       )}
+      
+      {/* Dialog para mostrar informações do token */}
+      <Dialog open={showTokenInfo} onClose={() => setShowTokenInfo(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Informações do Token</DialogTitle>
+        <DialogContent>
+          {tokenInfo ? (
+            <Box sx={{ fontFamily: 'monospace', fontSize: '0.9rem' }}>
+              <Typography variant="subtitle2" sx={{ mt: 1 }}>Válido: {tokenInfo.is_valid ? 'Sim' : 'Não'}</Typography>
+              <Typography variant="subtitle2" sx={{ mt: 1 }}>Tipo: {tokenInfo.type}</Typography>
+              
+              {tokenInfo.expires_at ? (
+                <Typography variant="subtitle2" sx={{ mt: 1 }}>
+                  Expira em: {new Date(tokenInfo.expires_at * 1000).toLocaleString()}
+                </Typography>
+              ) : (
+                <Typography variant="subtitle2" sx={{ mt: 1, color: 'success.main' }}>
+                  Não expira automaticamente
+                </Typography>
+              )}
+              
+              <Typography variant="subtitle2" sx={{ mt: 1 }}>App ID: {tokenInfo.app_id}</Typography>
+              
+              {tokenInfo.scopes && (
+                <Box sx={{ mt: 1 }}>
+                  <Typography variant="subtitle2">Permissões:</Typography>
+                  <Box sx={{ mt: 0.5, pl: 2 }}>
+                    {tokenInfo.scopes.map((scope: string) => (
+                      <Typography key={scope} variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        • {scope}
+                      </Typography>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+              
+              <Alert severity="info" sx={{ mt: 2 }}>
+                Tokens de página do Facebook não expiram automaticamente a menos que as permissões sejam revogadas.
+                Se você estiver enfrentando problemas com a expiração do token, tente reconectar sua conta.
+              </Alert>
+            </Box>
+          ) : (
+            <Typography>Nenhuma informação disponível</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowTokenInfo(false)}>Fechar</Button>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={() => {
+              setShowTokenInfo(false);
+              handleConnect();
+            }}
+          >
+            Reconectar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

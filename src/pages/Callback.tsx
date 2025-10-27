@@ -4,7 +4,7 @@ import axios from 'axios';
 
 // Constantes para autenticação
 const META_APP_ID = '1087259016929287';
-const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873'; // Não é ideal expor o segredo no cliente
+const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873';
 const META_REDIRECT_URI = 'https://aupe.vercel.app/callback';
 
 const Callback: React.FC = () => {
@@ -12,6 +12,13 @@ const Callback: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [detailedError, setDetailedError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+
+  // Função para adicionar informações de debug
+  const addDebug = (message: string) => {
+    setDebugInfo(prev => [...prev, `${new Date().toISOString().substring(11, 19)}: ${message}`]);
+    console.log(message);
+  };
 
   useEffect(() => {
     const processCallback = async () => {
@@ -37,14 +44,14 @@ const Callback: React.FC = () => {
           throw new Error('Validação de segurança falhou. Por favor, tente novamente.');
         }
         
-        console.log('Código de autorização obtido:', code);
+        addDebug('Código de autorização obtido');
         
         try {
           // Implementação direta no cliente
-          console.log('Processando autenticação diretamente no cliente...');
+          addDebug('Processando autenticação diretamente no cliente...');
           
           // 1. Trocar o código por um token de acesso de curta duração
-          console.log('Trocando código por token...');
+          addDebug('Trocando código por token de curta duração...');
           const tokenResponse = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
             params: {
               client_id: META_APP_ID,
@@ -55,9 +62,10 @@ const Callback: React.FC = () => {
           });
           
           const shortLivedToken = tokenResponse.data.access_token;
-          console.log('Token de curta duração obtido');
+          addDebug('Token de curta duração obtido');
           
           // 2. Converter para token de longa duração (60 dias)
+          addDebug('Convertendo para token de longa duração...');
           const longLivedTokenResponse = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
             params: {
               grant_type: 'fb_exchange_token',
@@ -67,20 +75,21 @@ const Callback: React.FC = () => {
             }
           });
           
-          const accessToken = longLivedTokenResponse.data.access_token;
+          const userAccessToken = longLivedTokenResponse.data.access_token;
           const expiresIn = longLivedTokenResponse.data.expires_in;
-          console.log('Token de longa duração obtido, expira em:', expiresIn, 'segundos');
+          addDebug(`Token de longa duração obtido, expira em: ${expiresIn} segundos`);
           
           // 3. Buscar as páginas do Facebook vinculadas
+          addDebug('Buscando páginas do Facebook...');
           const pagesResponse = await axios.get('https://graph.facebook.com/v21.0/me/accounts', {
             params: {
-              access_token: accessToken,
+              access_token: userAccessToken,
               fields: 'instagram_business_account,name,id,access_token'
             }
           });
           
           const pages = pagesResponse.data.data || [];
-          console.log('Páginas do Facebook obtidas:', pages.length);
+          addDebug(`Páginas do Facebook obtidas: ${pages.length}`);
           
           if (pages.length === 0) {
             throw new Error('Nenhuma página do Facebook encontrada. Você precisa ter uma página do Facebook vinculada à sua conta.');
@@ -93,25 +102,54 @@ const Callback: React.FC = () => {
             throw new Error('Nenhuma conta do Instagram Business encontrada. Você precisa vincular uma conta do Instagram à sua página do Facebook.');
           }
           
-          console.log('Página com Instagram encontrada:', pageWithInstagram.name);
-          console.log('Token da página obtido, este token não expira a menos que as permissões sejam revogadas');
+          addDebug(`Página com Instagram encontrada: ${pageWithInstagram.name}`);
+          addDebug('Token da página obtido, este token não expira a menos que as permissões sejam revogadas');
           
           // 4. Buscar dados da conta do Instagram
           const instagramAccountId = pageWithInstagram.instagram_business_account.id;
+          addDebug(`ID da conta do Instagram: ${instagramAccountId}`);
+          
+          addDebug('Buscando dados da conta do Instagram...');
           const instagramResponse = await axios.get(`https://graph.facebook.com/v21.0/${instagramAccountId}`, {
             params: {
-              access_token: pageWithInstagram.access_token,
+              access_token: pageWithInstagram.access_token, // Usando o token da página
               fields: 'username,profile_picture_url,followers_count,media_count'
             }
           });
           
           const instagramData = instagramResponse.data;
-          console.log('Dados da conta do Instagram obtidos:', instagramData.username);
+          addDebug(`Dados da conta do Instagram obtidos: @${instagramData.username}`);
+          
+          // Verificar se o token da página é válido
+          addDebug('Verificando validade do token da página...');
+          try {
+            const debugTokenResponse = await axios.get('https://graph.facebook.com/debug_token', {
+              params: {
+                input_token: pageWithInstagram.access_token,
+                access_token: `${META_APP_ID}|${META_APP_SECRET}`
+              }
+            });
+            
+            const tokenData = debugTokenResponse.data.data;
+            addDebug(`Token válido: ${tokenData.is_valid}`);
+            addDebug(`Tipo de token: ${tokenData.type}`);
+            addDebug(`App ID: ${tokenData.app_id}`);
+            
+            if (tokenData.expires_at) {
+              const expiryDate = new Date(tokenData.expires_at * 1000);
+              addDebug(`Data de expiração: ${expiryDate.toLocaleString()}`);
+            } else {
+              addDebug('Token não tem data de expiração definida (não expira)');
+            }
+          } catch (debugError) {
+            addDebug('Erro ao verificar token, mas continuando com o processo');
+            console.error('Erro ao verificar token:', debugError);
+          }
           
           // Calcular data de expiração do token
           // Para tokens de página, definimos uma data bem no futuro, pois eles não expiram automaticamente
           const tokenExpiry = new Date();
-          tokenExpiry.setFullYear(tokenExpiry.getFullYear() + 1); // Definir para 1 ano no futuro
+          tokenExpiry.setFullYear(tokenExpiry.getFullYear() + 10); // Definir para 10 anos no futuro
           
           // Salvar dados no localStorage para que possam ser acessados pelo componente ConnectInstagram
           const authData = {
@@ -124,14 +162,16 @@ const Callback: React.FC = () => {
             pageName: pageWithInstagram.name
           };
           
+          addDebug('Salvando dados de autenticação no localStorage');
           localStorage.setItem('instagram_auth_temp_data', JSON.stringify(authData));
           
           setSuccess(true);
           
           // Fechar a janela de popup após um breve atraso
+          addDebug('Autenticação concluída com sucesso. Fechando janela em 5 segundos...');
           setTimeout(() => {
             window.close();
-          }, 2000);
+          }, 5000);
         } catch (authError: any) {
           console.error('Erro detalhado na autenticação:', authError);
           setDetailedError(JSON.stringify(authError.response?.data || authError.message));
@@ -148,7 +188,7 @@ const Callback: React.FC = () => {
         // Fechar a janela de popup após um breve atraso
         setTimeout(() => {
           window.close();
-        }, 10000); // Aumentando o tempo para 10 segundos para poder ver o erro detalhado
+        }, 15000); // Aumentando o tempo para 15 segundos para poder ver o erro detalhado
       } finally {
         setLoading(false);
       }
@@ -206,11 +246,33 @@ const Callback: React.FC = () => {
           <Alert severity="success" sx={{ mb: 2, width: '100%', maxWidth: 500 }}>
             Conta conectada com sucesso!
           </Alert>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Esta janela será fechada automaticamente...
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 3 }}>
+            Esta janela será fechada automaticamente em alguns segundos...
           </Typography>
         </>
       )}
+      
+      {/* Mostrar informações de debug */}
+      <Box sx={{ mt: 3, width: '100%', maxWidth: 600, textAlign: 'left' }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
+          Log de processamento:
+        </Typography>
+        <Box 
+          sx={{ 
+            p: 2, 
+            bgcolor: 'rgba(0,0,0,0.03)', 
+            borderRadius: 1, 
+            maxHeight: 200, 
+            overflowY: 'auto',
+            fontSize: '0.75rem',
+            fontFamily: 'monospace'
+          }}
+        >
+          {debugInfo.map((line, index) => (
+            <div key={index}>{line}</div>
+          ))}
+        </Box>
+      </Box>
     </Box>
   );
 };
