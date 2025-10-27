@@ -1,18 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, CircularProgress } from '@mui/material';
-import { completeInstagramAuth } from '../services/instagramAuthService';
+import { Box, Typography, CircularProgress, Alert, Button } from '@mui/material';
+import { completeInstagramAuth, validateState } from '../services/instagramAuthService';
+import { useNavigate } from 'react-router-dom';
 
 const InstagramCallback: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const processCallback = async () => {
       try {
-        // Obter o código da URL
+        // Obter o código e state da URL
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
+        const state = urlParams.get('state');
         const error = urlParams.get('error');
         
         if (error) {
@@ -23,36 +26,33 @@ const InstagramCallback: React.FC = () => {
           throw new Error('Código de autorização não encontrado na URL.');
         }
         
+        // Validar o state para proteção CSRF
+        if (state && !validateState(state)) {
+          throw new Error('Validação de segurança falhou. Por favor, tente novamente.');
+        }
+        
         // Completar o fluxo de autenticação
         const instagramData = await completeInstagramAuth(code);
         
-        // Salvar dados no localStorage para que a janela principal possa acessá-los
-        localStorage.setItem('instagram_auth_temp_data', JSON.stringify(instagramData));
+        // Salvar dados no localStorage para que possam ser acessados posteriormente
+        localStorage.setItem('instagram_auth_data', JSON.stringify(instagramData));
         
         setSuccess(true);
         
-        // Fechar a janela após um breve atraso
+        // Redirecionar após um breve atraso
         setTimeout(() => {
-          window.close();
+          navigate('/');
         }, 2000);
       } catch (err) {
         console.error('Erro no callback do Instagram:', err);
         setError((err as Error).message || 'Erro desconhecido durante a autenticação');
-        
-        // Salvar erro no localStorage para que a janela principal possa acessá-lo
-        localStorage.setItem('instagram_auth_error', (err as Error).message);
-        
-        // Fechar a janela após um breve atraso mesmo em caso de erro
-        setTimeout(() => {
-          window.close();
-        }, 3000);
       } finally {
         setLoading(false);
       }
     };
     
     processCallback();
-  }, []);
+  }, [navigate]);
 
   return (
     <Box 
@@ -61,7 +61,7 @@ const InstagramCallback: React.FC = () => {
         flexDirection: 'column', 
         alignItems: 'center', 
         justifyContent: 'center', 
-        height: '100vh',
+        height: '100%',
         p: 3,
         textAlign: 'center'
       }}
@@ -80,25 +80,28 @@ const InstagramCallback: React.FC = () => {
       
       {error && (
         <>
-          <Typography variant="h6" color="error" sx={{ mb: 2 }}>
-            Erro na autenticação
-          </Typography>
-          <Typography variant="body1">
+          <Alert severity="error" sx={{ mb: 2, width: '100%', maxWidth: 500 }}>
             {error}
+          </Alert>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 3 }}>
+            Não foi possível conectar sua conta do Instagram.
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
-            Esta janela será fechada automaticamente...
-          </Typography>
+          <Button 
+            variant="contained" 
+            onClick={() => navigate('/')}
+          >
+            Voltar para o início
+          </Button>
         </>
       )}
       
       {success && (
         <>
-          <Typography variant="h6" color="success.main" sx={{ mb: 2 }}>
+          <Alert severity="success" sx={{ mb: 2, width: '100%', maxWidth: 500 }}>
             Conta conectada com sucesso!
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Esta janela será fechada automaticamente...
+          </Alert>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Você será redirecionado automaticamente...
           </Typography>
         </>
       )}

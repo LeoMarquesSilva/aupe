@@ -70,13 +70,18 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
   };
 
   // Função para iniciar o processo de conexão
-  const handleConnect = () => {
+  const handleConnect = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Gerar URL de autorização
-      const authUrl = getAuthorizationUrl();
+      // Gerar URL de autorização através da API
+      const response = await fetch(getAuthorizationUrl());
+      const data = await response.json();
+      
+      if (!data.authUrl) {
+        throw new Error('Não foi possível gerar URL de autorização');
+      }
       
       // Abrir popup para autenticação
       const width = 600;
@@ -85,7 +90,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       const top = window.innerHeight / 2 - height / 2;
       
       const popup = window.open(
-        authUrl,
+        data.authUrl,
         'instagram-auth',
         `width=${width},height=${height},top=${top},left=${left}`
       );
@@ -97,9 +102,9 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
           handlePopupClosed();
         }
       }, 500);
-    } catch (err) {
+    } catch (err: any) {
       setLoading(false);
-      setError('Erro ao iniciar processo de conexão');
+      setError(err.message || 'Erro ao iniciar processo de conexão');
       console.error('Erro ao conectar Instagram:', err);
     }
   };
