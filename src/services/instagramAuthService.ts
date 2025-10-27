@@ -3,7 +3,7 @@ import axios from 'axios';
 // Constantes para autenticação
 const META_APP_ID = '1087259016929287';
 const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873';
-const META_REDIRECT_URI = 'http://localhost:3000/api/instagram-auth/callback';
+const META_REDIRECT_URI = 'https://aupe.vercel.app/auth/callback';
 
 // Interface para os dados de retorno da autenticação
 export interface InstagramAuthData {
