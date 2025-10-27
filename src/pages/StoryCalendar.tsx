@@ -35,7 +35,7 @@ import {
   Grid
 } from '@mui/material';
 import { Link } from 'react-router-dom';
-import { useHistory } from 'react-router-dom'; // Substituído useNavigate por useHistory
+import { useNavigate } from 'react-router-dom';
 import { 
   Add as AddIcon,
   ArrowBack as ArrowBackIcon,
@@ -56,7 +56,8 @@ import {
   VideoLibrary as VideoIcon,
   Collections as CarouselIcon,
   Error as ErrorIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  PersonAdd as PersonAddIcon
 } from '@mui/icons-material';
 import { 
   format, 
@@ -71,16 +72,15 @@ import {
   startOfWeek,
   endOfWeek,
   getDay,
-  addDays
+  addDays,
+  parseISO,
+  isWithinInterval
 } from 'date-fns';
-import { parseISO } from 'date-fns/parseISO'; // Importação correta como named export
-import { isWithinInterval } from 'date-fns/isWithinInterval'; // Importação correta como named export
 import { ptBR } from 'date-fns/locale';
-import Header from '../components/Header';
 import { clientService, postService } from '../services/supabaseClient';
 import { Client, Post, Story } from '../types';
 import StoryPreview from '../components/StoryPreview';
-
+import ClientManager from '../components/ClientManager';
 
 // Implementação personalizada da função eachDayOfInterval para evitar problemas
 function eachDayOfInterval({ start, end }: { start: Date; end: Date }): Date[] {
@@ -111,7 +111,7 @@ interface ScheduledContent {
 
 const ContentCalendar: React.FC = () => {
   const theme = useTheme();
-  const history = useHistory();
+  const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
   
@@ -127,6 +127,7 @@ const ContentCalendar: React.FC = () => {
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
   const [contentTypeFilter, setContentTypeFilter] = useState<string>('all');
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
+  const [clientDialogOpen, setClientDialogOpen] = useState<boolean>(false);
   
   // Gerar dias do mês atual
   const monthStart = startOfMonth(currentDate);
@@ -251,12 +252,12 @@ const ContentCalendar: React.FC = () => {
     // Redirecionar para a página de edição apropriada com base no tipo de conteúdo
     switch (selectedContent.type) {
       case 'story':
-        history.push(`/edit-story/${selectedContent.id}`);
+        navigate(`/edit-story/${selectedContent.id}`);
         break;
       case 'post':
       case 'carousel':
       case 'reels':
-        history.push(`/edit-post/${selectedContent.id}`);
+        navigate(`/edit-post/${selectedContent.id}`);
         break;
     }
   };
@@ -285,6 +286,12 @@ const ContentCalendar: React.FC = () => {
       console.error('Erro ao excluir conteúdo:', err);
       // Mostrar mensagem de erro
     }
+  };
+  
+  // Função para lidar com a adição de um novo cliente
+  const handleAddClient = (client: Client) => {
+    setClients(prevClients => [...prevClients, client]);
+    setClientDialogOpen(false);
   };
   
   // Função para obter conteúdo de um dia específico
@@ -449,8 +456,6 @@ const ContentCalendar: React.FC = () => {
   
   return (
     <>
-      <Header />
-      
       <Container maxWidth="lg" sx={{ py: 4 }}>
         {/* Breadcrumbs de navegação */}
         <Breadcrumbs 
@@ -567,6 +572,16 @@ const ContentCalendar: React.FC = () => {
             </Box>
             
             <Box sx={{ display: 'flex', gap: 1 }}>
+              {/* Botão para adicionar novo cliente */}
+              <Button 
+                variant="outlined"
+                startIcon={<PersonAddIcon />}
+                onClick={() => setClientDialogOpen(true)}
+                sx={{ whiteSpace: 'nowrap' }}
+              >
+                Novo Cliente
+              </Button>
+              
               <Button 
                 variant="outlined"
                 startIcon={<RefreshIcon />}
@@ -579,7 +594,7 @@ const ContentCalendar: React.FC = () => {
               <Button 
                 variant="contained" 
                 startIcon={<AddIcon />}
-                onClick={() => history.push('/create-story')}
+                onClick={() => navigate('/create-story')}
                 sx={{ whiteSpace: 'nowrap' }}
               >
                 Novo Conteúdo
@@ -736,16 +751,14 @@ const ContentCalendar: React.FC = () => {
                                   </Avatar>
                                 </Tooltip>
                                 <Tooltip title={format(contentDate, "HH:mm")}>
-                                  <Typography 
-                                    variant="caption" 
-                                    noWrap 
-                                    sx={{ fontWeight: 'medium', mr: 0.5 }}
-                                  >
+                                  <Box component="span" sx={{ fontWeight: 'medium', mr: 0.5 }}>
                                     {format(contentDate, "HH:mm")}
-                                  </Typography>
+                                  </Box>
                                 </Tooltip>
                                 <Tooltip title={content.type}>
-                                  {getContentTypeIcon(content.type)}
+                                  <Box component="span">
+                                    {getContentTypeIcon(content.type)}
+                                  </Box>
                                 </Tooltip>
                               </Box>
                               <IconButton 
@@ -815,7 +828,7 @@ const ContentCalendar: React.FC = () => {
                 <Button 
                   variant="contained" 
                   startIcon={<AddIcon />}
-                  onClick={() => history.push('/create-story')}
+                  onClick={() => navigate('/create-story')}
                 >
                   Criar Novo Conteúdo
                 </Button>
@@ -999,6 +1012,34 @@ const ContentCalendar: React.FC = () => {
           <Button onClick={() => setDeleteConfirmOpen(false)}>Cancelar</Button>
           <Button onClick={handleDelete} color="error" variant="contained">
             Excluir
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Novo diálogo para adicionar cliente */}
+      <Dialog
+        open={clientDialogOpen}
+        onClose={() => setClientDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <PersonAddIcon sx={{ mr: 1 }} />
+            Gerenciar Clientes
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          <ClientManager 
+            clients={clients} 
+            onAddClient={handleAddClient} 
+            onSelectClient={() => {}} 
+            selectedClientId=""
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setClientDialogOpen(false)}>
+            Fechar
           </Button>
         </DialogActions>
       </Dialog>

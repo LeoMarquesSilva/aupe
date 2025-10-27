@@ -1,61 +1,86 @@
 import React from 'react';
-import { BrowserRouter as Router, Switch, Route } from 'react-router-dom';
-import { ThemeProvider, createTheme, CssBaseline, Box } from '@mui/material';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { CssBaseline, Box } from '@mui/material';
 import CreatePost from './pages/CreatePost';
 import CreateStory from './pages/CreateStory';
 import InstagramCallback from './pages/InstagramCallback';
 import StoryCalendar from './pages/StoryCalendar';
 import EditStory from './pages/EditStory';
+import ClientDashboard from './pages/ClientDashboard';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ptBR } from 'date-fns/locale';
+import Header from './components/Header';
 
-// Tema personalizado
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
+// Layout compartilhado para todas as páginas
+const PageLayout = ({ children }: { children: React.ReactNode }) => (
+  <Box 
+    sx={{ 
+      minHeight: '100vh', 
+      bgcolor: 'background.default', 
+      display: 'flex', 
+      flexDirection: 'column',
+      color: 'text.primary'
+    }}
+  >
+    <Header />
+    <Box 
+      className="page-container fade-in" 
+      sx={{ 
+        flex: 1, 
+        pt: 2,
+        pb: 4
+      }}
+    >
+      {children}
+    </Box>
+  </Box>
+);
+
+// Configuração do router sem as flags futuras que causam erro
+const router = createBrowserRouter(
+  [
+    {
+      path: "/",
+      element: <PageLayout><ClientDashboard /></PageLayout>,
     },
-    secondary: {
-      main: '#9c27b0',
+    {
+      path: "/clients",
+      element: <PageLayout><ClientDashboard /></PageLayout>,
     },
-    background: {
-      default: '#f5f5f5',
+    {
+      path: "/calendar",
+      element: <PageLayout><StoryCalendar /></PageLayout>,
     },
-  },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-        },
-      },
+    {
+      path: "/calendar/:clientId",
+      element: <PageLayout><StoryCalendar /></PageLayout>,
     },
-  },
-});
+    {
+      path: "/create-post",
+      element: <PageLayout><CreatePost /></PageLayout>,
+    },
+    {
+      path: "/create-story",
+      element: <PageLayout><CreateStory /></PageLayout>,
+    },
+    {
+      path: "/edit-story/:id",
+      element: <PageLayout><EditStory /></PageLayout>,
+    },
+    {
+      path: "/api/instagram-auth/callback",
+      element: <PageLayout><InstagramCallback /></PageLayout>,
+    },
+  ]
+);
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
-        <CssBaseline />
-        <Router>
-          <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-            <Switch>
-              <Route exact path="/" component={StoryCalendar} />
-              <Route path="/calendar" component={StoryCalendar} />
-              <Route path="/create-post" component={CreatePost} />
-              <Route path="/create-story" component={CreateStory} />
-              <Route path="/edit-story/:id" component={EditStory} />
-              <Route path="/api/instagram-auth/callback" component={InstagramCallback} />
-            </Switch>
-          </Box>
-        </Router>
-      </LocalizationProvider>
-    </ThemeProvider>
+    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
+      <CssBaseline />
+      <RouterProvider router={router} />
+    </LocalizationProvider>
   );
 }
 

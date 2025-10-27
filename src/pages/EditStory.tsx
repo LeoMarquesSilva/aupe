@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useHistory } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Box, 
   Container, 
@@ -21,7 +21,7 @@ import { Story } from '../types';
 
 const EditStory: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const history = useHistory();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(true);
   const [story, setStory] = useState<Story | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +37,7 @@ const EditStory: React.FC = () => {
         // Por enquanto, apenas simular um carregamento
         setTimeout(() => {
           setStory({
-            id: id,
+            id: id || '',
             clientId: 'placeholder-client-id',
             image: {
               id: 'preview',
@@ -77,7 +77,7 @@ const EditStory: React.FC = () => {
         >
           <Button 
             component="a"
-            onClick={() => history.push('/')}
+            onClick={() => navigate('/')}
             sx={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -89,7 +89,7 @@ const EditStory: React.FC = () => {
           </Button>
           <Button
             component="a"
-            onClick={() => history.push('/story-calendar')}
+            onClick={() => navigate('/story-calendar')}
             sx={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -121,7 +121,7 @@ const EditStory: React.FC = () => {
             <Button 
               variant="contained" 
               color="primary"
-              onClick={() => history.push('/story-calendar')}
+              onClick={() => navigate('/story-calendar')}
               sx={{ mt: 2 }}
               startIcon={<ArrowBackIcon />}
             >
@@ -136,7 +136,7 @@ const EditStory: React.FC = () => {
             <Button 
               variant="contained" 
               color="primary"
-              onClick={() => history.push('/story-calendar')}
+              onClick={() => navigate('/story-calendar')}
               startIcon={<ArrowBackIcon />}
             >
               Voltar ao Calendário
