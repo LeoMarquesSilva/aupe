@@ -34,18 +34,27 @@ const InstagramCallback: React.FC = () => {
         // Completar o fluxo de autenticação
         const instagramData = await completeInstagramAuth(code);
         
-        // Salvar dados no localStorage para que possam ser acessados posteriormente
-        localStorage.setItem('instagram_auth_data', JSON.stringify(instagramData));
+        // Salvar dados no localStorage para que possam ser acessados pelo componente ConnectInstagram
+        localStorage.setItem('instagram_auth_temp_data', JSON.stringify(instagramData));
         
         setSuccess(true);
         
-        // Redirecionar após um breve atraso
+        // Fechar a janela de popup após um breve atraso
         setTimeout(() => {
-          navigate('/');
+          window.close();
         }, 2000);
       } catch (err) {
         console.error('Erro no callback do Instagram:', err);
-        setError((err as Error).message || 'Erro desconhecido durante a autenticação');
+        const errorMessage = (err as Error).message || 'Erro desconhecido durante a autenticação';
+        setError(errorMessage);
+        
+        // Salvar mensagem de erro no localStorage para que possa ser acessada pelo componente ConnectInstagram
+        localStorage.setItem('instagram_auth_error', errorMessage);
+        
+        // Fechar a janela de popup após um breve atraso
+        setTimeout(() => {
+          window.close();
+        }, 3000);
       } finally {
         setLoading(false);
       }
@@ -61,7 +70,7 @@ const InstagramCallback: React.FC = () => {
         flexDirection: 'column', 
         alignItems: 'center', 
         justifyContent: 'center', 
-        height: '100%',
+        height: '100vh',
         p: 3,
         textAlign: 'center'
       }}
@@ -86,12 +95,9 @@ const InstagramCallback: React.FC = () => {
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 3 }}>
             Não foi possível conectar sua conta do Instagram.
           </Typography>
-          <Button 
-            variant="contained" 
-            onClick={() => navigate('/')}
-          >
-            Voltar para o início
-          </Button>
+          <Typography variant="body2">
+            Esta janela será fechada automaticamente...
+          </Typography>
         </>
       )}
       
@@ -101,7 +107,7 @@ const InstagramCallback: React.FC = () => {
             Conta conectada com sucesso!
           </Alert>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Você será redirecionado automaticamente...
+            Esta janela será fechada automaticamente...
           </Typography>
         </>
       )}

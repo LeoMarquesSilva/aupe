@@ -13,7 +13,8 @@ export interface InstagramAuthData {
 
 // Constantes para autenticação
 const META_APP_ID = '1087259016929287';
-const META_REDIRECT_URI = 'https://aupe.vercel.app/auth/callback';
+// Ajustando a URL de redirecionamento para corresponder à rota existente no seu aplicativo
+const META_REDIRECT_URI = window.location.origin + '/instagram-callback';
 
 // Função para gerar a URL de autorização
 export const getAuthorizationUrl = (): string => {
@@ -73,7 +74,10 @@ export const getInstagramAccountData = async (instagramAccountId: string, access
 // Função que completa o fluxo de autenticação chamando nossa API segura
 export const completeInstagramAuth = async (code: string): Promise<InstagramAuthData> => {
   try {
-    const response = await axios.post('/api/instagram/auth', { code });
+    const response = await axios.post('/api/instagram/auth', { 
+      code,
+      redirectUri: META_REDIRECT_URI // Enviando a URL de redirecionamento para o servidor
+    });
     
     // Converter a string de data para um objeto Date
     const data = response.data;
