@@ -217,28 +217,29 @@ export const clientService = {
         ...client,
         instagramAccountId: authData.instagramAccountId,
         accessToken: authData.accessToken,
-        username: authData.username, // Isso será mapeado para instagram_username
+        username: authData.username,
         profilePicture: authData.profilePicture,
         tokenExpiry: authData.tokenExpiry,
         pageId: authData.pageId,
         pageName: authData.pageName
       };
       
-      // Preparar os dados para atualização
-      const updateData = {
+      // Usar o convertToDbFormat para garantir que os campos sejam mapeados corretamente
+      // Isso vai usar o mapeamento de colunas definido no início do arquivo
+      const updateData = convertToDbFormat({
         id: clientId,
-        instagram_account_id: authData.instagramAccountId,
-        access_token: authData.accessToken,
-        instagram_username: authData.username,
-        profile_picture: authData.profilePicture,
-        token_expiry: authData.tokenExpiry instanceof Date ? authData.tokenExpiry.toISOString() : authData.tokenExpiry,
-        page_id: authData.pageId,
-        page_name: authData.pageName
-      };
+        instagramAccountId: authData.instagramAccountId,
+        accessToken: authData.accessToken,
+        username: authData.username,
+        profilePicture: authData.profilePicture,
+        tokenExpiry: authData.tokenExpiry,
+        pageId: authData.pageId,
+        pageName: authData.pageName
+      });
       
-      console.log('Atualizando cliente diretamente com dados:', updateData);
+      console.log('Atualizando cliente com dados convertidos:', updateData);
       
-      // Atualizar diretamente no banco de dados para garantir que os campos corretos sejam atualizados
+      // Atualizar no banco de dados usando os campos mapeados corretamente
       const { data, error } = await supabase
         .from('clients')
         .update(updateData)
@@ -294,31 +295,19 @@ export const clientService = {
     try {
       console.log('Removendo dados de autenticação do Instagram para o cliente:', clientId);
       
-      // Buscar o cliente existente
-      const { data: existingClient, error: fetchError } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', clientId)
-        .single();
-        
-      if (fetchError) {
-        console.error('Erro ao buscar cliente existente:', fetchError);
-        throw new Error(`Não foi possível buscar o cliente: ${fetchError.message}`);
-      }
-      
-      // Preparar os dados para atualização (remover campos relacionados ao Instagram)
-      const updateData = {
+      // Usar o convertToDbFormat para garantir que os campos sejam mapeados corretamente
+      const updateData = convertToDbFormat({
         id: clientId,
-        instagram_account_id: null,
-        access_token: null,
-        instagram_username: null,
-        profile_picture: null,
-        token_expiry: null,
-        page_id: null,
-        page_name: null
-      };
+        instagramAccountId: null,
+        accessToken: null,
+        username: null,
+        profilePicture: null,
+        tokenExpiry: null,
+        pageId: null,
+        pageName: null
+      });
       
-      // Atualizar diretamente no banco de dados
+      // Atualizar diretamente no banco de dados usando os campos mapeados corretamente
       const { data, error } = await supabase
         .from('clients')
         .update(updateData)
