@@ -15,7 +15,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Mapeamento específico para corrigir erros de ortografia ou discrepâncias
 const columnMapping: Record<string, string> = {
-  'accessToken': 'access_token', // Corrigido: acess_token -> access_token
+  'accessToken': 'access_token',
   'logoUrl': 'logo_url',
   'userId': 'user_id',
   'appId': 'app_id',
@@ -26,7 +26,7 @@ const columnMapping: Record<string, string> = {
   'tokenExpiry': 'token_expiry',
   'pageId': 'page_id',
   'pageName': 'page_name',
-  'username': 'instagram_username'
+  'username': 'instagram_username' // Mapeamento para o campo instagram_username
 };
 
 // Função para converter camelCase para snake_case com mapeamento específico
@@ -137,7 +137,7 @@ export const clientService = {
   },
   
   // Atualizar um cliente existente
-  async updateClient(client: Client): Promise<Client> {
+  async updateClient(client: Partial<Client> & { id: string }): Promise<Client> {
     try {
       // Remover campos vazios para evitar problemas de validação
       const filteredClient = Object.fromEntries(
@@ -187,20 +187,35 @@ export const clientService = {
     try {
       console.log('Salvando dados de autenticação do Instagram para o cliente:', clientId);
       
-      // Preparar os dados para atualização
-      const updateData = {
-        id: clientId,
+      // Primeiro, buscar o cliente existente
+      const { data: existingClient, error: fetchError } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', clientId)
+        .single();
+        
+      if (fetchError) {
+        console.error('Erro ao buscar cliente existente:', fetchError);
+        throw new Error(`Não foi possível buscar o cliente: ${fetchError.message}`);
+      }
+      
+      // Converter o cliente do formato do banco para o formato da aplicação
+      const client = convertFromDbFormat(existingClient) as Client;
+      
+      // Mesclar os dados de autenticação com o cliente existente
+      const updatedClient = {
+        ...client,
         instagramAccountId: authData.instagramAccountId,
         accessToken: authData.accessToken,
-        username: authData.username,
+        username: authData.username, // Isso será mapeado para instagram_username
         profilePicture: authData.profilePicture,
         tokenExpiry: authData.tokenExpiry,
         pageId: authData.pageId,
         pageName: authData.pageName
       };
       
-      // Atualizar o cliente com os dados de autenticação do Instagram
-      return await this.updateClient(updateData as Client);
+      // Atualizar o cliente com os dados mesclados
+      return await this.updateClient(updatedClient);
     } catch (err) {
       console.error('Erro ao salvar dados de autenticação do Instagram:', err);
       throw new Error('Não foi possível salvar os dados de autenticação do Instagram');
@@ -235,20 +250,35 @@ export const clientService = {
     try {
       console.log('Removendo dados de autenticação do Instagram para o cliente:', clientId);
       
-      // Preparar os dados para atualização (remover campos relacionados ao Instagram)
-      const updateData = {
-        id: clientId,
+      // Buscar o cliente existente
+      const { data: existingClient, error: fetchError } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', clientId)
+        .single();
+        
+      if (fetchError) {
+        console.error('Erro ao buscar cliente existente:', fetchError);
+        throw new Error(`Não foi possível buscar o cliente: ${fetchError.message}`);
+      }
+      
+      // Converter o cliente do formato do banco para o formato da aplicação
+      const client = convertFromDbFormat(existingClient) as Client;
+      
+      // Criar uma versão atualizada do cliente sem os dados de autenticação
+      const updatedClient = {
+        ...client,
         instagramAccountId: null,
         accessToken: null,
-        username: null,
+        username: client.instagram, // Manter o nome de usuário original
         profilePicture: null,
         tokenExpiry: null,
         pageId: null,
         pageName: null
       };
       
-      // Atualizar o cliente removendo os dados de autenticação do Instagram
-      return await this.updateClient(updateData as unknown as Client);
+      // Atualizar o cliente removendo os dados de autenticação
+      return await this.updateClient(updatedClient);
     } catch (err) {
       console.error('Erro ao remover dados de autenticação do Instagram:', err);
       throw new Error('Não foi possível remover os dados de autenticação do Instagram');

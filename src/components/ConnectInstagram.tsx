@@ -62,18 +62,23 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         addDebug(`Verificando dados de autenticação para o cliente ${client.id}`);
         
         // Verificar se o cliente já tem dados de autenticação do Instagram
+        // Importante: verificar instagramAccountId e accessToken
         if (
           client.instagramAccountId && 
-          client.accessToken && 
-          client.username
+          client.accessToken
         ) {
-          addDebug(`Cliente tem dados de autenticação: @${client.username}, ID: ${client.instagramAccountId}`);
+          addDebug(`Cliente tem dados de autenticação: ID: ${client.instagramAccountId}`);
+          
+          // Determinar o nome de usuário - pode estar em client.username ou client.instagram
+          const username = client.username || client.instagram;
+          
+          addDebug(`Nome de usuário encontrado: @${username}`);
           
           // Criar objeto com os dados de autenticação
           const authData: InstagramAuthData = {
             instagramAccountId: client.instagramAccountId,
             accessToken: client.accessToken,
-            username: client.username,
+            username: username,
             profilePicture: client.profilePicture || '',
             tokenExpiry: client.tokenExpiry || new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000), // 10 anos se não tiver data
             pageId: client.pageId || '',
@@ -87,6 +92,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
           verifyTokenValidity(authData.accessToken);
         } else {
           addDebug('Cliente não tem dados de autenticação do Instagram');
+          addDebug(`Valores encontrados: instagramAccountId=${client.instagramAccountId}, accessToken=${client.accessToken ? 'presente' : 'ausente'}`);
         }
       } catch (err: any) {
         console.error('Erro ao verificar autenticação do Instagram:', err);
@@ -320,8 +326,9 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         
         // Salvar dados no Supabase
         addDebug('Salvando dados no Supabase...');
-        await clientService.saveInstagramAuth(client.id, authData);
+        const updatedClient = await clientService.saveInstagramAuth(client.id, authData);
         addDebug('Dados salvos no Supabase com sucesso');
+        addDebug(`Cliente atualizado: ${JSON.stringify(updatedClient)}`);
         
         // Limpar dados temporários
         localStorage.removeItem('instagram_auth_temp_data');
