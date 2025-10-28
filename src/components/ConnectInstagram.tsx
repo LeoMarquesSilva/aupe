@@ -39,17 +39,35 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
   const [verifying, setVerifying] = useState<boolean>(false);
   const [tokenInfo, setTokenInfo] = useState<any>(null);
   const [showTokenInfo, setShowTokenInfo] = useState<boolean>(false);
+  const [debugMode, setDebugMode] = useState<boolean>(false);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
 
   // Constantes para autenticação
   const META_APP_ID = '1087259016929287';
   const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873';
+
+  // Função para adicionar logs de debug
+  const addDebug = (message: string) => {
+    const timestamp = new Date().toTimeString().split(' ')[0];
+    const logMessage = `${timestamp}: ${message}`;
+    console.log(logMessage);
+    setDebugLog(prev => [...prev, logMessage]);
+  };
 
   // Verificar se já existe uma conexão salva para este cliente
   useEffect(() => {
     const savedData = localStorage.getItem(`instagram_connection_${client.id}`);
     if (savedData) {
       try {
+        addDebug(`Carregando dados salvos para o cliente ${client.id}`);
         const parsedData = JSON.parse(savedData) as InstagramAuthData;
+        
+        // Garantir que a data de expiração seja um objeto Date
+        if (typeof parsedData.tokenExpiry === 'string') {
+          parsedData.tokenExpiry = new Date(parsedData.tokenExpiry);
+        }
+        
+        addDebug(`Dados carregados: @${parsedData.username}, ID: ${parsedData.instagramAccountId}`);
         setInstagramData(parsedData);
         setConnected(true);
         
@@ -57,8 +75,11 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         verifyTokenValidity(parsedData.accessToken);
       } catch (err) {
         console.error('Erro ao carregar dados de conexão salvos:', err);
+        addDebug(`Erro ao carregar dados salvos: ${err}`);
         localStorage.removeItem(`instagram_connection_${client.id}`);
       }
+    } else {
+      addDebug(`Nenhum dado salvo encontrado para o cliente ${client.id}`);
     }
   }, [client.id]);
 
@@ -68,8 +89,10 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     setError(null);
     
     try {
+      addDebug('Iniciando verificação do token...');
+      
       // Verificar token diretamente com a API do Facebook
-      // Não depender de um endpoint intermediário que pode não estar disponível
+      addDebug('Chamando API debug_token do Facebook...');
       const response = await axios.get('https://graph.facebook.com/debug_token', {
         params: {
           input_token: token,
@@ -78,12 +101,13 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       });
       
       const tokenData = response.data.data;
-      console.log('Dados do token:', tokenData);
+      addDebug(`Token válido: ${tokenData.is_valid}, Tipo: ${tokenData.type}`);
       
       // Salvar informações do token para exibição
       setTokenInfo(tokenData);
       
       if (!tokenData.is_valid) {
+        addDebug('Token inválido, solicitando reconexão');
         setError('O token de acesso não é mais válido. Por favor, reconecte sua conta.');
         setConnected(false);
         localStorage.removeItem(`instagram_connection_${client.id}`);
@@ -94,37 +118,91 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       
       // Verificar se o token é do tipo esperado (PAGE)
       if (tokenData.type !== 'PAGE') {
-        console.warn('O token não é do tipo PAGE, pode expirar:', tokenData.type);
+        addDebug(`Aviso: Token não é do tipo PAGE, é do tipo ${tokenData.type}`);
       }
       
       // Verificar se o token tem data de expiração
       if (tokenData.expires_at) {
         const expiryDate = new Date(tokenData.expires_at * 1000);
+        addDebug(`Token expira em: ${expiryDate.toLocaleString()}`);
+        
         const now = new Date();
         
         // Se o token expira em menos de 7 dias, mostrar aviso
         if (expiryDate.getTime() - now.getTime() < 7 * 24 * 60 * 60 * 1000) {
           setError(`O token expirará em ${Math.ceil((expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))} dias. Recomendamos reconectar sua conta.`);
         }
+      } else {
+        addDebug('Token não tem data de expiração (não expira automaticamente)');
       }
       
       // Testar o token fazendo uma chamada simples
-      try {
-        if (instagramData?.instagramAccountId) {
+      if (instagramData?.instagramAccountId) {
+        try {
+          addDebug(`Testando token com chamada para a conta ${instagramData.instagramAccountId}...`);
           const testResponse = await axios.get(`https://graph.facebook.com/v21.0/${instagramData.instagramAccountId}`, {
             params: {
               access_token: token,
               fields: 'username'
             }
           });
-          console.log('Teste do token bem-sucedido:', testResponse.data);
+          addDebug(`Teste bem-sucedido: @${testResponse.data.username}`);
+        } catch (testError: any) {
+          addDebug(`Erro no teste prático: ${testError.message}`);
+          console.error('Erro ao testar token:', testError);
+          
+          // Tentar uma abordagem diferente - buscar as páginas do Facebook
+          try {
+            addDebug('Tentando abordagem alternativa: buscar páginas do Facebook...');
+            const pagesResponse = await axios.get('https://graph.facebook.com/v21.0/me/accounts', {
+              params: {
+                access_token: token,
+                fields: 'instagram_business_account,name,id'
+              }
+            });
+            
+            const pages = pagesResponse.data.data || [];
+            addDebug(`Páginas encontradas: ${pages.length}`);
+            
+            // Encontrar a página com a conta do Instagram
+            const pageWithInstagram = pages.find((page: any) => 
+              page.instagram_business_account && 
+              page.instagram_business_account.id === instagramData.instagramAccountId
+            );
+            
+            if (pageWithInstagram) {
+              addDebug(`Página encontrada: ${pageWithInstagram.name}`);
+              // Atualizar o token se necessário
+              if (pageWithInstagram.access_token !== token) {
+                addDebug('Atualizando token com o novo token da página');
+                
+                // Atualizar os dados salvos
+                const updatedData = {
+                  ...instagramData,
+                  accessToken: pageWithInstagram.access_token
+                };
+                
+                localStorage.setItem(`instagram_connection_${client.id}`, JSON.stringify(updatedData));
+                setInstagramData(updatedData);
+                onConnectionUpdate(client.id, updatedData);
+                
+                addDebug('Token atualizado com sucesso');
+              }
+            } else {
+              throw new Error('Página com Instagram não encontrada');
+            }
+          } catch (alternativeError: any) {
+            addDebug(`Abordagem alternativa falhou: ${alternativeError.message}`);
+            setError('O token parece ser válido, mas falhou em um teste prático. Recomendamos reconectar sua conta.');
+          }
         }
-      } catch (testError) {
-        console.error('Erro ao testar token:', testError);
-        setError('O token parece ser válido, mas falhou em um teste prático. Recomendamos reconectar sua conta.');
+      } else {
+        addDebug('ID da conta do Instagram não disponível, não é possível fazer o teste prático');
+        setError('Dados da conta do Instagram incompletos. Recomendamos reconectar sua conta.');
       }
     } catch (err: any) {
       console.error('Erro ao verificar token:', err);
+      addDebug(`Erro na verificação do token: ${err.message}`);
       setError('Não foi possível verificar o token. Por favor, reconecte sua conta.');
       setConnected(false);
       localStorage.removeItem(`instagram_connection_${client.id}`);
@@ -139,10 +217,13 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
   const handleConnect = async () => {
     setLoading(true);
     setError(null);
+    setDebugLog([]);
+    addDebug('Iniciando processo de conexão...');
     
     try {
       // Obter a URL de autorização diretamente
       const authUrl = getAuthorizationUrl();
+      addDebug(`URL de autorização gerada: ${authUrl.substring(0, 50)}...`);
       
       // Abrir popup para autenticação
       const width = 600;
@@ -156,16 +237,25 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         `width=${width},height=${height},top=${top},left=${left}`
       );
       
+      if (!popup) {
+        throw new Error('Não foi possível abrir a janela de autenticação. Verifique se os popups estão permitidos.');
+      }
+      
+      addDebug('Janela de autenticação aberta');
+      
       // Monitorar quando o popup fechar
       const checkPopup = setInterval(() => {
         if (!popup || popup.closed) {
           clearInterval(checkPopup);
+          addDebug('Janela de autenticação fechada');
           handlePopupClosed();
         }
       }, 500);
     } catch (err: any) {
       setLoading(false);
-      setError(err.message || 'Erro ao iniciar processo de conexão');
+      const errorMessage = err.message || 'Erro ao iniciar processo de conexão';
+      setError(errorMessage);
+      addDebug(`Erro: ${errorMessage}`);
       console.error('Erro ao conectar Instagram:', err);
     }
   };
@@ -173,14 +263,25 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
   // Função chamada quando o popup é fechado
   const handlePopupClosed = async () => {
     try {
+      addDebug('Processando resultado da autenticação...');
+      
       // Verificar se temos os dados no localStorage (serão salvos pelo callback)
       const savedData = localStorage.getItem(`instagram_auth_temp_data`);
       
       if (savedData) {
+        addDebug('Dados temporários de autenticação encontrados');
         const authData = JSON.parse(savedData) as InstagramAuthData;
+        
+        // Garantir que a data de expiração seja um objeto Date
+        if (typeof authData.tokenExpiry === 'string') {
+          authData.tokenExpiry = new Date(authData.tokenExpiry);
+        }
+        
+        addDebug(`Dados obtidos: @${authData.username}, ID: ${authData.instagramAccountId}`);
         
         // Salvar dados específicos para este cliente
         localStorage.setItem(`instagram_connection_${client.id}`, savedData);
+        addDebug(`Dados salvos para o cliente ${client.id}`);
         
         // Limpar dados temporários
         localStorage.removeItem('instagram_auth_temp_data');
@@ -191,18 +292,22 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         
         // Notificar componente pai
         onConnectionUpdate(client.id, authData);
+        addDebug('Componente pai notificado sobre a conexão');
       } else {
         // Verificar se houve erro
         const errorData = localStorage.getItem('instagram_auth_error');
         if (errorData) {
+          addDebug(`Erro encontrado: ${errorData}`);
           setError(errorData);
           localStorage.removeItem('instagram_auth_error');
         } else {
+          addDebug('Nenhum dado ou erro encontrado, conexão cancelada ou falhou');
           setError('A conexão foi cancelada ou falhou');
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao processar dados de autenticação:', err);
+      addDebug(`Erro ao processar dados: ${err.message}`);
       setError('Erro ao processar dados de autenticação');
     } finally {
       setLoading(false);
@@ -211,10 +316,12 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
 
   // Função para desconectar a conta
   const handleDisconnect = () => {
+    addDebug('Desconectando conta...');
     localStorage.removeItem(`instagram_connection_${client.id}`);
     setConnected(false);
     setInstagramData(null);
     onConnectionUpdate(client.id, null);
+    addDebug('Conta desconectada');
   };
 
   // Renderizar botão de conexão ou informações da conta conectada
@@ -323,6 +430,40 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
             </Tooltip>
           </Box>
         </Paper>
+      )}
+      
+      {/* Botão para ativar/desativar modo de debug */}
+      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+        <Button 
+          size="small" 
+          variant="text" 
+          color="inherit" 
+          onClick={() => setDebugMode(!debugMode)}
+          sx={{ fontSize: '0.75rem', color: 'text.secondary' }}
+        >
+          {debugMode ? 'Ocultar logs' : 'Mostrar logs'}
+        </Button>
+      </Box>
+      
+      {/* Logs de debug */}
+      {debugMode && debugLog.length > 0 && (
+        <Box sx={{ mt: 1, p: 2, bgcolor: 'rgba(0,0,0,0.03)', borderRadius: 1 }}>
+          <Typography variant="caption" sx={{ fontWeight: 500 }}>Logs de debug:</Typography>
+          <Box 
+            sx={{ 
+              mt: 1, 
+              maxHeight: 200, 
+              overflowY: 'auto', 
+              fontFamily: 'monospace', 
+              fontSize: '0.75rem',
+              whiteSpace: 'pre-wrap'
+            }}
+          >
+            {debugLog.map((log, index) => (
+              <div key={index}>{log}</div>
+            ))}
+          </Box>
+        </Box>
       )}
       
       {/* Dialog para mostrar informações do token */}
