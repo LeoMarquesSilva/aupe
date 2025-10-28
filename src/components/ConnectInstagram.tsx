@@ -20,12 +20,14 @@ import {
   Refresh as RefreshIcon,
   LinkOff as LinkOffIcon,
   CheckCircle as CheckCircleIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  BugReport as BugReportIcon
 } from '@mui/icons-material';
 import { getAuthorizationUrl, InstagramAuthData } from '../services/instagramAuthService';
 import { clientService } from '../services/supabaseClient';
 import { Client } from '../types';
 import axios from 'axios';
+import { supabase } from '../services/supabaseClient';
 
 interface ConnectInstagramProps {
   client: Client;
@@ -42,6 +44,8 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
   const [showTokenInfo, setShowTokenInfo] = useState<boolean>(false);
   const [debugMode, setDebugMode] = useState<boolean>(true); // Modo debug ativado por padrão
   const [debugLog, setDebugLog] = useState<string[]>([]);
+  const [debugData, setDebugData] = useState<any>(null);
+  const [showDebugInfo, setShowDebugInfo] = useState<boolean>(false);
 
   // Constantes para autenticação
   const META_APP_ID = '1087259016929287';
@@ -55,11 +59,57 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     setDebugLog(prev => [...prev, logMessage]);
   };
 
+  // Função para depurar os dados do cliente diretamente do Supabase
+  const debugClientData = async () => {
+    try {
+      addDebug(`Depurando dados do cliente ${client.id} diretamente do Supabase...`);
+      
+      // Buscar o cliente diretamente do Supabase
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', client.id)
+        .single();
+        
+      if (error) {
+        addDebug(`Erro ao buscar cliente: ${error.message}`);
+        return;
+      }
+      
+      // Mostrar os dados brutos do banco de dados
+      addDebug(`Dados brutos do banco de dados: ${JSON.stringify(data)}`);
+      
+      // Verificar se os campos específicos do Instagram existem
+      const instagramFields = {
+        instagram_account_id: data.instagram_account_id || null,
+        access_token: data.access_token ? 'presente' : null,
+        instagram_username: data.instagram_username || null,
+        profile_picture: data.profile_picture || null,
+        token_expiry: data.token_expiry || null,
+        page_id: data.page_id || null,
+        page_name: data.page_name || null
+      };
+      
+      addDebug(`Campos específicos do Instagram: ${JSON.stringify(instagramFields)}`);
+      
+      // Salvar dados para exibição
+      setDebugData({
+        rawData: data,
+        instagramFields
+      });
+      
+      setShowDebugInfo(true);
+    } catch (err: any) {
+      addDebug(`Erro ao depurar dados: ${err.message}`);
+    }
+  };
+
   // Verificar se o cliente já tem dados de autenticação do Instagram
   useEffect(() => {
     const checkInstagramAuth = async () => {
       try {
         addDebug(`Verificando dados de autenticação para o cliente ${client.id}`);
+        addDebug(`Dados do cliente recebidos: ${JSON.stringify(client)}`);
         
         // Verificar se o cliente já tem dados de autenticação do Instagram
         // Importante: verificar instagramAccountId e accessToken
@@ -93,6 +143,9 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         } else {
           addDebug('Cliente não tem dados de autenticação do Instagram');
           addDebug(`Valores encontrados: instagramAccountId=${client.instagramAccountId}, accessToken=${client.accessToken ? 'presente' : 'ausente'}`);
+          
+          // Depurar os dados do cliente diretamente do Supabase
+          await debugClientData();
         }
       } catch (err: any) {
         console.error('Erro ao verificar autenticação do Instagram:', err);
@@ -212,12 +265,17 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         addDebug('Atualizando dados no Supabase com informações mais recentes');
         
         // Salvar dados no Supabase
-        await clientService.saveInstagramAuth(client.id, updatedData);
+        const updatedClient = await clientService.saveInstagramAuth(client.id, updatedData);
+        
+        addDebug(`Cliente atualizado: ${JSON.stringify(updatedClient)}`);
         
         setInstagramData(updatedData);
         onConnectionUpdate(client.id, updatedData);
         
         addDebug('Dados atualizados com sucesso no Supabase');
+        
+        // Depurar os dados do cliente após a atualização
+        await debugClientData();
       } catch (fetchError: any) {
         addDebug(`Erro ao buscar dados atualizados: ${fetchError.message}`);
         
@@ -340,6 +398,9 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         // Notificar componente pai
         onConnectionUpdate(client.id, authData);
         addDebug('Componente pai notificado sobre a conexão');
+        
+        // Depurar os dados do cliente após a atualização
+        await debugClientData();
       } else {
         // Verificar se houve erro
         const errorData = localStorage.getItem('instagram_auth_error');
@@ -391,31 +452,43 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       )}
       
       {!connected ? (
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<InstagramIcon />}
-          onClick={handleConnect}
-          disabled={loading}
-          sx={{ 
-            bgcolor: '#E1306C',
-            '&:hover': {
-              bgcolor: '#C13584'
-            },
-            borderRadius: 2,
-            px: 3,
-            py: 1.2
-          }}
-        >
-          {loading ? (
-            <>
-              <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
-              Conectando...
-            </>
-          ) : (
-            'Conectar Instagram'
-          )}
-        </Button>
+        <Box>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<InstagramIcon />}
+            onClick={handleConnect}
+            disabled={loading}
+            sx={{ 
+              bgcolor: '#E1306C',
+              '&:hover': {
+                bgcolor: '#C13584'
+              },
+              borderRadius: 2,
+              px: 3,
+              py: 1.2
+            }}
+          >
+            {loading ? (
+              <>
+                <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
+                Conectando...
+              </>
+            ) : (
+              'Conectar Instagram'
+            )}
+          </Button>
+          
+          <Button
+            variant="text"
+            color="inherit"
+            startIcon={<BugReportIcon />}
+            onClick={debugClientData}
+            sx={{ ml: 2, fontSize: '0.8rem' }}
+          >
+            Depurar Dados
+          </Button>
+        </Box>
       ) : (
         <Paper
           elevation={0}
@@ -457,6 +530,15 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
           </Box>
           
           <Box>
+            <Tooltip title="Depurar Dados">
+              <IconButton 
+                size="small" 
+                onClick={debugClientData}
+                sx={{ mr: 1 }}
+              >
+                <BugReportIcon />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="Informações do token">
               <IconButton 
                 size="small" 
@@ -573,6 +655,58 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
             color="primary" 
             onClick={() => {
               setShowTokenInfo(false);
+              handleConnect();
+            }}
+          >
+            Reconectar
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Dialog para mostrar informações de debug */}
+      <Dialog open={showDebugInfo} onClose={() => setShowDebugInfo(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Informações de Debug</DialogTitle>
+        <DialogContent>
+          {debugData ? (
+            <Box sx={{ fontFamily: 'monospace', fontSize: '0.9rem' }}>
+              <Typography variant="subtitle2" sx={{ mt: 1 }}>Dados brutos do Supabase:</Typography>
+              <Box sx={{ 
+                mt: 1, 
+                p: 2, 
+                bgcolor: 'rgba(0,0,0,0.03)', 
+                borderRadius: 1,
+                maxHeight: 300,
+                overflowY: 'auto'
+              }}>
+                <pre>{JSON.stringify(debugData.rawData, null, 2)}</pre>
+              </Box>
+              
+              <Typography variant="subtitle2" sx={{ mt: 2 }}>Campos específicos do Instagram:</Typography>
+              <Box sx={{ 
+                mt: 1, 
+                p: 2, 
+                bgcolor: 'rgba(0,0,0,0.03)', 
+                borderRadius: 1
+              }}>
+                <pre>{JSON.stringify(debugData.instagramFields, null, 2)}</pre>
+              </Box>
+              
+              <Alert severity="info" sx={{ mt: 2 }}>
+                Se o campo instagram_account_id estiver vazio ou nulo no banco de dados, os dados não estão sendo salvos corretamente.
+                Verifique se o mapeamento de colunas está correto e se a função saveInstagramAuth está funcionando corretamente.
+              </Alert>
+            </Box>
+          ) : (
+            <Typography>Nenhuma informação disponível</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDebugInfo(false)}>Fechar</Button>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={() => {
+              setShowDebugInfo(false);
               handleConnect();
             }}
           >
