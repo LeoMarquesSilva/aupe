@@ -39,7 +39,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
   const [verifying, setVerifying] = useState<boolean>(false);
   const [tokenInfo, setTokenInfo] = useState<any>(null);
   const [showTokenInfo, setShowTokenInfo] = useState<boolean>(false);
-  const [debugMode, setDebugMode] = useState<boolean>(false);
+  const [debugMode, setDebugMode] = useState<boolean>(true); // Modo debug ativado por padrão
   const [debugLog, setDebugLog] = useState<string[]>([]);
 
   // Constantes para autenticação
@@ -60,7 +60,15 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     if (savedData) {
       try {
         addDebug(`Carregando dados salvos para o cliente ${client.id}`);
-        const parsedData = JSON.parse(savedData) as InstagramAuthData;
+        const parsedData = JSON.parse(savedData);
+        
+        addDebug(`Dados brutos: ${JSON.stringify(parsedData)}`);
+        
+        // Garantir que todos os campos necessários existam
+        if (!parsedData.instagramAccountId) {
+          addDebug('ERRO: ID da conta do Instagram não encontrado nos dados salvos');
+          throw new Error('Dados da conta do Instagram incompletos');
+        }
         
         // Garantir que a data de expiração seja um objeto Date
         if (typeof parsedData.tokenExpiry === 'string') {
@@ -136,69 +144,73 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         addDebug('Token não tem data de expiração (não expira automaticamente)');
       }
       
-      // Testar o token fazendo uma chamada simples
-      if (instagramData?.instagramAccountId) {
-        try {
-          addDebug(`Testando token com chamada para a conta ${instagramData.instagramAccountId}...`);
-          const testResponse = await axios.get(`https://graph.facebook.com/v21.0/${instagramData.instagramAccountId}`, {
-            params: {
-              access_token: token,
-              fields: 'username'
-            }
-          });
-          addDebug(`Teste bem-sucedido: @${testResponse.data.username}`);
-        } catch (testError: any) {
-          addDebug(`Erro no teste prático: ${testError.message}`);
-          console.error('Erro ao testar token:', testError);
-          
-          // Tentar uma abordagem diferente - buscar as páginas do Facebook
-          try {
-            addDebug('Tentando abordagem alternativa: buscar páginas do Facebook...');
-            const pagesResponse = await axios.get('https://graph.facebook.com/v21.0/me/accounts', {
-              params: {
-                access_token: token,
-                fields: 'instagram_business_account,name,id'
-              }
-            });
-            
-            const pages = pagesResponse.data.data || [];
-            addDebug(`Páginas encontradas: ${pages.length}`);
-            
-            // Encontrar a página com a conta do Instagram
-            const pageWithInstagram = pages.find((page: any) => 
-              page.instagram_business_account && 
-              page.instagram_business_account.id === instagramData.instagramAccountId
-            );
-            
-            if (pageWithInstagram) {
-              addDebug(`Página encontrada: ${pageWithInstagram.name}`);
-              // Atualizar o token se necessário
-              if (pageWithInstagram.access_token !== token) {
-                addDebug('Atualizando token com o novo token da página');
-                
-                // Atualizar os dados salvos
-                const updatedData = {
-                  ...instagramData,
-                  accessToken: pageWithInstagram.access_token
-                };
-                
-                localStorage.setItem(`instagram_connection_${client.id}`, JSON.stringify(updatedData));
-                setInstagramData(updatedData);
-                onConnectionUpdate(client.id, updatedData);
-                
-                addDebug('Token atualizado com sucesso');
-              }
-            } else {
-              throw new Error('Página com Instagram não encontrada');
-            }
-          } catch (alternativeError: any) {
-            addDebug(`Abordagem alternativa falhou: ${alternativeError.message}`);
-            setError('O token parece ser válido, mas falhou em um teste prático. Recomendamos reconectar sua conta.');
+      // Buscar páginas do Facebook para obter o ID da conta do Instagram
+      try {
+        addDebug('Buscando páginas do Facebook para obter dados atualizados...');
+        const pagesResponse = await axios.get('https://graph.facebook.com/v21.0/me/accounts', {
+          params: {
+            access_token: token,
+            fields: 'instagram_business_account,name,id,access_token'
           }
+        });
+        
+        const pages = pagesResponse.data.data || [];
+        addDebug(`Páginas encontradas: ${pages.length}`);
+        
+        if (pages.length === 0) {
+          throw new Error('Nenhuma página do Facebook encontrada');
         }
-      } else {
-        addDebug('ID da conta do Instagram não disponível, não é possível fazer o teste prático');
-        setError('Dados da conta do Instagram incompletos. Recomendamos reconectar sua conta.');
+        
+        // Encontrar a primeira página com uma conta do Instagram vinculada
+        const pageWithInstagram = pages.find((page: any) => page.instagram_business_account);
+        
+        if (!pageWithInstagram) {
+          throw new Error('Nenhuma página com conta do Instagram vinculada encontrada');
+        }
+        
+        addDebug(`Página encontrada: ${pageWithInstagram.name}`);
+        addDebug(`ID da conta do Instagram: ${pageWithInstagram.instagram_business_account.id}`);
+        
+        // Buscar dados da conta do Instagram
+        const instagramAccountId = pageWithInstagram.instagram_business_account.id;
+        const instagramResponse = await axios.get(`https://graph.facebook.com/v21.0/${instagramAccountId}`, {
+          params: {
+            access_token: pageWithInstagram.access_token,
+            fields: 'username,profile_picture_url'
+          }
+        });
+        
+        const instagramData = instagramResponse.data;
+        addDebug(`Dados da conta obtidos: @${instagramData.username}`);
+        
+        // Atualizar os dados salvos
+        const updatedData = {
+          instagramAccountId,
+          accessToken: pageWithInstagram.access_token,
+          username: instagramData.username,
+          profilePicture: instagramData.profile_picture_url,
+          tokenExpiry: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000), // 10 anos
+          pageId: pageWithInstagram.id,
+          pageName: pageWithInstagram.name
+        };
+        
+        addDebug('Atualizando dados com informações mais recentes');
+        localStorage.setItem(`instagram_connection_${client.id}`, JSON.stringify(updatedData));
+        setInstagramData(updatedData);
+        onConnectionUpdate(client.id, updatedData);
+        
+        addDebug('Dados atualizados com sucesso');
+      } catch (fetchError: any) {
+        addDebug(`Erro ao buscar dados atualizados: ${fetchError.message}`);
+        
+        // Se não conseguirmos atualizar os dados, mas o token é válido,
+        // não desconectamos a conta, apenas mostramos um aviso
+        if (instagramData) {
+          setError('Não foi possível atualizar os dados da conta. Recomendamos reconectar sua conta.');
+        } else {
+          setError('Não foi possível obter os dados da conta. Por favor, reconecte sua conta.');
+          setConnected(false);
+        }
       }
     } catch (err: any) {
       console.error('Erro ao verificar token:', err);
@@ -270,7 +282,15 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       
       if (savedData) {
         addDebug('Dados temporários de autenticação encontrados');
-        const authData = JSON.parse(savedData) as InstagramAuthData;
+        const authData = JSON.parse(savedData);
+        
+        addDebug(`Dados brutos: ${JSON.stringify(authData)}`);
+        
+        // Garantir que todos os campos necessários existam
+        if (!authData.instagramAccountId) {
+          addDebug('ERRO: ID da conta do Instagram não encontrado nos dados temporários');
+          throw new Error('Dados da conta do Instagram incompletos');
+        }
         
         // Garantir que a data de expiração seja um objeto Date
         if (typeof authData.tokenExpiry === 'string') {
