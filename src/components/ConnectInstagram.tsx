@@ -28,6 +28,7 @@ import { clientService } from '../services/supabaseClient';
 import { Client } from '../types';
 import axios from 'axios';
 import { supabase } from '../services/supabaseClient';
+import InstagramConnectionFix from './InstagramConnectionFix';
 
 interface ConnectInstagramProps {
   client: Client;
@@ -46,6 +47,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
   const [debugLog, setDebugLog] = useState<string[]>([]);
   const [debugData, setDebugData] = useState<any>(null);
   const [showDebugInfo, setShowDebugInfo] = useState<boolean>(false);
+  const [needsFix, setNeedsFix] = useState<boolean>(false);
 
   // Constantes para autenticação
   const META_APP_ID = '1087259016929287';
@@ -111,6 +113,17 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         addDebug(`Verificando dados de autenticação para o cliente ${client.id}`);
         addDebug(`Dados do cliente recebidos: ${JSON.stringify(client)}`);
         
+        // Verificar se o cliente tem token mas faltam outros dados
+        if (
+          client.accessToken && 
+          (!client.instagramAccountId || !client.username || !client.pageId)
+        ) {
+          addDebug('Cliente tem token mas falta dados importantes. Recomendando correção.');
+          setNeedsFix(true);
+        } else {
+          setNeedsFix(false);
+        }
+        
         // Verificar se o cliente já tem dados de autenticação do Instagram
         // Importante: verificar instagramAccountId e accessToken
         if (
@@ -155,6 +168,28 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     
     checkInstagramAuth();
   }, [client]);
+
+  // Função para lidar com a correção da conexão
+  const handleConnectionFixed = (updatedClient: any) => {
+    setNeedsFix(false);
+    
+    // Converter os dados do cliente para o formato esperado pelo InstagramAuthData
+    const authData: InstagramAuthData = {
+      instagramAccountId: updatedClient.instagram_account_id,
+      accessToken: updatedClient.access_token,
+      username: updatedClient.instagram_username,
+      profilePicture: updatedClient.profile_picture,
+      tokenExpiry: updatedClient.token_expiry ? new Date(updatedClient.token_expiry) : new Date(),
+      pageId: updatedClient.page_id,
+      pageName: updatedClient.page_name
+    };
+    
+    setInstagramData(authData);
+    setConnected(true);
+    onConnectionUpdate(client.id, authData);
+    
+    addDebug('Conexão corrigida com sucesso');
+  };
 
   // Função para verificar se o token ainda é válido
   const verifyTokenValidity = async (token: string) => {
@@ -449,6 +484,15 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
+      )}
+      
+      {needsFix && (
+        <Box sx={{ mt: 2, mb: 2 }}>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            Detectamos que sua conta tem um token de acesso, mas faltam informações importantes para fazer postagens.
+          </Alert>
+          <InstagramConnectionFix client={client} onConnectionFixed={handleConnectionFixed} />
+        </Box>
       )}
       
       {!connected ? (
