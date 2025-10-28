@@ -1,11 +1,19 @@
+// No arquivo types.ts ou onde estiver definida a interface Client
 export interface Client {
   id: string;
   name: string;
   instagram: string;
   logoUrl?: string;
-  appId?: string;
   accessToken?: string;
   userId?: string;
+  appId?: string;
+  // Novos campos para autenticação do Instagram
+  instagramAccountId?: string;
+  username?: string; // Pode ser redundante com instagram
+  profilePicture?: string;
+  tokenExpiry?: Date;
+  pageId?: string;
+  pageName?: string;
 }
 
 export interface Post {

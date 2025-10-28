@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Client } from '../types';
+import { InstagramAuthData } from '../services/instagramAuthService';
 
 // Usar variáveis de ambiente para as credenciais do Supabase
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -19,7 +20,13 @@ const columnMapping: Record<string, string> = {
   'userId': 'user_id',
   'appId': 'app_id',
   'clientId': 'client_id',
-  'scheduledDate': 'scheduled_date'
+  'scheduledDate': 'scheduled_date',
+  'instagramAccountId': 'instagram_account_id',
+  'profilePicture': 'profile_picture',
+  'tokenExpiry': 'token_expiry',
+  'pageId': 'page_id',
+  'pageName': 'page_name',
+  'username': 'instagram_username'
 };
 
 // Função para converter camelCase para snake_case com mapeamento específico
@@ -30,7 +37,13 @@ const convertToDbFormat = (obj: Record<string, any>) => {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
       // Usar o mapeamento específico se existir, caso contrário usar a conversão padrão
       const dbKey = columnMapping[key] || key.replace(/([A-Z])/g, '_$1').toLowerCase();
-      result[dbKey] = obj[key];
+      
+      // Converter datas para formato ISO string para armazenamento no banco
+      if (obj[key] instanceof Date) {
+        result[dbKey] = obj[key].toISOString();
+      } else {
+        result[dbKey] = obj[key];
+      }
     }
   }
   
@@ -51,7 +64,18 @@ const convertFromDbFormat = (obj: Record<string, any>) => {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
       // Usar o mapeamento reverso se existir, caso contrário usar a conversão padrão
       const jsKey = reverseMapping[key] || key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-      result[jsKey] = obj[key];
+      
+      // Converter strings de data para objetos Date
+      if (key === 'token_expiry' && obj[key]) {
+        try {
+          result[jsKey] = new Date(obj[key]);
+        } catch (e) {
+          console.error('Erro ao converter data:', e);
+          result[jsKey] = obj[key];
+        }
+      } else {
+        result[jsKey] = obj[key];
+      }
     }
   }
   
@@ -123,6 +147,8 @@ export const clientService = {
       // Converter camelCase para snake_case com mapeamento específico
       const clientData = convertToDbFormat(filteredClient);
       
+      console.log('Atualizando cliente com dados:', clientData);
+      
       const { data, error } = await supabase
         .from('clients')
         .update(clientData)
@@ -153,6 +179,79 @@ export const clientService = {
     if (error) {
       console.error('Erro ao excluir cliente:', error);
       throw new Error(`Não foi possível excluir o cliente: ${error.message}`);
+    }
+  },
+  
+  // Salvar dados de autenticação do Instagram para um cliente
+  async saveInstagramAuth(clientId: string, authData: InstagramAuthData): Promise<Client> {
+    try {
+      console.log('Salvando dados de autenticação do Instagram para o cliente:', clientId);
+      
+      // Preparar os dados para atualização
+      const updateData = {
+        id: clientId,
+        instagramAccountId: authData.instagramAccountId,
+        accessToken: authData.accessToken,
+        username: authData.username,
+        profilePicture: authData.profilePicture,
+        tokenExpiry: authData.tokenExpiry,
+        pageId: authData.pageId,
+        pageName: authData.pageName
+      };
+      
+      // Atualizar o cliente com os dados de autenticação do Instagram
+      return await this.updateClient(updateData as Client);
+    } catch (err) {
+      console.error('Erro ao salvar dados de autenticação do Instagram:', err);
+      throw new Error('Não foi possível salvar os dados de autenticação do Instagram');
+    }
+  },
+  
+  // Verificar se o token do Instagram ainda é válido
+  async verifyInstagramToken(accessToken: string): Promise<boolean> {
+    try {
+      // Verificar o token usando a API do Facebook
+      const META_APP_ID = '1087259016929287';
+      const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873';
+      
+      // Fazer uma chamada para a API do Facebook para verificar o token
+      const response = await fetch(`https://graph.facebook.com/debug_token?input_token=${accessToken}&access_token=${META_APP_ID}|${META_APP_SECRET}`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error('Erro ao verificar token:', data);
+        return false;
+      }
+      
+      return data.data?.is_valid || false;
+    } catch (err) {
+      console.error('Erro ao verificar token do Instagram:', err);
+      return false;
+    }
+  },
+  
+  // Remover dados de autenticação do Instagram para um cliente
+  async removeInstagramAuth(clientId: string): Promise<Client> {
+    try {
+      console.log('Removendo dados de autenticação do Instagram para o cliente:', clientId);
+      
+      // Preparar os dados para atualização (remover campos relacionados ao Instagram)
+      const updateData = {
+        id: clientId,
+        instagramAccountId: null,
+        accessToken: null,
+        username: null,
+        profilePicture: null,
+        tokenExpiry: null,
+        pageId: null,
+        pageName: null
+      };
+      
+      // Atualizar o cliente removendo os dados de autenticação do Instagram
+      return await this.updateClient(updateData as unknown as Client);
+    } catch (err) {
+      console.error('Erro ao remover dados de autenticação do Instagram:', err);
+      throw new Error('Não foi possível remover os dados de autenticação do Instagram');
     }
   }
 };

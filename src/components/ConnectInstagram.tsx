@@ -23,6 +23,7 @@ import {
   Info as InfoIcon
 } from '@mui/icons-material';
 import { getAuthorizationUrl, InstagramAuthData } from '../services/instagramAuthService';
+import { clientService } from '../services/supabaseClient';
 import { Client } from '../types';
 import axios from 'axios';
 
@@ -54,42 +55,47 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     setDebugLog(prev => [...prev, logMessage]);
   };
 
-  // Verificar se já existe uma conexão salva para este cliente
+  // Verificar se o cliente já tem dados de autenticação do Instagram
   useEffect(() => {
-    const savedData = localStorage.getItem(`instagram_connection_${client.id}`);
-    if (savedData) {
+    const checkInstagramAuth = async () => {
       try {
-        addDebug(`Carregando dados salvos para o cliente ${client.id}`);
-        const parsedData = JSON.parse(savedData);
+        addDebug(`Verificando dados de autenticação para o cliente ${client.id}`);
         
-        addDebug(`Dados brutos: ${JSON.stringify(parsedData)}`);
-        
-        // Garantir que todos os campos necessários existam
-        if (!parsedData.instagramAccountId) {
-          addDebug('ERRO: ID da conta do Instagram não encontrado nos dados salvos');
-          throw new Error('Dados da conta do Instagram incompletos');
+        // Verificar se o cliente já tem dados de autenticação do Instagram
+        if (
+          client.instagramAccountId && 
+          client.accessToken && 
+          client.username
+        ) {
+          addDebug(`Cliente tem dados de autenticação: @${client.username}, ID: ${client.instagramAccountId}`);
+          
+          // Criar objeto com os dados de autenticação
+          const authData: InstagramAuthData = {
+            instagramAccountId: client.instagramAccountId,
+            accessToken: client.accessToken,
+            username: client.username,
+            profilePicture: client.profilePicture || '',
+            tokenExpiry: client.tokenExpiry || new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000), // 10 anos se não tiver data
+            pageId: client.pageId || '',
+            pageName: client.pageName || ''
+          };
+          
+          setInstagramData(authData);
+          setConnected(true);
+          
+          // Verificar se o token ainda é válido
+          verifyTokenValidity(authData.accessToken);
+        } else {
+          addDebug('Cliente não tem dados de autenticação do Instagram');
         }
-        
-        // Garantir que a data de expiração seja um objeto Date
-        if (typeof parsedData.tokenExpiry === 'string') {
-          parsedData.tokenExpiry = new Date(parsedData.tokenExpiry);
-        }
-        
-        addDebug(`Dados carregados: @${parsedData.username}, ID: ${parsedData.instagramAccountId}`);
-        setInstagramData(parsedData);
-        setConnected(true);
-        
-        // Verificar se o token ainda é válido
-        verifyTokenValidity(parsedData.accessToken);
-      } catch (err) {
-        console.error('Erro ao carregar dados de conexão salvos:', err);
-        addDebug(`Erro ao carregar dados salvos: ${err}`);
-        localStorage.removeItem(`instagram_connection_${client.id}`);
+      } catch (err: any) {
+        console.error('Erro ao verificar autenticação do Instagram:', err);
+        addDebug(`Erro ao verificar autenticação: ${err.message}`);
       }
-    } else {
-      addDebug(`Nenhum dado salvo encontrado para o cliente ${client.id}`);
-    }
-  }, [client.id]);
+    };
+    
+    checkInstagramAuth();
+  }, [client]);
 
   // Função para verificar se o token ainda é válido
   const verifyTokenValidity = async (token: string) => {
@@ -118,7 +124,10 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         addDebug('Token inválido, solicitando reconexão');
         setError('O token de acesso não é mais válido. Por favor, reconecte sua conta.');
         setConnected(false);
-        localStorage.removeItem(`instagram_connection_${client.id}`);
+        
+        // Remover dados de autenticação do Supabase
+        await clientService.removeInstagramAuth(client.id);
+        
         setInstagramData(null);
         onConnectionUpdate(client.id, null);
         return;
@@ -184,7 +193,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         addDebug(`Dados da conta obtidos: @${instagramData.username}`);
         
         // Atualizar os dados salvos
-        const updatedData = {
+        const updatedData: InstagramAuthData = {
           instagramAccountId,
           accessToken: pageWithInstagram.access_token,
           username: instagramData.username,
@@ -194,12 +203,15 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
           pageName: pageWithInstagram.name
         };
         
-        addDebug('Atualizando dados com informações mais recentes');
-        localStorage.setItem(`instagram_connection_${client.id}`, JSON.stringify(updatedData));
+        addDebug('Atualizando dados no Supabase com informações mais recentes');
+        
+        // Salvar dados no Supabase
+        await clientService.saveInstagramAuth(client.id, updatedData);
+        
         setInstagramData(updatedData);
         onConnectionUpdate(client.id, updatedData);
         
-        addDebug('Dados atualizados com sucesso');
+        addDebug('Dados atualizados com sucesso no Supabase');
       } catch (fetchError: any) {
         addDebug(`Erro ao buscar dados atualizados: ${fetchError.message}`);
         
@@ -217,7 +229,10 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       addDebug(`Erro na verificação do token: ${err.message}`);
       setError('Não foi possível verificar o token. Por favor, reconecte sua conta.');
       setConnected(false);
-      localStorage.removeItem(`instagram_connection_${client.id}`);
+      
+      // Remover dados de autenticação do Supabase
+      await clientService.removeInstagramAuth(client.id);
+      
       setInstagramData(null);
       onConnectionUpdate(client.id, null);
     } finally {
@@ -233,6 +248,10 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     addDebug('Iniciando processo de conexão...');
     
     try {
+      // Limpar dados temporários que possam existir
+      localStorage.removeItem('instagram_auth_temp_data');
+      localStorage.removeItem('instagram_auth_error');
+      
       // Obter a URL de autorização diretamente
       const authUrl = getAuthorizationUrl();
       addDebug(`URL de autorização gerada: ${authUrl.substring(0, 50)}...`);
@@ -282,7 +301,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       
       if (savedData) {
         addDebug('Dados temporários de autenticação encontrados');
-        const authData = JSON.parse(savedData);
+        const authData = JSON.parse(savedData) as InstagramAuthData;
         
         addDebug(`Dados brutos: ${JSON.stringify(authData)}`);
         
@@ -299,9 +318,10 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         
         addDebug(`Dados obtidos: @${authData.username}, ID: ${authData.instagramAccountId}`);
         
-        // Salvar dados específicos para este cliente
-        localStorage.setItem(`instagram_connection_${client.id}`, savedData);
-        addDebug(`Dados salvos para o cliente ${client.id}`);
+        // Salvar dados no Supabase
+        addDebug('Salvando dados no Supabase...');
+        await clientService.saveInstagramAuth(client.id, authData);
+        addDebug('Dados salvos no Supabase com sucesso');
         
         // Limpar dados temporários
         localStorage.removeItem('instagram_auth_temp_data');
@@ -335,13 +355,23 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
   };
 
   // Função para desconectar a conta
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
     addDebug('Desconectando conta...');
-    localStorage.removeItem(`instagram_connection_${client.id}`);
-    setConnected(false);
-    setInstagramData(null);
-    onConnectionUpdate(client.id, null);
-    addDebug('Conta desconectada');
+    
+    try {
+      // Remover dados de autenticação do Supabase
+      await clientService.removeInstagramAuth(client.id);
+      addDebug('Dados de autenticação removidos do Supabase');
+      
+      setConnected(false);
+      setInstagramData(null);
+      onConnectionUpdate(client.id, null);
+      addDebug('Conta desconectada com sucesso');
+    } catch (err: any) {
+      console.error('Erro ao desconectar conta:', err);
+      addDebug(`Erro ao desconectar conta: ${err.message}`);
+      setError('Erro ao desconectar conta. Por favor, tente novamente.');
+    }
   };
 
   // Renderizar botão de conexão ou informações da conta conectada
