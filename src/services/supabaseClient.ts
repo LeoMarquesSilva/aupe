@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { Client } from '../types';
 import { InstagramAuthData } from '../services/instagramAuthService';
+import { fixInstagramConnection } from '../services/instagramFixService';
 
 // Usar variáveis de ambiente para as credenciais do Supabase
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -197,49 +198,22 @@ export const clientService = {
       console.log('Salvando dados de autenticação do Instagram para o cliente:', clientId);
       console.log('Dados de autenticação:', authData);
       
-      // Primeiro, buscar o cliente existente
-      const { data: existingClient, error: fetchError } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', clientId)
-        .single();
-        
-      if (fetchError) {
-        console.error('Erro ao buscar cliente existente:', fetchError);
-        throw new Error(`Não foi possível buscar o cliente: ${fetchError.message}`);
-      }
-      
-      // Converter o cliente do formato do banco para o formato da aplicação
-      const client = convertFromDbFormat(existingClient) as Client;
-      
-      // Mesclar os dados de autenticação com o cliente existente
-      const updatedClient = {
-        ...client,
-        instagramAccountId: authData.instagramAccountId,
-        accessToken: authData.accessToken,
-        username: authData.username,
-        profilePicture: authData.profilePicture,
-        tokenExpiry: authData.tokenExpiry,
-        pageId: authData.pageId,
-        pageName: authData.pageName
+      // Criar objeto com os nomes exatos das colunas no banco de dados
+      // Esta abordagem ignora o sistema de mapeamento para garantir que os campos sejam salvos corretamente
+      const updateData = {
+        instagram_account_id: authData.instagramAccountId,
+        access_token: authData.accessToken,
+        instagram_username: authData.username,
+        profile_picture: authData.profilePicture,
+        token_expiry: authData.tokenExpiry instanceof Date ? authData.tokenExpiry.toISOString() : authData.tokenExpiry,
+        page_id: authData.pageId,
+        page_name: authData.pageName,
+        user_id: authData.username // Também atualizar user_id para manter consistência
       };
       
-      // Usar o convertToDbFormat para garantir que os campos sejam mapeados corretamente
-      // Isso vai usar o mapeamento de colunas definido no início do arquivo
-      const updateData = convertToDbFormat({
-        id: clientId,
-        instagramAccountId: authData.instagramAccountId,
-        accessToken: authData.accessToken,
-        username: authData.username,
-        profilePicture: authData.profilePicture,
-        tokenExpiry: authData.tokenExpiry,
-        pageId: authData.pageId,
-        pageName: authData.pageName
-      });
+      console.log('Atualizando cliente com dados diretos:', updateData);
       
-      console.log('Atualizando cliente com dados convertidos:', updateData);
-      
-      // Atualizar no banco de dados usando os campos mapeados corretamente
+      // Atualizar diretamente no banco de dados com os campos em snake_case
       const { data, error } = await supabase
         .from('clients')
         .update(updateData)
@@ -257,6 +231,14 @@ export const clientService = {
       // Verificar se os dados foram salvos corretamente
       if (!data.instagram_account_id) {
         console.error('AVISO: instagram_account_id não foi salvo corretamente!');
+        
+        // Se ainda houver problema, tentar usar o serviço de correção existente
+        console.log('Tentando corrigir usando o serviço de correção...');
+        const fixResult = await fixInstagramConnection(clientId);
+        if (fixResult.success) {
+          console.log('Correção aplicada com sucesso!');
+          return convertFromDbFormat(fixResult.data) as Client;
+        }
       }
       
       // Converter snake_case para camelCase com mapeamento específico
@@ -295,19 +277,19 @@ export const clientService = {
     try {
       console.log('Removendo dados de autenticação do Instagram para o cliente:', clientId);
       
-      // Usar o convertToDbFormat para garantir que os campos sejam mapeados corretamente
-      const updateData = convertToDbFormat({
-        id: clientId,
-        instagramAccountId: null,
-        accessToken: null,
-        username: null,
-        profilePicture: null,
-        tokenExpiry: null,
-        pageId: null,
-        pageName: null
-      });
+      // Criar objeto com os nomes exatos das colunas no banco de dados
+      const updateData = {
+        instagram_account_id: null,
+        access_token: null,
+        instagram_username: null,
+        profile_picture: null,
+        token_expiry: null,
+        page_id: null,
+        page_name: null,
+        user_id: null
+      };
       
-      // Atualizar diretamente no banco de dados usando os campos mapeados corretamente
+      // Atualizar diretamente no banco de dados
       const { data, error } = await supabase
         .from('clients')
         .update(updateData)
