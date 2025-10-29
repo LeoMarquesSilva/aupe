@@ -97,16 +97,33 @@ export const clientService = {
       throw new Error('Não foi possível buscar os clientes');
     }
     
-    // Converter snake_case para camelCase
+    // Converter cada cliente manualmente para garantir que funcione
     return (data || []).map(client => {
       // Verificar se o cliente tem app_id mas não tem instagram_account_id
-      // Este é o caso que identificamos no seu banco de dados
       if (client.app_id && !client.instagram_account_id) {
         console.log(`Cliente ${client.id} tem app_id mas não tem instagram_account_id. Usando app_id como instagram_account_id.`);
         client.instagram_account_id = client.app_id;
       }
       
-      return convertFromDbFormat(client) as Client;
+      // CONVERSÃO MANUAL IGUAL À saveInstagramAuth
+      const convertedClient: Client = {
+        id: client.id,
+        name: client.name,
+        instagram: client.instagram,
+        logoUrl: client.logo_url,
+        accessToken: client.access_token,
+        userId: client.user_id,
+        appId: client.app_id,
+        // *** CONVERSÃO MANUAL DOS CAMPOS CRÍTICOS DO INSTAGRAM ***
+        instagramAccountId: client.instagram_account_id,
+        username: client.instagram_username,              // <- ESTE CAMPO ESTAVA FALHANDO
+        profilePicture: client.profile_picture,           // <- ESTE TAMBÉM
+        tokenExpiry: client.token_expiry ? new Date(client.token_expiry) : undefined, // <- E ESTE
+        pageId: client.page_id,                           // <- E ESTE
+        pageName: client.page_name                        // <- E ESTE
+      };
+      
+      return convertedClient;
     });
   },
   
@@ -138,8 +155,24 @@ export const clientService = {
         throw new Error('Nenhum dado retornado após inserção');
       }
       
-      // Converter snake_case para camelCase com mapeamento específico
-      return convertFromDbFormat(data) as Client;
+      // CONVERSÃO MANUAL IGUAL À getClients
+      const convertedClient: Client = {
+        id: data.id,
+        name: data.name,
+        instagram: data.instagram,
+        logoUrl: data.logo_url,
+        accessToken: data.access_token,
+        userId: data.user_id,
+        appId: data.app_id,
+        instagramAccountId: data.instagram_account_id,
+        username: data.instagram_username,
+        profilePicture: data.profile_picture,
+        tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
+        pageId: data.page_id,
+        pageName: data.page_name
+      };
+      
+      return convertedClient;
     } catch (err) {
       console.error('Erro ao adicionar cliente:', err);
       throw new Error('Não foi possível adicionar o cliente');
@@ -182,8 +215,24 @@ export const clientService = {
         throw new Error(`Não foi possível atualizar o cliente: ${error.message}`);
       }
       
-      // Converter snake_case para camelCase com mapeamento específico
-      return convertFromDbFormat(data) as Client;
+      // CONVERSÃO MANUAL IGUAL À getClients
+      const convertedClient: Client = {
+        id: data.id,
+        name: data.name,
+        instagram: data.instagram,
+        logoUrl: data.logo_url,
+        accessToken: data.access_token,
+        userId: data.user_id,
+        appId: data.app_id,
+        instagramAccountId: data.instagram_account_id,
+        username: data.instagram_username,
+        profilePicture: data.profile_picture,
+        tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
+        pageId: data.page_id,
+        pageName: data.page_name
+      };
+      
+      return convertedClient;
     } catch (err) {
       console.error('Erro ao atualizar cliente:', err);
       throw new Error('Não foi possível atualizar o cliente');
@@ -320,8 +369,24 @@ export const clientService = {
         throw new Error(`Não foi possível remover os dados de autenticação: ${error.message}`);
       }
       
-      // Converter snake_case para camelCase com mapeamento específico
-      return convertFromDbFormat(data) as Client;
+      // CONVERSÃO MANUAL IGUAL À getClients
+      const convertedClient: Client = {
+        id: data.id,
+        name: data.name,
+        instagram: data.instagram,
+        logoUrl: data.logo_url,
+        accessToken: data.access_token,
+        userId: data.user_id,
+        appId: data.app_id,
+        instagramAccountId: data.instagram_account_id,
+        username: data.instagram_username,
+        profilePicture: data.profile_picture,
+        tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
+        pageId: data.page_id,
+        pageName: data.page_name
+      };
+      
+      return convertedClient;
     } catch (err) {
       console.error('Erro ao remover dados de autenticação do Instagram:', err);
       throw new Error('Não foi possível remover os dados de autenticação do Instagram');
