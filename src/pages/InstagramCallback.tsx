@@ -9,6 +9,7 @@ const InstagramCallback: React.FC = () => {
   const [success, setSuccess] = useState<boolean>(false);
   const [showAccountSelector, setShowAccountSelector] = useState<boolean>(false);
   const [authCode, setAuthCode] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false); // Novo estado para controlar processamento
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -44,7 +45,7 @@ const InstagramCallback: React.FC = () => {
         
         console.log('✅ Código de autorização recebido, iniciando seletor de contas');
         
-        // Ir direto para o seletor de contas (sem validação CSRF)
+        // Ir direto para o seletor de contas
         setAuthCode(code);
         setShowAccountSelector(true);
         
@@ -73,6 +74,9 @@ const InstagramCallback: React.FC = () => {
   const handleAccountSelected = (instagramData: any) => {
     console.log('✅ Conta selecionada:', instagramData);
     
+    // Marcar como processando para evitar conflitos
+    setIsProcessing(true);
+    
     // Salvar dados no localStorage
     localStorage.setItem('instagram_auth_temp_data', JSON.stringify(instagramData));
     localStorage.setItem('instagram_auth_success', 'true');
@@ -89,7 +93,13 @@ const InstagramCallback: React.FC = () => {
   };
 
   const handleSelectorClose = () => {
-    console.log('❌ Seleção de conta cancelada');
+    // Só processar o cancelamento se não estiver processando uma seleção
+    if (isProcessing) {
+      console.log('⏳ Ignorando fechamento - conta sendo processada');
+      return;
+    }
+    
+    console.log('❌ Seleção de conta cancelada pelo usuário');
     setShowAccountSelector(false);
     setError('Seleção de conta cancelada pelo usuário.');
     
@@ -106,6 +116,7 @@ const InstagramCallback: React.FC = () => {
   const handleRetry = () => {
     setError(null);
     setLoading(true);
+    setIsProcessing(false); // Reset do estado de processamento
     
     // Reprocessar o callback
     const urlParams = new URLSearchParams(window.location.search);
@@ -190,9 +201,9 @@ const InstagramCallback: React.FC = () => {
         <Box sx={{ maxWidth: 500, width: '100%' }}>
           <Alert severity="success" sx={{ mb: 3 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Sucesso!
+              🎉 Sucesso!
             </Typography>
-            Conta do Instagram conectada com sucesso!
+            Conta <strong>@{JSON.parse(localStorage.getItem('instagram_auth_temp_data') || '{}').username}</strong> conectada com sucesso!
           </Alert>
           
           <Typography variant="body2" color="text.secondary">

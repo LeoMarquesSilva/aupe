@@ -45,13 +45,14 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [hasSelectedAccount, setHasSelectedAccount] = useState(false); // Novo estado
 
   // Carregar contas disponíveis quando o diálogo abrir
   useEffect(() => {
-    if (open && authCode) {
+    if (open && authCode && !hasSelectedAccount) {
       loadAvailableAccounts();
     }
-  }, [open, authCode]);
+  }, [open, authCode, hasSelectedAccount]);
 
   const loadAvailableAccounts = async () => {
     try {
@@ -73,25 +74,46 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
   };
 
   const handleAccountSelect = async (account: AvailableInstagramAccount) => {
+    // Evitar seleções múltiplas
+    if (connecting || hasSelectedAccount) {
+      console.log('⏳ Já processando uma conta, ignorando nova seleção');
+      return;
+    }
+
     try {
       setConnecting(true);
       setSelectedAccountId(account.instagramAccountId);
       setError(null);
+      setHasSelectedAccount(true); // Marcar como selecionado
       
       console.log(`Conectando conta: @${account.username}`);
       const authData = await connectSpecificInstagramAccount(account);
       
       console.log('Conta conectada com sucesso!');
+      
+      // Chamar callback de sucesso
       onAccountSelected(authData);
-      onClose();
+      
+      // NÃO chamar onClose() aqui - deixar o componente pai gerenciar
       
     } catch (err: any) {
       console.error('Erro ao conectar conta:', err);
       setError(err.message || 'Erro ao conectar conta do Instagram');
+      setHasSelectedAccount(false); // Reset em caso de erro
     } finally {
       setConnecting(false);
       setSelectedAccountId(null);
     }
+  };
+
+  const handleClose = () => {
+    // Só permitir fechar se não estiver processando uma conta
+    if (connecting || hasSelectedAccount) {
+      console.log('⏳ Não é possível fechar - processando conta');
+      return;
+    }
+    
+    onClose();
   };
 
   const formatNumber = (num: number) => {
@@ -106,12 +128,15 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
   return (
     <Dialog 
       open={open} 
-      onClose={onClose}
+      onClose={handleClose}
       maxWidth="md"
       fullWidth
       PaperProps={{
         sx: { borderRadius: 2 }
       }}
+      // Evitar fechar com ESC ou clique fora durante processamento
+      disableEscapeKeyDown={connecting || hasSelectedAccount}
+      onBackdropClick={connecting || hasSelectedAccount ? undefined : handleClose}
     >
       <DialogTitle sx={{ pb: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -152,13 +177,14 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
                       mb: 2,
                       border: selectedAccountId === account.instagramAccountId ? 2 : 0,
                       borderColor: 'primary.main',
-                      borderRadius: 2
+                      borderRadius: 2,
+                      opacity: hasSelectedAccount && selectedAccountId !== account.instagramAccountId ? 0.5 : 1
                     }}
                   >
                     <ListItem sx={{ p: 0 }}>
                       <ListItemButton
                         onClick={() => handleAccountSelect(account)}
-                        disabled={connecting}
+                        disabled={connecting || hasSelectedAccount}
                         sx={{ 
                           p: 2,
                           borderRadius: 2,
@@ -186,6 +212,14 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
                               </Typography>
                               {connecting && selectedAccountId === account.instagramAccountId && (
                                 <CircularProgress size={16} sx={{ ml: 1 }} />
+                              )}
+                              {hasSelectedAccount && selectedAccountId === account.instagramAccountId && (
+                                <Chip 
+                                  label="Selecionada" 
+                                  color="success" 
+                                  size="small" 
+                                  sx={{ ml: 1 }}
+                                />
                               )}
                             </Box>
                           }
@@ -231,7 +265,19 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
             
             {connecting && (
               <Alert severity="info" sx={{ mt: 2 }}>
-                Conectando conta selecionada...
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Conectando conta selecionada...
+                </Typography>
+                Por favor, aguarde enquanto processamos sua seleção.
+              </Alert>
+            )}
+
+            {hasSelectedAccount && !connecting && (
+              <Alert severity="success" sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  ✅ Conta conectada!
+                </Typography>
+                Esta janela será fechada automaticamente...
               </Alert>
             )}
           </Box>
@@ -239,13 +285,16 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
       </DialogContent>
       
       <DialogActions sx={{ px: 3, pb: 3 }}>
-        <Button onClick={onClose} disabled={connecting}>
+        <Button 
+          onClick={handleClose} 
+          disabled={connecting || hasSelectedAccount}
+        >
           Cancelar
         </Button>
         {error && (
           <Button 
             onClick={loadAvailableAccounts}
-            disabled={loading || connecting}
+            disabled={loading || connecting || hasSelectedAccount}
             variant="outlined"
           >
             Tentar Novamente
