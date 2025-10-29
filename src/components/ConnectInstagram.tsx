@@ -260,7 +260,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     }
   };
 
-  // Função para iniciar o processo de conexão
+   // Função para iniciar o processo de conexão
   const handleConnect = async () => {
     setLoading(true);
     setError(null);
@@ -268,9 +268,13 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     addDebug('Iniciando processo de conexão...');
     
     try {
+      // Salvar o clientId no localStorage para uso no callback
+      localStorage.setItem('current_client_id', client.id);
+      
       // Limpar dados temporários que possam existir
       localStorage.removeItem('instagram_auth_temp_data');
       localStorage.removeItem('instagram_auth_error');
+      localStorage.removeItem('instagram_auth_success');
       
       // Obter a URL de autorização diretamente
       const authUrl = getAuthorizationUrl();
@@ -294,14 +298,49 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       
       addDebug('Janela de autenticação aberta');
       
-      // Monitorar quando o popup fechar
+      // Escutar mensagens da janela popup
+      const handleMessage = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+
+        if (event.data.type === 'INSTAGRAM_AUTH_SUCCESS') {
+          addDebug('✅ Recebida confirmação de sucesso da janela popup');
+          
+          // Remover listener
+          window.removeEventListener('message', handleMessage);
+          
+          // Processar sucesso
+          handleAuthSuccess(event.data.data, event.data.updatedClient);
+          
+        } else if (event.data.type === 'INSTAGRAM_AUTH_ERROR') {
+          addDebug(`❌ Recebido erro da janela popup: ${event.data.error}`);
+          
+          // Remover listener
+          window.removeEventListener('message', handleMessage);
+          
+          // Processar erro
+          setError(event.data.error);
+          setLoading(false);
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+      
+      // Monitorar quando o popup fechar (fallback)
       const checkPopup = setInterval(() => {
         if (!popup || popup.closed) {
           clearInterval(checkPopup);
           addDebug('Janela de autenticação fechada');
-          handlePopupClosed();
+          
+          // Remover listener
+          window.removeEventListener('message', handleMessage);
+          
+          // Se ainda estiver carregando, processar via localStorage (fallback)
+          if (loading) {
+            handlePopupClosed();
+          }
         }
       }, 500);
+      
     } catch (err: any) {
       setLoading(false);
       const errorMessage = err.message || 'Erro ao iniciar processo de conexão';
@@ -311,15 +350,45 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     }
   };
 
-  // Função chamada quando o popup é fechado
+  // Nova função para processar sucesso da autenticação
+  const handleAuthSuccess = (authData: InstagramAuthData, updatedClient?: any) => {
+    try {
+      addDebug(`Processando sucesso da autenticação: @${authData.username}`);
+      
+      // Garantir que a data de expiração seja um objeto Date
+      if (typeof authData.tokenExpiry === 'string') {
+        authData.tokenExpiry = new Date(authData.tokenExpiry);
+      }
+      
+      // Atualizar estado
+      setInstagramData(authData);
+      setConnected(true);
+      setError(null);
+      setNeedsFix(false);
+      setLoading(false);
+      
+      // Notificar componente pai
+      onConnectionUpdate(client.id, authData);
+      addDebug('Componente pai notificado sobre a conexão');
+      
+    } catch (err: any) {
+      console.error('Erro ao processar sucesso da autenticação:', err);
+      addDebug(`Erro ao processar sucesso: ${err.message}`);
+      setError('Erro ao processar dados de autenticação');
+      setLoading(false);
+    }
+  };
+
+  // Função chamada quando o popup é fechado (mantida como fallback)
   const handlePopupClosed = async () => {
     try {
-      addDebug('Processando resultado da autenticação...');
+      addDebug('Processando resultado da autenticação via fallback...');
       
       // Verificar se temos os dados no localStorage (serão salvos pelo callback)
       const savedData = localStorage.getItem(`instagram_auth_temp_data`);
+      const authSuccess = localStorage.getItem('instagram_auth_success');
       
-      if (savedData) {
+      if (authSuccess && savedData) {
         addDebug('Dados temporários de autenticação encontrados');
         const authData = JSON.parse(savedData) as InstagramAuthData;
         
@@ -329,30 +398,12 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
           throw new Error('Dados da conta do Instagram incompletos');
         }
         
-        // Garantir que a data de expiração seja um objeto Date
-        if (typeof authData.tokenExpiry === 'string') {
-          authData.tokenExpiry = new Date(authData.tokenExpiry);
-        }
-        
-        addDebug(`Dados obtidos: @${authData.username}, ID: ${authData.instagramAccountId}`);
-        
-        // Salvar dados no Supabase
-        addDebug('Salvando dados no Supabase...');
-        const updatedClient = await clientService.saveInstagramAuth(client.id, authData);
-        addDebug('Dados salvos no Supabase com sucesso');
+        // Processar sucesso
+        handleAuthSuccess(authData);
         
         // Limpar dados temporários
         localStorage.removeItem('instagram_auth_temp_data');
-        
-        // Atualizar estado
-        setInstagramData(authData);
-        setConnected(true);
-        setError(null);
-        setNeedsFix(false);
-        
-        // Notificar componente pai
-        onConnectionUpdate(client.id, authData);
-        addDebug('Componente pai notificado sobre a conexão');
+        localStorage.removeItem('instagram_auth_success');
         
       } else {
         // Verificar se houve erro
@@ -365,12 +416,12 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
           addDebug('Nenhum dado ou erro encontrado, conexão cancelada ou falhou');
           setError('A conexão foi cancelada ou falhou');
         }
+        setLoading(false);
       }
     } catch (err: any) {
       console.error('Erro ao processar dados de autenticação:', err);
       addDebug(`Erro ao processar dados: ${err.message}`);
       setError('Erro ao processar dados de autenticação');
-    } finally {
       setLoading(false);
     }
   };

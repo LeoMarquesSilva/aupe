@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Box, Typography, CircularProgress, Alert, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import InstagramAccountSelector from '../components/InstagramAccountSelector';
+import { clientService } from '../services/supabaseClient';
 
 const InstagramCallback: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
@@ -9,7 +10,8 @@ const InstagramCallback: React.FC = () => {
   const [success, setSuccess] = useState<boolean>(false);
   const [showAccountSelector, setShowAccountSelector] = useState<boolean>(false);
   const [authCode, setAuthCode] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState<boolean>(false); // Novo estado para controlar processamento
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [selectedUsername, setSelectedUsername] = useState<string>('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -59,9 +61,7 @@ const InstagramCallback: React.FC = () => {
         
         // Fechar a janela de popup após um breve atraso
         setTimeout(() => {
-          if (window.opener) {
-            window.close();
-          }
+          closeWindow();
         }, 5000);
       } finally {
         setLoading(false);
@@ -71,25 +71,102 @@ const InstagramCallback: React.FC = () => {
     processCallback();
   }, [navigate]);
 
-  const handleAccountSelected = (instagramData: any) => {
+  const closeWindow = () => {
+    try {
+      // Tentar fechar a janela popup
+      if (window.opener && window.opener !== window) {
+        window.close();
+      } else {
+        // Se não for uma popup, redirecionar para a página principal
+        window.location.href = window.location.origin;
+      }
+    } catch (e) {
+      console.log('Não foi possível fechar a janela automaticamente');
+      // Fallback: redirecionar para a página principal
+      window.location.href = window.location.origin;
+    }
+  };
+
+  const handleAccountSelected = async (instagramData: any) => {
     console.log('✅ Conta selecionada:', instagramData);
     
     // Marcar como processando para evitar conflitos
     setIsProcessing(true);
+    setSelectedUsername(instagramData.username);
     
-    // Salvar dados no localStorage
-    localStorage.setItem('instagram_auth_temp_data', JSON.stringify(instagramData));
-    localStorage.setItem('instagram_auth_success', 'true');
-    
-    setSuccess(true);
-    setShowAccountSelector(false);
-    
-    // Fechar a janela de popup após um breve atraso
-    setTimeout(() => {
-      if (window.opener) {
-        window.close();
+    try {
+      // Salvar dados no localStorage (para compatibilidade)
+      localStorage.setItem('instagram_auth_temp_data', JSON.stringify(instagramData));
+      localStorage.setItem('instagram_auth_success', 'true');
+      
+      // Salvar no Supabase usando a função existente
+      await saveInstagramDataToSupabase(instagramData);
+      
+      setSuccess(true);
+      setShowAccountSelector(false);
+      
+      console.log('🎉 Dados salvos com sucesso! Fechando janela em 3 segundos...');
+      
+      // Fechar a janela de popup após um breve atraso
+      setTimeout(() => {
+        closeWindow();
+      }, 3000);
+      
+    } catch (error) {
+      console.error('❌ Erro ao salvar dados:', error);
+      setError(`Conta conectada, mas houve erro ao salvar os dados: ${(error as Error).message}`);
+      setIsProcessing(false);
+    }
+  };
+
+  const saveInstagramDataToSupabase = async (instagramData: any) => {
+    try {
+      console.log('💾 Salvando dados no Supabase usando clientService...');
+      
+      // Buscar o cliente atual (assumindo que há um clientId no localStorage ou URL)
+      const clientId = localStorage.getItem('current_client_id') || 
+                      new URLSearchParams(window.location.search).get('client_id');
+      
+      if (!clientId) {
+        throw new Error('ID do cliente não encontrado. Certifique-se de que o cliente foi selecionado corretamente.');
       }
-    }, 2000);
+      
+      console.log('Cliente ID encontrado:', clientId);
+      
+      // Usar a função existente do clientService para salvar os dados
+      const updatedClient = await clientService.saveInstagramAuth(clientId, instagramData);
+      
+      console.log('✅ Dados salvos no Supabase com sucesso:', updatedClient);
+      
+      // Notificar a janela pai sobre o sucesso
+      if (window.opener) {
+        window.opener.postMessage({
+          type: 'INSTAGRAM_AUTH_SUCCESS',
+          data: instagramData,
+          clientId: clientId,
+          updatedClient: updatedClient
+        }, window.location.origin);
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao salvar no Supabase:', error);
+      
+      // Mesmo com erro no Supabase, manter os dados no localStorage
+      // para que o usuário não perca a conexão
+      console.log('📝 Dados mantidos no localStorage como fallback');
+      
+      // Notificar a janela pai sobre o erro
+      if (window.opener) {
+        window.opener.postMessage({
+          type: 'INSTAGRAM_AUTH_ERROR',
+          error: (error as Error).message,
+          data: instagramData,
+          clientId: localStorage.getItem('current_client_id')
+        }, window.location.origin);
+      }
+      
+      throw error;
+    }
   };
 
   const handleSelectorClose = () => {
@@ -107,16 +184,14 @@ const InstagramCallback: React.FC = () => {
     
     // Fechar a janela de popup após um breve atraso
     setTimeout(() => {
-      if (window.opener) {
-        window.close();
-      }
+      closeWindow();
     }, 3000);
   };
 
   const handleRetry = () => {
     setError(null);
     setLoading(true);
-    setIsProcessing(false); // Reset do estado de processamento
+    setIsProcessing(false);
     
     // Reprocessar o callback
     const urlParams = new URLSearchParams(window.location.search);
@@ -133,9 +208,7 @@ const InstagramCallback: React.FC = () => {
   };
 
   const handleClose = () => {
-    if (window.opener) {
-      window.close();
-    }
+    closeWindow();
   };
 
   return (
@@ -203,11 +276,18 @@ const InstagramCallback: React.FC = () => {
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
               🎉 Sucesso!
             </Typography>
-            Conta <strong>@{JSON.parse(localStorage.getItem('instagram_auth_temp_data') || '{}').username}</strong> conectada com sucesso!
+            Conta <strong>@{selectedUsername}</strong> conectada e salva com sucesso!
           </Alert>
           
-          <Typography variant="body2" color="text.secondary">
-            Esta janela será fechada automaticamente...
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+            <CircularProgress size={20} sx={{ mr: 1 }} />
+            <Typography variant="body2" color="text.secondary">
+              Finalizando e fechando janela...
+            </Typography>
+          </Box>
+          
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+            Esta janela será fechada automaticamente em 3 segundos
           </Typography>
         </Box>
       )}
