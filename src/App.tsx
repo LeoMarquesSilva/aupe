@@ -4,7 +4,6 @@ import { CssBaseline, Box } from '@mui/material';
 import CreatePost from './pages/CreatePost';
 import CreateStory from './pages/CreateStory';
 import InstagramCallback from './pages/InstagramCallback';
-import Callback from './pages/Callback'; // Importando o componente de callback
 import StoryCalendar from './pages/StoryCalendar';
 import EditStory from './pages/EditStory';
 import ClientDashboard from './pages/ClientDashboard';
@@ -12,6 +11,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { ptBR } from 'date-fns/locale';
 import Header from './components/Header';
+import SingleClientDashboard from './pages/SingleClientDashboard';
 
 // Layout compartilhado para todas as páginas
 const PageLayout = ({ children }: { children: React.ReactNode }) => (
@@ -53,7 +53,7 @@ const CallbackLayout = ({ children }: { children: React.ReactNode }) => (
   </Box>
 );
 
-// Configuração do router sem as flags futuras que causam erro
+// Configuração do router
 const router = createBrowserRouter(
   [
     {
@@ -85,13 +85,18 @@ const router = createBrowserRouter(
       element: <PageLayout><EditStory /></PageLayout>,
     },
     {
+      path: "/client/:clientId",
+      element: <PageLayout><SingleClientDashboard /></PageLayout>,
+    },
+    {
       path: "/api/instagram-auth/callback",
       element: <CallbackLayout><InstagramCallback /></CallbackLayout>,
     },
-    // Adicionando a rota /callback que já está validada no Facebook Developer
+    // Rota principal do callback configurada no Facebook Developer
+    // Agora usa o novo componente com seletor de contas
     {
       path: "/callback",
-      element: <CallbackLayout><Callback /></CallbackLayout>,
+      element: <CallbackLayout><InstagramCallback /></CallbackLayout>,
     },
   ]
 );

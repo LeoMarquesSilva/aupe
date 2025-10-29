@@ -22,7 +22,6 @@ import {
   Tab,
   Alert
 } from '@mui/material';
-// Remover importação do Grid
 import { 
   Add as AddIcon, 
   Delete as DeleteIcon, 
@@ -164,9 +163,13 @@ const ClientManager: React.FC<ClientManagerProps> = ({
       if (clientToUpdate) {
         const updatedClient: Client = {
           ...clientToUpdate,
-          appId: instagramData.instagramAccountId,
+          instagramAccountId: instagramData.instagramAccountId,
           accessToken: instagramData.accessToken,
-          userId: instagramData.username
+          username: instagramData.username,
+          profilePicture: instagramData.profilePicture,
+          tokenExpiry: instagramData.tokenExpiry,
+          pageId: instagramData.pageId,
+          pageName: instagramData.pageName
         };
         
         clientService.updateClient(updatedClient)
@@ -178,6 +181,16 @@ const ClientManager: React.FC<ClientManagerProps> = ({
           });
       }
     }
+  };
+
+  // Função para obter a imagem do avatar
+  const getAvatarImage = (client: Client) => {
+    // Priorizar a foto do perfil do Instagram
+    if (client.profilePicture) {
+      return client.profilePicture;
+    }
+    // Fallback para o logo do cliente
+    return client.logoUrl;
   };
 
   // Filtrar clientes com base na pesquisa
@@ -337,15 +350,28 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                           onClick={() => handleSelectClient(client)}
                         >
                           <ListItemAvatar>
-                            <Avatar src={client.logoUrl} alt={client.name}>
+                            <Avatar 
+                              src={getAvatarImage(client)} 
+                              alt={client.name}
+                              sx={{ 
+                                width: 56, 
+                                height: 56,
+                                border: client.profilePicture ? '2px solid #E1306C' : 'none'
+                              }}
+                            >
                               {client.name.charAt(0)}
                             </Avatar>
                           </ListItemAvatar>
                           <ListItemText 
                             primary={
-                              <Typography component="span" variant="subtitle1" sx={{ fontWeight: 500 }}>
-                                {client.name}
-                              </Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography component="span" variant="subtitle1" sx={{ fontWeight: 500 }}>
+                                  {client.name}
+                                </Typography>
+                                {client.profilePicture && (
+                                  <InstagramIcon sx={{ fontSize: 16, color: '#E1306C' }} />
+                                )}
+                              </Box>
                             } 
                             secondary={
                               <Typography component="span" variant="body2">

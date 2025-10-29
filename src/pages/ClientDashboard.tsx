@@ -163,7 +163,7 @@ const ClientDashboard: React.FC = () => {
   
   // Função para navegar para o calendário do cliente
   const handleViewCalendar = (client: Client) => {
-    navigate(`/calendar/${client.id}`);
+    navigate(`/client/${client.id}`);
   };
   
   // Função para criar novo post para o cliente
@@ -174,6 +174,16 @@ const ClientDashboard: React.FC = () => {
   // Função para criar novo story para o cliente
   const handleCreateStory = (client: Client) => {
     navigate(`/create-story?clientId=${client.id}`);
+  };
+
+  // Função para obter a imagem do avatar
+  const getAvatarImage = (client: Client) => {
+    // Priorizar a foto do perfil do Instagram
+    if (client.profilePicture) {
+      return client.profilePicture;
+    }
+    // Fallback para o logo do cliente
+    return client.logoUrl;
   };
   
   return (
@@ -295,8 +305,8 @@ const ClientDashboard: React.FC = () => {
                 }}
               >
                 <CardActionArea 
-                  onClick={() => handleViewCalendar(client)}
-                  sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
+                onClick={() => handleViewCalendar(client)}
+                sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
                 >
                   <Box sx={{ 
                     height: 120, 
@@ -307,21 +317,38 @@ const ClientDashboard: React.FC = () => {
                     position: 'relative'
                   }}>
                     <Avatar 
-                      src={client.logoUrl} 
+                      src={getAvatarImage(client)} 
                       alt={client.name}
                       sx={{ 
                         width: 80, 
                         height: 80,
-                        border: '4px solid white',
+                        border: client.profilePicture ? '3px solid #e0e0e0ff' : '4px solid white',
                         boxShadow: 2
                       }}
                     >
                       {client.name.charAt(0)}
                     </Avatar>
+                    {client.profilePicture && (
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          bottom: 8,
+                          right: 8,
+                          bgcolor: '#000000ff',
+                          borderRadius: '50%',
+                          p: 0.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <InstagramIcon sx={{ fontSize: 16, color: 'white' }} />
+                      </Box>
+                    )}
                   </Box>
                   
-                  <CardContent sx={{ flexGrow: 1, pb: 1 }}>
-                    <Typography variant="h6" align="center" noWrap sx={{ mb: 0.5 }}>
+                  <CardContent sx={{ flexGrow: 1, pb: 2 }}>
+                    <Typography variant="h6" align="center" noWrap sx={{ mb: 1 }}>
                       {client.name}
                     </Typography>
                     
@@ -333,49 +360,133 @@ const ClientDashboard: React.FC = () => {
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'center',
-                        mb: 2
+                        mb: 3
                       }}
                     >
                       <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: '#E1306C' }} />
                       @{client.instagram}
                     </Typography>
                     
-                    <Divider sx={{ my: 1 }} />
+                    <Divider sx={{ my: 2 }} />
                     
-                    <Box sx={{ display: 'flex', justifyContent: 'space-around', mt: 2 }}>
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="h6" color="primary">
+                    {/* Cards de estatísticas com melhor espaçamento */}
+                    <Box sx={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: 'repeat(3, 1fr)', 
+                      gap: 2,
+                      mt: 2 
+                    }}>
+                      <Paper
+                        elevation={0}
+                        sx={{ 
+                          p: 1.5, 
+                          textAlign: 'center',
+                          bgcolor: 'rgba(25, 118, 210, 0.08)',
+                          borderRadius: 1.5,
+                          border: '1px solid rgba(25, 118, 210, 0.12)'
+                        }}
+                      >
+                        <Typography 
+                          variant="h6" 
+                          color="primary" 
+                          sx={{ 
+                            fontWeight: 'bold',
+                            fontSize: '1.1rem',
+                            mb: 0.5
+                          }}
+                        >
                           {clientStats[client.id]?.scheduled || 0}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography 
+                          variant="caption" 
+                          color="text.secondary"
+                          sx={{ 
+                            fontSize: '0.7rem',
+                            fontWeight: 500,
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.5
+                          }}
+                        >
                           Agendados
                         </Typography>
-                      </Box>
+                      </Paper>
                       
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="h6" color="success.main">
+                      <Paper
+                        elevation={0}
+                        sx={{ 
+                          p: 1.5, 
+                          textAlign: 'center',
+                          bgcolor: 'rgba(46, 125, 50, 0.08)',
+                          borderRadius: 1.5,
+                          border: '1px solid rgba(46, 125, 50, 0.12)'
+                        }}
+                      >
+                        <Typography 
+                          variant="h6" 
+                          color="success.main" 
+                          sx={{ 
+                            fontWeight: 'bold',
+                            fontSize: '1.1rem',
+                            mb: 0.5
+                          }}
+                        >
                           {clientStats[client.id]?.posted || 0}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography 
+                          variant="caption" 
+                          color="text.secondary"
+                          sx={{ 
+                            fontSize: '0.7rem',
+                            fontWeight: 500,
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.5
+                          }}
+                        >
                           Publicados
                         </Typography>
-                      </Box>
+                      </Paper>
                       
-                      <Box sx={{ textAlign: 'center' }}>
-                        <Typography variant="h6" color="text.secondary">
+                      <Paper
+                        elevation={0}
+                        sx={{ 
+                          p: 1.5, 
+                          textAlign: 'center',
+                          bgcolor: 'rgba(117, 117, 117, 0.08)',
+                          borderRadius: 1.5,
+                          border: '1px solid rgba(117, 117, 117, 0.12)'
+                        }}
+                      >
+                        <Typography 
+                          variant="h6" 
+                          color="text.secondary" 
+                          sx={{ 
+                            fontWeight: 'bold',
+                            fontSize: '1.1rem',
+                            mb: 0.5
+                          }}
+                        >
                           {clientStats[client.id]?.draft || 0}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography 
+                          variant="caption" 
+                          color="text.secondary"
+                          sx={{ 
+                            fontSize: '0.7rem',
+                            fontWeight: 500,
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.5
+                          }}
+                        >
                           Rascunhos
                         </Typography>
-                      </Box>
+                      </Paper>
                     </Box>
                   </CardContent>
                 </CardActionArea>
                 
                 <Divider />
                 
-                <CardActions sx={{ justifyContent: 'space-between', px: 2 }}>
+                <CardActions sx={{ justifyContent: 'space-between', px: 2, py: 1.5 }}>
                   <Box>
                     <Tooltip title="Editar cliente">
                       <IconButton 

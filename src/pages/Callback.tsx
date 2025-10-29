@@ -1,201 +1,131 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, CircularProgress, Alert } from '@mui/material';
-import axios from 'axios';
-
-// Constantes para autenticação
-const META_APP_ID = '1087259016929287';
-const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873';
-const META_REDIRECT_URI = 'https://aupe.vercel.app/callback';
+import { Box, Typography, CircularProgress, Alert, Button } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import InstagramAccountSelector from '../components/InstagramAccountSelector';
 
 const Callback: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [detailedError, setDetailedError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
-  const [debugInfo, setDebugInfo] = useState<string[]>([]);
-
-  // Função para adicionar informações de debug
-  const addDebug = (message: string) => {
-    setDebugInfo(prev => [...prev, `${new Date().toISOString().substring(11, 19)}: ${message}`]);
-    console.log(message);
-  };
+  const [showAccountSelector, setShowAccountSelector] = useState<boolean>(false);
+  const [authCode, setAuthCode] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const processCallback = async () => {
       try {
-        // Obter o código e state da URL
+        // Obter o código da URL
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
-        const state = urlParams.get('state');
         const error = urlParams.get('error');
+        const errorDescription = urlParams.get('error_description');
+        
+        console.log('🔍 Processando callback do Instagram:', { 
+          hasCode: !!code, 
+          error, 
+          errorDescription 
+        });
         
         if (error) {
-          throw new Error('Autorização negada ou cancelada pelo usuário.');
+          let errorMessage = 'Autorização negada ou cancelada pelo usuário.';
+          
+          if (error === 'access_denied') {
+            errorMessage = 'Acesso negado. Você precisa autorizar o aplicativo para continuar.';
+          } else if (errorDescription) {
+            errorMessage = errorDescription;
+          }
+          
+          throw new Error(errorMessage);
         }
         
         if (!code) {
-          throw new Error('Código de autorização não encontrado na URL.');
+          throw new Error('Código de autorização não encontrado na URL. Por favor, tente novamente.');
         }
         
-        // Validar o state para proteção CSRF
-        const savedState = sessionStorage.getItem('oauth_state');
-        sessionStorage.removeItem('oauth_state');
-        if (state && savedState !== state) {
-          throw new Error('Validação de segurança falhou. Por favor, tente novamente.');
-        }
+        console.log('✅ Código de autorização recebido, iniciando seletor de contas');
         
-        addDebug('Código de autorização obtido');
+        // Ir direto para o seletor de contas (sem validação CSRF)
+        setAuthCode(code);
+        setShowAccountSelector(true);
         
-        try {
-          // Implementação direta no cliente
-          addDebug('Processando autenticação diretamente no cliente...');
-          
-          // 1. Trocar o código por um token de acesso de curta duração
-          addDebug('Trocando código por token de curta duração...');
-          const tokenResponse = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
-            params: {
-              client_id: META_APP_ID,
-              client_secret: META_APP_SECRET,
-              redirect_uri: META_REDIRECT_URI,
-              code
-            }
-          });
-          
-          const shortLivedToken = tokenResponse.data.access_token;
-          addDebug('Token de curta duração obtido');
-          
-          // 2. Converter para token de longa duração (60 dias)
-          addDebug('Convertendo para token de longa duração...');
-          const longLivedTokenResponse = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
-            params: {
-              grant_type: 'fb_exchange_token',
-              client_id: META_APP_ID,
-              client_secret: META_APP_SECRET,
-              fb_exchange_token: shortLivedToken
-            }
-          });
-          
-          const userAccessToken = longLivedTokenResponse.data.access_token;
-          const expiresIn = longLivedTokenResponse.data.expires_in;
-          addDebug(`Token de longa duração obtido, expira em: ${expiresIn} segundos`);
-          
-          // 3. Buscar as páginas do Facebook vinculadas
-          addDebug('Buscando páginas do Facebook...');
-          const pagesResponse = await axios.get('https://graph.facebook.com/v21.0/me/accounts', {
-            params: {
-              access_token: userAccessToken,
-              fields: 'instagram_business_account,name,id,access_token'
-            }
-          });
-          
-          const pages = pagesResponse.data.data || [];
-          addDebug(`Páginas do Facebook obtidas: ${pages.length}`);
-          
-          if (pages.length === 0) {
-            throw new Error('Nenhuma página do Facebook encontrada. Você precisa ter uma página do Facebook vinculada à sua conta.');
-          }
-          
-          // Encontrar a primeira página com uma conta do Instagram vinculada
-          const pageWithInstagram = pages.find(page => page.instagram_business_account);
-          
-          if (!pageWithInstagram) {
-            throw new Error('Nenhuma conta do Instagram Business encontrada. Você precisa vincular uma conta do Instagram à sua página do Facebook.');
-          }
-          
-          addDebug(`Página com Instagram encontrada: ${pageWithInstagram.name}`);
-          addDebug('Token da página obtido, este token não expira a menos que as permissões sejam revogadas');
-          
-          // 4. Buscar dados da conta do Instagram
-          const instagramAccountId = pageWithInstagram.instagram_business_account.id;
-          addDebug(`ID da conta do Instagram: ${instagramAccountId}`);
-          
-          addDebug('Buscando dados da conta do Instagram...');
-          const instagramResponse = await axios.get(`https://graph.facebook.com/v21.0/${instagramAccountId}`, {
-            params: {
-              access_token: pageWithInstagram.access_token, // Usando o token da página
-              fields: 'username,profile_picture_url,followers_count,media_count'
-            }
-          });
-          
-          const instagramData = instagramResponse.data;
-          addDebug(`Dados da conta do Instagram obtidos: @${instagramData.username}`);
-          
-          // Verificar se o token da página é válido
-          addDebug('Verificando validade do token da página...');
-          try {
-            const debugTokenResponse = await axios.get('https://graph.facebook.com/debug_token', {
-              params: {
-                input_token: pageWithInstagram.access_token,
-                access_token: `${META_APP_ID}|${META_APP_SECRET}`
-              }
-            });
-            
-            const tokenData = debugTokenResponse.data.data;
-            addDebug(`Token válido: ${tokenData.is_valid}`);
-            addDebug(`Tipo de token: ${tokenData.type}`);
-            addDebug(`App ID: ${tokenData.app_id}`);
-            
-            if (tokenData.expires_at) {
-              const expiryDate = new Date(tokenData.expires_at * 1000);
-              addDebug(`Data de expiração: ${expiryDate.toLocaleString()}`);
-            } else {
-              addDebug('Token não tem data de expiração definida (não expira)');
-            }
-          } catch (debugError) {
-            addDebug('Erro ao verificar token, mas continuando com o processo');
-            console.error('Erro ao verificar token:', debugError);
-          }
-          
-          // Calcular data de expiração do token
-          // Para tokens de página, definimos uma data bem no futuro, pois eles não expiram automaticamente
-          const tokenExpiry = new Date();
-          tokenExpiry.setFullYear(tokenExpiry.getFullYear() + 10); // Definir para 10 anos no futuro
-          
-          // Salvar dados no localStorage para que possam ser acessados pelo componente ConnectInstagram
-          const authData = {
-            instagramAccountId,
-            accessToken: pageWithInstagram.access_token, // Usamos o token da página, não o token do usuário
-            username: instagramData.username,
-            profilePicture: instagramData.profile_picture_url,
-            tokenExpiry: tokenExpiry.toISOString(),
-            pageId: pageWithInstagram.id,
-            pageName: pageWithInstagram.name
-          };
-          
-          addDebug('Salvando dados de autenticação no localStorage');
-          localStorage.setItem('instagram_auth_temp_data', JSON.stringify(authData));
-          
-          setSuccess(true);
-          
-          // Fechar a janela de popup após um breve atraso
-          addDebug('Autenticação concluída com sucesso. Fechando janela em 5 segundos...');
-          setTimeout(() => {
-            window.close();
-          }, 5000);
-        } catch (authError: any) {
-          console.error('Erro detalhado na autenticação:', authError);
-          setDetailedError(JSON.stringify(authError.response?.data || authError.message));
-          throw authError;
-        }
-      } catch (err: any) {
-        console.error('Erro no callback do Instagram:', err);
+      } catch (err) {
+        console.error('❌ Erro no callback do Instagram:', err);
         const errorMessage = (err as Error).message || 'Erro desconhecido durante a autenticação';
         setError(errorMessage);
         
-        // Salvar mensagem de erro no localStorage para que possa ser acessada pelo componente ConnectInstagram
+        // Salvar mensagem de erro no localStorage
         localStorage.setItem('instagram_auth_error', errorMessage);
         
         // Fechar a janela de popup após um breve atraso
         setTimeout(() => {
-          window.close();
-        }, 15000); // Aumentando o tempo para 15 segundos para poder ver o erro detalhado
+          if (window.opener) {
+            window.close();
+          }
+        }, 5000);
       } finally {
         setLoading(false);
       }
     };
     
     processCallback();
-  }, []);
+  }, [navigate]);
+
+  const handleAccountSelected = (instagramData: any) => {
+    console.log('✅ Conta selecionada:', instagramData);
+    
+    // Salvar dados no localStorage
+    localStorage.setItem('instagram_auth_temp_data', JSON.stringify(instagramData));
+    localStorage.setItem('instagram_auth_success', 'true');
+    
+    setSuccess(true);
+    setShowAccountSelector(false);
+    
+    // Fechar a janela de popup após um breve atraso
+    setTimeout(() => {
+      if (window.opener) {
+        window.close();
+      }
+    }, 2000);
+  };
+
+  const handleSelectorClose = () => {
+    console.log('❌ Seleção de conta cancelada');
+    setShowAccountSelector(false);
+    setError('Seleção de conta cancelada pelo usuário.');
+    
+    localStorage.setItem('instagram_auth_error', 'Seleção cancelada pelo usuário');
+    
+    // Fechar a janela de popup após um breve atraso
+    setTimeout(() => {
+      if (window.opener) {
+        window.close();
+      }
+    }, 3000);
+  };
+
+  const handleRetry = () => {
+    setError(null);
+    setLoading(true);
+    
+    // Reprocessar o callback
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    
+    if (code) {
+      setAuthCode(code);
+      setShowAccountSelector(true);
+      setLoading(false);
+    } else {
+      setError('Código de autorização não encontrado. Por favor, feche esta janela e tente novamente.');
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (window.opener) {
+      window.close();
+    }
+  };
 
   return (
     <Box 
@@ -204,75 +134,82 @@ const Callback: React.FC = () => {
         flexDirection: 'column', 
         alignItems: 'center', 
         justifyContent: 'center', 
-        height: '100vh',
+        minHeight: '100vh',
         p: 3,
-        textAlign: 'center'
+        textAlign: 'center',
+        bgcolor: 'background.default'
       }}
     >
       {loading && (
         <>
-          <CircularProgress size={60} sx={{ mb: 3 }} />
-          <Typography variant="h6">
+          <CircularProgress size={60} sx={{ mb: 3, color: '#E1306C' }} />
+          <Typography variant="h6" sx={{ mb: 1 }}>
             Processando autenticação do Instagram...
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Por favor, aguarde enquanto conectamos sua conta.
+          <Typography variant="body2" color="text.secondary">
+            Por favor, aguarde enquanto carregamos suas contas.
           </Typography>
         </>
       )}
       
       {error && (
-        <>
-          <Alert severity="error" sx={{ mb: 2, width: '100%', maxWidth: 500 }}>
+        <Box sx={{ maxWidth: 500, width: '100%' }}>
+          <Alert severity="error" sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Erro na Autenticação
+            </Typography>
             {error}
           </Alert>
-          {detailedError && (
-            <Alert severity="warning" sx={{ mb: 2, width: '100%', maxWidth: 500, textAlign: 'left', overflowX: 'auto' }}>
-              <Typography variant="subtitle2">Detalhes do erro:</Typography>
-              <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem' }}>{detailedError}</pre>
-            </Alert>
-          )}
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 3 }}>
-            Não foi possível conectar sua conta do Instagram.
+          
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mb: 3 }}>
+            <Button 
+              variant="contained" 
+              onClick={handleRetry}
+              sx={{ 
+                bgcolor: '#E1306C', 
+                '&:hover': { bgcolor: '#C13584' } 
+              }}
+            >
+              Tentar Novamente
+            </Button>
+            <Button 
+              variant="outlined" 
+              onClick={handleClose}
+            >
+              Fechar
+            </Button>
+          </Box>
+          
+          <Typography variant="body2" color="text.secondary">
+            Esta janela será fechada automaticamente em alguns segundos...
           </Typography>
-          <Typography variant="body2">
-            Esta janela será fechada automaticamente...
-          </Typography>
-        </>
+        </Box>
       )}
       
       {success && (
-        <>
-          <Alert severity="success" sx={{ mb: 2, width: '100%', maxWidth: 500 }}>
-            Conta conectada com sucesso!
+        <Box sx={{ maxWidth: 500, width: '100%' }}>
+          <Alert severity="success" sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Sucesso!
+            </Typography>
+            Conta do Instagram conectada com sucesso!
           </Alert>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 3 }}>
-            Esta janela será fechada automaticamente em alguns segundos...
+          
+          <Typography variant="body2" color="text.secondary">
+            Esta janela será fechada automaticamente...
           </Typography>
-        </>
-      )}
-      
-      {/* Mostrar informações de debug */}
-      <Box sx={{ mt: 3, width: '100%', maxWidth: 600, textAlign: 'left' }}>
-        <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
-          Log de processamento:
-        </Typography>
-        <Box 
-          sx={{ 
-            p: 2, 
-            bgcolor: 'rgba(0,0,0,0.03)', 
-            borderRadius: 1, 
-            maxHeight: 200, 
-            overflowY: 'auto',
-            fontSize: '0.75rem',
-            fontFamily: 'monospace'
-          }}
-        >
-          {debugInfo.map((line, index) => (
-            <div key={index}>{line}</div>
-          ))}
         </Box>
-      </Box>
+      )}
+
+      {/* Seletor de contas do Instagram */}
+      {authCode && (
+        <InstagramAccountSelector
+          open={showAccountSelector}
+          onClose={handleSelectorClose}
+          onAccountSelected={handleAccountSelected}
+          authCode={authCode}
+        />
+      )}
     </Box>
   );
 };
