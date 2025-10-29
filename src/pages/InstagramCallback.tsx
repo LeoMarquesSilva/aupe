@@ -119,19 +119,28 @@ const InstagramCallback: React.FC = () => {
     }
   };
 
-  const saveInstagramDataToSupabase = async (instagramData: any) => {
+   const saveInstagramDataToSupabase = async (instagramData: any) => {
     try {
       console.log('💾 Salvando dados no Supabase usando clientService...');
       
-      // Buscar o cliente atual (assumindo que há um clientId no localStorage ou URL)
-      const clientId = localStorage.getItem('current_client_id') || 
-                      new URLSearchParams(window.location.search).get('client_id');
+      // MODIFICAÇÃO: Buscar o cliente ID de múltiplas fontes
+      const urlParams = new URLSearchParams(window.location.search);
+      const clientId = urlParams.get('state') ||                    // Primeiro: da URL (parâmetro state)
+                      localStorage.getItem('current_client_id') ||   // Segundo: do localStorage
+                      urlParams.get('client_id');                   // Terceiro: parâmetro client_id direto
+      
+      console.log('🔍 Tentativas de encontrar clientId:', {
+        fromState: urlParams.get('state'),
+        fromLocalStorage: localStorage.getItem('current_client_id'),
+        fromClientId: urlParams.get('client_id'),
+        finalClientId: clientId
+      });
       
       if (!clientId) {
         throw new Error('ID do cliente não encontrado. Certifique-se de que o cliente foi selecionado corretamente.');
       }
       
-      console.log('Cliente ID encontrado:', clientId);
+      console.log('✅ Cliente ID encontrado:', clientId);
       
       // Usar a função existente do clientService para salvar os dados
       const updatedClient = await clientService.saveInstagramAuth(clientId, instagramData);
@@ -161,14 +170,14 @@ const InstagramCallback: React.FC = () => {
           type: 'INSTAGRAM_AUTH_ERROR',
           error: (error as Error).message,
           data: instagramData,
-          clientId: localStorage.getItem('current_client_id')
+          clientId: localStorage.getItem('current_client_id') || 'unknown'
         }, window.location.origin);
       }
       
       throw error;
     }
   };
-
+  
   const handleSelectorClose = () => {
     // Só processar o cancelamento se não estiver processando uma seleção
     if (isProcessing) {

@@ -61,8 +61,8 @@ const META_REDIRECT_URI = 'https://aupe.vercel.app/callback';
 // Configuração da URL base da API
 const API_BASE_URL = window.location.origin;
 
-// Função para gerar a URL de autorização (SEM state para evitar problemas entre janelas)
-export const getAuthorizationUrl = (): string => {
+// Função para gerar a URL de autorização COM state para passar o clientId
+export const getAuthorizationUrl = (clientId?: string): string => {
   const scopes = [
     'instagram_basic',
     'instagram_content_publish',
@@ -71,9 +71,18 @@ export const getAuthorizationUrl = (): string => {
     'business_management'
   ].join(',');
   
-  // Removendo o state para evitar problemas entre janelas popup
-  // O código de autorização do Facebook já fornece segurança suficiente
-  return `https://www.facebook.com/v21.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(META_REDIRECT_URI)}&scope=${scopes}&response_type=code`;
+  // Construir URL base
+  let url = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(META_REDIRECT_URI)}&scope=${scopes}&response_type=code`;
+  
+  // Adicionar state se clientId for fornecido
+  if (clientId) {
+    url += `&state=${encodeURIComponent(clientId)}`;
+    console.log(`🔗 URL de autorização gerada com clientId: ${clientId}`);
+  } else {
+    console.log('🔗 URL de autorização gerada sem clientId');
+  }
+  
+  return url;
 };
 
 // Função de validação simplificada (sempre retorna true agora)
