@@ -7,6 +7,9 @@ export interface Client {
   accessToken?: string;
   userId?: string;
   appId?: string;
+  // Campos de timestamp
+  createdAt?: string;
+  updatedAt?: string;
   // Novos campos para autenticação do Instagram
   instagramAccountId?: string;
   username?: string; // Pode ser redundante com instagram

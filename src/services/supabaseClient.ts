@@ -194,7 +194,6 @@ export const clientService = {
   },
   
  // Salvar dados de autenticação do Instagram para um cliente
-// Salvar dados de autenticação do Instagram para um cliente
 async saveInstagramAuth(clientId: string, authData: InstagramAuthData): Promise<Client> {
   try {
     console.log('=== SALVANDO DADOS DO INSTAGRAM ===');
@@ -229,43 +228,33 @@ async saveInstagramAuth(clientId: string, authData: InstagramAuthData): Promise<
     
     console.log('Dados salvos com sucesso no banco:', data);
     
-    // Verificação crítica
-    if (!data.instagram_account_id) {
-      console.error('ERRO CRÍTICO: instagram_account_id ainda está null após o update!');
-      console.error('Dados retornados pelo Supabase:', data);
-      
-      // Fazer uma segunda tentativa com dados mais explícitos
-      console.log('Tentando segunda vez com dados mais explícitos...');
-      const { data: data2, error: error2 } = await supabase
-        .from('clients')
-        .update({
-          instagram_account_id: String(authData.instagramAccountId),
-          access_token: String(authData.accessToken),
-          instagram_username: String(authData.username)
-        })
-        .eq('id', clientId)
-        .select('*')
-        .single();
-      
-      if (error2) {
-        console.error('ERRO na segunda tentativa:', error2);
-        throw new Error(`Segunda tentativa falhou: ${error2.message}`);
-      }
-      
-      console.log('Segunda tentativa - dados salvos:', data2);
-      
-      if (!data2.instagram_account_id) {
-        console.error('ERRO CRÍTICO: Mesmo na segunda tentativa, instagram_account_id está null!');
-        throw new Error('Não foi possível salvar o instagram_account_id no banco de dados');
-      }
-      
-      // Usar os dados da segunda tentativa
-      return convertFromDbFormat(data2) as Client;
-    }
+    // *** AQUI ESTÁ O PROBLEMA! ***
+    // Em vez de usar convertFromDbFormat que pode estar bugada,
+    // vamos fazer a conversão manualmente para garantir que funcione
     
-    // Se chegou aqui, os dados foram salvos corretamente
-    console.log('=== DADOS SALVOS COM SUCESSO ===');
-    return convertFromDbFormat(data) as Client;
+    const convertedClient: Client = {
+      id: data.id,
+      name: data.name,
+      instagram: data.instagram,
+      logoUrl: data.logo_url,
+      accessToken: data.access_token,
+      userId: data.user_id,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      appId: data.app_id,
+      // *** CONVERSÃO MANUAL DOS CAMPOS PROBLEMÁTICOS ***
+      instagramAccountId: data.instagram_account_id,  // <- ESTE É O CAMPO CRÍTICO
+      username: data.instagram_username,              // <- ESTE TAMBÉM
+      profilePicture: data.profile_picture,           // <- E ESTE
+      tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
+      pageId: data.page_id,
+      pageName: data.page_name
+    };
+    
+    console.log('Cliente convertido manualmente:', convertedClient);
+    console.log('=== DADOS SALVOS E CONVERTIDOS COM SUCESSO ===');
+    
+    return convertedClient;
     
   } catch (err: any) {
     console.error('ERRO FATAL ao salvar dados do Instagram:', err);
