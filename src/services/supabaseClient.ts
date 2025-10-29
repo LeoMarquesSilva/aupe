@@ -3,7 +3,6 @@ import { Client } from '../types';
 import { InstagramAuthData } from '../services/instagramAuthService';
 import { fixInstagramConnection } from 'services/instagramFixService';
 
-
 // Usar variáveis de ambiente para as credenciais do Supabase
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
 const supabaseKey = process.env.REACT_APP_SUPABASE_KEY || '';
@@ -150,15 +149,26 @@ export const clientService = {
   // Atualizar um cliente existente
   async updateClient(client: Partial<Client> & { id: string }): Promise<Client> {
     try {
-      // Remover campos vazios para evitar problemas de validação
+      // Remover campos vazios E campos do Instagram para não sobrescrever
       const filteredClient = Object.fromEntries(
-        Object.entries(client).filter(([key, value]) => key === 'id' || value !== '')
+        Object.entries(client).filter(([key, value]) => {
+          // Sempre manter o ID
+          if (key === 'id') return true;
+          
+          // Pular campos do Instagram para não sobrescrever
+          if (['instagramAccountId', 'username', 'profilePicture', 'tokenExpiry', 'pageId', 'pageName'].includes(key)) {
+            return false; // Não incluir estes campos no update
+          }
+          
+          // Manter outros campos que não são vazios
+          return value !== '' && value !== null && value !== undefined;
+        })
       );
       
       // Converter camelCase para snake_case com mapeamento específico
       const clientData = convertToDbFormat(filteredClient);
       
-      console.log('Atualizando cliente com dados:', clientData);
+      console.log('Atualizando cliente com dados (SEM campos do Instagram):', clientData);
       
       const { data, error } = await supabase
         .from('clients')
@@ -193,74 +203,69 @@ export const clientService = {
     }
   },
   
- // Salvar dados de autenticação do Instagram para um cliente
-async saveInstagramAuth(clientId: string, authData: InstagramAuthData): Promise<Client> {
-  try {
-    console.log('=== SALVANDO DADOS DO INSTAGRAM ===');
-    console.log('Cliente ID:', clientId);
-    console.log('Dados recebidos:', authData);
-    
-    // Preparar dados para update - usando EXATAMENTE os nomes das colunas do banco
-    const updateData = {
-      instagram_account_id: authData.instagramAccountId,
-      access_token: authData.accessToken,
-      instagram_username: authData.username,
-      profile_picture: authData.profilePicture,
-      token_expiry: authData.tokenExpiry instanceof Date ? authData.tokenExpiry.toISOString() : authData.tokenExpiry,
-      page_id: authData.pageId,
-      page_name: authData.pageName
-    };
-    
-    console.log('Dados que serão salvos no banco:', updateData);
-    
-    // Fazer o update diretamente
-    const { data, error } = await supabase
-      .from('clients')
-      .update(updateData)
-      .eq('id', clientId)
-      .select('*')
-      .single();
-    
-    if (error) {
-      console.error('ERRO no Supabase:', error);
-      throw new Error(`Erro do Supabase: ${error.message}`);
+  // Salvar dados de autenticação do Instagram para um cliente
+  async saveInstagramAuth(clientId: string, authData: InstagramAuthData): Promise<Client> {
+    try {
+      console.log('=== SALVANDO DADOS DO INSTAGRAM ===');
+      console.log('Cliente ID:', clientId);
+      console.log('Dados recebidos:', authData);
+      
+      // Preparar dados para update - usando EXATAMENTE os nomes das colunas do banco
+      const updateData = {
+        instagram_account_id: authData.instagramAccountId,
+        access_token: authData.accessToken,
+        instagram_username: authData.username,
+        profile_picture: authData.profilePicture,
+        token_expiry: authData.tokenExpiry instanceof Date ? authData.tokenExpiry.toISOString() : authData.tokenExpiry,
+        page_id: authData.pageId,
+        page_name: authData.pageName
+      };
+      
+      console.log('Dados que serão salvos no banco:', updateData);
+      
+      // Fazer o update diretamente
+      const { data, error } = await supabase
+        .from('clients')
+        .update(updateData)
+        .eq('id', clientId)
+        .select('*')
+        .single();
+      
+      if (error) {
+        console.error('ERRO no Supabase:', error);
+        throw new Error(`Erro do Supabase: ${error.message}`);
+      }
+      
+      console.log('Dados salvos com sucesso no banco:', data);
+      
+      // Conversão manual para garantir que funcione
+      const convertedClient: Client = {
+        id: data.id,
+        name: data.name,
+        instagram: data.instagram,
+        logoUrl: data.logo_url,
+        accessToken: data.access_token,
+        userId: data.user_id,
+        appId: data.app_id,
+        // Conversão manual dos campos críticos do Instagram
+        instagramAccountId: data.instagram_account_id,
+        username: data.instagram_username,
+        profilePicture: data.profile_picture,
+        tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
+        pageId: data.page_id,
+        pageName: data.page_name
+      };
+      
+      console.log('Cliente convertido manualmente:', convertedClient);
+      console.log('=== DADOS SALVOS E CONVERTIDOS COM SUCESSO ===');
+      
+      return convertedClient;
+      
+    } catch (err: any) {
+      console.error('ERRO FATAL ao salvar dados do Instagram:', err);
+      throw new Error(`Falha ao salvar dados: ${err.message}`);
     }
-    
-    console.log('Dados salvos com sucesso no banco:', data);
-    
-    // *** AQUI ESTÁ O PROBLEMA! ***
-    // Em vez de usar convertFromDbFormat que pode estar bugada,
-    // vamos fazer a conversão manualmente para garantir que funcione
-    
-    const convertedClient: Client = {
-      id: data.id,
-      name: data.name,
-      instagram: data.instagram,
-      logoUrl: data.logo_url,
-      accessToken: data.access_token,
-      userId: data.user_id,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      appId: data.app_id,
-      // *** CONVERSÃO MANUAL DOS CAMPOS PROBLEMÁTICOS ***
-      instagramAccountId: data.instagram_account_id,  // <- ESTE É O CAMPO CRÍTICO
-      username: data.instagram_username,              // <- ESTE TAMBÉM
-      profilePicture: data.profile_picture,           // <- E ESTE
-      tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
-      pageId: data.page_id,
-      pageName: data.page_name
-    };
-    
-    console.log('Cliente convertido manualmente:', convertedClient);
-    console.log('=== DADOS SALVOS E CONVERTIDOS COM SUCESSO ===');
-    
-    return convertedClient;
-    
-  } catch (err: any) {
-    console.error('ERRO FATAL ao salvar dados do Instagram:', err);
-    throw new Error(`Falha ao salvar dados: ${err.message}`);
-  }
-},
+  },
   
   // Verificar se o token do Instagram ainda é válido
   async verifyInstagramToken(accessToken: string): Promise<boolean> {
