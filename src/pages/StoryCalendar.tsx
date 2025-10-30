@@ -521,7 +521,7 @@ const ContentCalendar: React.FC = () => {
                     <MenuItem key={client.id} value={client.id}>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <Avatar 
-                          src={client.logoUrl} 
+                          src={client.profilePicture || client.logoUrl}
                           sx={{ width: 24, height: 24, mr: 1 }}
                         >
                           {client.name.charAt(0)}

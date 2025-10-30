@@ -1,56 +1,64 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Box,
   Container,
-  Typography,
-  Paper,
-  Grid,
-  Card,
-  CardContent,
-  CardMedia,
-  CardActionArea,
-  Tabs,
+  Box,
   Tab,
-  Avatar,
-  Chip,
-  Button,
-  Divider,
+  Tabs,
   CircularProgress,
   Alert,
+  TextField,
+  InputAdornment,
   IconButton,
-  Tooltip,
-  useTheme,
-  useMediaQuery,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
-  Badge
+  Button,
+  Grid,
+  Typography,
+  Chip,
+  LinearProgress
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
-  CalendarMonth as CalendarIcon,
-  Edit as EditIcon,
   Instagram as InstagramIcon,
-  Image as ImageIcon,
-  Movie as VideoIcon,
-  PhotoLibrary as CarouselIcon,
-  Favorite as LikeIcon,
-  Comment as CommentIcon,
-  Link as LinkIcon,
-  Visibility as VisibilityIcon,
-  BarChart as ChartIcon,
-  PostAdd as PostAddIcon,
-  AddPhotoAlternate as StoryAddIcon,
+  CalendarMonth as CalendarIcon,
   Settings as SettingsIcon,
-  Refresh as RefreshIcon
+  FilterList as FilterIcon,
+  Search as SearchIcon,
+  Clear as ClearIcon,
+  FileDownload as ExportIcon,
+  Refresh as RefreshIcon,
+  Update as UpdateIcon,
+  CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon,
+  Schedule as ScheduleIcon
 } from '@mui/icons-material';
-import { format, formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { clientService, postService } from '../services/supabaseClient';
-import { instagramMetricsService, InstagramPost, InstagramProfile } from '../services/instagramMetricsService';
+import { supabase } from '../services/supabaseClient';
 import { Client } from '../types';
+import { 
+  instagramMetricsService, 
+  InstagramPost, 
+  InstagramProfile, 
+  PostsFilter,
+  DashboardSummary,
+  MediaTypeAnalysis,
+  EngagementBreakdown,
+  TimelineData
+} from '../services/instagramMetricsService';
+import { instagramCacheService, CachedData } from '../services/instagramCacheService';
+import { clientService } from '../services/supabaseClient';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+// Importar componentes
+import ClientHeader from '../components/ClientHeader';
+import {
+  MetricsOverview,
+  FeaturedPost,
+  PostsTable,
+  PostFilters,
+  PostDetails,
+  ClientSettings,
+  ScheduledPostsList
+} from '../components/dashboard';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -65,12 +73,12 @@ function TabPanel(props: TabPanelProps) {
     <div
       role="tabpanel"
       hidden={value !== index}
-      id={`client-tabpanel-${index}`}
-      aria-labelledby={`client-tab-${index}`}
+      id={`tabpanel-${index}`}
+      aria-labelledby={`tab-${index}`}
       {...other}
     >
       {value === index && (
-        <Box sx={{ p: 3 }}>
+        <Box sx={{ pt: 3 }}>
           {children}
         </Box>
       )}
@@ -78,933 +86,816 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-function a11yProps(index: number) {
-  return {
-    id: `client-tab-${index}`,
-    'aria-controls': `client-tabpanel-${index}`,
-  };
-}
-
 const SingleClientDashboard: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
-
   const [tabValue, setTabValue] = useState(0);
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [posts, setPosts] = useState<InstagramPost[]>([]);
-  const [profile, setProfile] = useState<InstagramProfile | null>(null);
+  
+  // Instagram data com cache
+  const [cachedData, setCachedData] = useState<CachedData | null>(null);
+  const [syncInProgress, setSyncInProgress] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  
+  // Dashboard data
+  const [dashboardData, setDashboardData] = useState<{
+    summary: DashboardSummary;
+    by_media_type: MediaTypeAnalysis;
+    engagement_breakdown: EngagementBreakdown;
+    timeline: TimelineData[];
+    top_posts: InstagramPost[];
+    recent_posts: InstagramPost[];
+  } | null>(null);
+  const [loadingDashboard, setLoadingDashboard] = useState(false);
+  
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<PostsFilter>({
+    sortBy: 'date',
+    sortOrder: 'desc'
+  });
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  
+  // Post details
+  const [selectedPost, setSelectedPost] = useState<InstagramPost | null>(null);
+  const [postDetailsOpen, setPostDetailsOpen] = useState(false);
+  
+  // Scheduled posts
   const [scheduledPosts, setScheduledPosts] = useState<any[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
 
-  // Carregar dados do cliente e métricas
+  // Debug client data
   useEffect(() => {
-    const loadClientData = async () => {
-      if (!clientId) return;
-      
+    if (client) {
+      console.log('=== DEBUG CLIENT DATA ===');
+      console.log('Client object:', client);
+      console.log('accessToken:', client.accessToken);
+      console.log('instagramAccountId:', client.instagramAccountId);
+      console.log('username:', client.username);
+      console.log('hasInstagramAuth:', Boolean(client.accessToken && client.instagramAccountId));
+      console.log('========================');
+    }
+  }, [client]);
+
+  useEffect(() => {
+    if (!clientId) return;
+    
+    const fetchClient = async () => {
       try {
-        setLoading(true);
-        
-        // Carregar dados do cliente
+        // Usar o clientService ao invés de consulta direta
         const clients = await clientService.getClients();
-        const foundClient = clients.find(c => c.id === clientId);
+        const clientData = clients.find(c => c.id === clientId);
         
-        if (!foundClient) {
-          setError('Cliente não encontrado');
+        if (!clientData) {
+          throw new Error('Cliente não encontrado');
+        }
+        
+        console.log('Cliente carregado:', clientData);
+        console.log('Tem accessToken?', !!clientData.accessToken);
+        console.log('Tem instagramAccountId?', !!clientData.instagramAccountId);
+        
+        setClient(clientData);
+        
+        // Verificar se o cliente tem autenticação do Instagram
+        if (clientData.accessToken && clientData.instagramAccountId) {
+          console.log('Cliente autenticado, carregando dados do Instagram...');
+          await loadInstagramDataWithCache(clientData.id);
+        } else {
+          console.log('Cliente não autenticado com Instagram');
           setLoading(false);
-          return;
         }
-        
-        setClient(foundClient);
-        
-        // Carregar posts agendados
-        const scheduledPostsData = await postService.getScheduledPostsByClient(clientId);
-        setScheduledPosts(scheduledPostsData);
-        
-        // Carregar métricas do Instagram se o cliente estiver conectado
-        if (foundClient.accessToken && foundClient.instagramAccountId) {
-          try {
-            // Carregar perfil do Instagram
-            const profileData = await instagramMetricsService.getClientProfile(clientId);
-            if (profileData) {
-              setProfile(profileData);
-            }
-            
-            // Carregar posts do Instagram
-            const postsData = await instagramMetricsService.getClientPosts(clientId);
-            setPosts(postsData);
-          } catch (metricsError) {
-            console.error('Erro ao carregar dados do Instagram:', metricsError);
-            // Não exibimos o erro para não interromper a exibição do dashboard
-          }
-        }
-      } catch (err) {
-        console.error('Erro ao carregar dados do cliente:', err);
-        setError('Erro ao carregar dados do cliente');
-      } finally {
+      } catch (err: any) {
+        console.error('Erro ao buscar cliente:', err);
+        setError(err.message);
         setLoading(false);
       }
     };
     
-    loadClientData();
+    const fetchScheduledPosts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('scheduled_posts')
+          .select('*')
+          .eq('client_id', clientId)
+          .order('scheduled_date', { ascending: true });
+          
+        if (error) throw error;
+        
+        setScheduledPosts(data || []);
+      } catch (err: any) {
+        console.error('Erro ao buscar posts agendados:', err);
+      }
+    };
+    
+    fetchClient();
+    fetchScheduledPosts();
   }, [clientId]);
 
-  // Manipuladores de eventos
+  /**
+   * Carrega dados do Instagram usando o sistema de cache - VERSÃO CORRIGIDA
+   */
+  const loadInstagramDataWithCache = async (clientId: string, forceRefresh = false) => {
+    setLoading(true);
+    setLoadingDashboard(true);
+    
+    try {
+      setSyncInProgress(forceRefresh);
+      console.log(forceRefresh ? 'Forçando sincronização...' : 'Usando sincronização inteligente...');
+      
+      // ✅ USAR O NOVO MÉTODO QUE JÁ RESOLVE TUDO
+      const result = await instagramCacheService.getDataWithCache(clientId, forceRefresh);
+      
+      // Construir CachedData a partir do resultado
+      const data: CachedData = {
+        posts: result.posts,
+        profile: result.profile,
+        cacheStatus: result.cacheStatus,
+        isStale: !result.isFromCache // Se não veio do cache, não está stale
+      };
+      
+      setCachedData(data);
+      setLastSyncTime(result.cacheStatus.lastFullSync);
+      
+      // Gerar dados do dashboard se temos posts
+      if (result.posts.length > 0) {
+        await generateDashboardData(result.posts);
+      } else {
+        // Limpar dashboard se não há posts
+        setDashboardData(null);
+      }
+      
+      console.log(`📊 Dashboard atualizado: ${result.posts.length} posts, fonte: ${result.isFromCache ? 'cache' : 'API'}`);
+      
+    } catch (err: any) {
+      console.error('Erro ao carregar dados do Instagram:', err);
+      setError('Não foi possível carregar os dados do Instagram. Verifique a conexão.');
+      
+      // Em caso de erro, tentar usar dados em cache se existirem
+      try {
+        const cachedDataFallback = await instagramCacheService.getCachedData(clientId);
+        if (cachedDataFallback.posts.length > 0) {
+          setCachedData(cachedDataFallback);
+          await generateDashboardData(cachedDataFallback.posts);
+          console.log('📋 Usando dados em cache como fallback');
+        }
+      } catch (cacheError) {
+        console.error('Erro ao buscar dados em cache:', cacheError);
+      }
+    } finally {
+      setLoading(false);
+      setLoadingDashboard(false);
+      setSyncInProgress(false);
+    }
+  };
+
+  /**
+   * Gera dados do dashboard a partir dos posts em cache
+   */
+  const generateDashboardData = async (posts: InstagramPost[]) => {
+    try {
+      const summary = instagramMetricsService.generateDashboardSummaryFromPosts(posts);
+      const mediaTypeAnalysis = instagramMetricsService.analyzeMediaTypes(posts);
+      const engagementBreakdown = instagramMetricsService.getEngagementBreakdown(posts);
+      const timeline = instagramMetricsService.generateTimelineData(posts);
+      
+      setDashboardData({
+        summary,
+        by_media_type: mediaTypeAnalysis,
+        engagement_breakdown: engagementBreakdown,
+        timeline,
+        top_posts: posts.slice(0, 5),
+        recent_posts: posts.slice(0, 10)
+      });
+      
+      console.log('📊 Dados do dashboard gerados:', {
+        posts: posts.length,
+        totalReach: summary.total_reach,
+        totalEngagement: summary.total_engagement
+      });
+    } catch (err: any) {
+      console.error('Erro ao gerar dados do dashboard:', err);
+    }
+  };
+
+  // Event handlers
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
-
+  
   const handleCreatePost = () => {
-    navigate(`/create-post?clientId=${clientId}`);
+    navigate('/create-post');
   };
-
+  
   const handleCreateStory = () => {
-    navigate(`/create-story?clientId=${clientId}`);
+    navigate('/create-story');
   };
-
+  
   const handleViewCalendar = () => {
-    navigate(`/calendar/${clientId}`);
+    navigate('/calendar');
   };
 
-  const handleRefreshMetrics = async () => {
-    if (!clientId) return;
+  /**
+   * Força uma atualização dos dados do Instagram
+   */
+  const handleForceRefresh = async () => {
+    if (!clientId || syncInProgress) return;
+    
+    console.log('🔄 Usuário solicitou atualização manual');
+    setError(null); // Limpar erros anteriores
+    await loadInstagramDataWithCache(clientId, true);
+  };
+
+  /**
+   * Limpa o cache e recarrega
+   */
+  const handleClearCache = async () => {
+    if (!clientId || syncInProgress) return;
     
     try {
-      setRefreshing(true);
+      console.log('🗑️ Limpando cache...');
+      await instagramCacheService.clearCache(clientId);
+      setCachedData(null);
+      setDashboardData(null);
+      setError(null);
       
-      // Recarregar perfil do Instagram
-      const profileData = await instagramMetricsService.getClientProfile(clientId);
-      if (profileData) {
-        setProfile(profileData);
-      }
+      // Recarregar dados
+      await loadInstagramDataWithCache(clientId, true);
+    } catch (err: any) {
+      console.error('Erro ao limpar cache:', err);
+      setError('Não foi possível limpar o cache.');
+    }
+  };
+  
+  const handleViewPostDetails = (post: InstagramPost) => {
+    setSelectedPost(post);
+    setPostDetailsOpen(true);
+  };
+  
+  const handleClosePostDetails = () => {
+    setPostDetailsOpen(false);
+    setSelectedPost(null);
+  };
+  
+  const handleOpenFilterDialog = () => {
+    setFilterDialogOpen(true);
+  };
+  
+  const handleCloseFilterDialog = () => {
+    setFilterDialogOpen(false);
+  };
+  
+  const handleApplyFilters = (newFilters: PostsFilter) => {
+    setFilters(newFilters);
+    console.log('🔍 Filtros aplicados:', newFilters);
+    
+    // Regenerar dashboard com novos filtros se necessário
+    if (cachedData?.posts) {
+      setTimeout(() => generateDashboardData(cachedData.posts), 100);
+    }
+  };
+  
+  const handleResetFilters = () => {
+    const defaultFilters = {
+      sortBy: 'date' as const,
+      sortOrder: 'desc' as const
+    };
+    
+    setFilters(defaultFilters);
+    setSearchQuery('');
+    console.log('🔄 Filtros resetados');
+    
+    // Regenerar dashboard sem filtros
+    if (cachedData?.posts) {
+      setTimeout(() => generateDashboardData(cachedData.posts), 100);
+    }
+  };
+  
+  const handleEditClient = () => {
+    console.log('✏️ Editar cliente:', client);
+    // TODO: Implementar modal de edição ou navegar para página de edição
+    navigate(`/clients/${clientId}/edit`);
+  };
+  
+  const handleConnectInstagram = () => {
+    navigate(`/clients/${clientId}/connect-instagram`);
+  };
+  
+  const handleDisconnectInstagram = async () => {
+    if (!client) return;
+    
+    try {
+      console.log('🔌 Desconectando Instagram...');
       
-      // Recarregar posts do Instagram
-      const postsData = await instagramMetricsService.getClientPosts(clientId);
-      setPosts(postsData);
+      // Usar o clientService ao invés de consulta direta
+      const updatedClient = await clientService.removeInstagramAuth(client.id);
+      
+      console.log('✅ Instagram desconectado, cliente atualizado:', updatedClient);
+      
+      // Atualizar estado local
+      setClient(updatedClient);
+      
+      // Limpar dados do Instagram e cache
+      setCachedData(null);
+      setDashboardData(null);
+      await instagramCacheService.clearCache(client.id);
+      
+      setError(null);
+    } catch (err: any) {
+      console.error('❌ Erro ao desconectar Instagram:', err);
+      setError('Não foi possível desconectar a conta do Instagram.');
+    }
+  };
+  
+  const handleExportData = () => {
+    const posts = cachedData?.posts || [];
+    if (posts.length === 0) {
+      console.log('⚠️ Nenhum post para exportar');
+      return;
+    }
+    
+    try {
+      console.log('📤 Exportando dados...', posts.length, 'posts');
+      
+      // Criar CSV com dados mais completos
+      const headers = [
+        'ID',
+        'Data',
+        'Tipo',
+        'Legenda',
+        'Curtidas',
+        'Comentários',
+        'Alcance',
+        'Impressões',
+        'Engajamento Total',
+        'Taxa de Engajamento (%)',
+        'Link'
+      ];
+      
+      const csvRows = [
+        headers.join(','),
+        ...posts.map(post => {
+          const engagement = (post.insights?.engagement || 0);
+          const reach = (post.insights?.reach || 0);
+          const impressions = (post.insights?.impressions || 0);
+          const engagementRate = reach > 0 ? ((engagement / reach) * 100).toFixed(2) : '0';
+          
+          return [
+            post.id,
+            new Date(post.timestamp).toLocaleDateString('pt-BR'),
+            post.media_product_type === 'REELS' ? 'Reels' : 
+            post.media_type === 'CAROUSEL_ALBUM' ? 'Carrossel' :
+            post.media_type === 'VIDEO' ? 'Vídeo' : 'Imagem',
+            `"${(post.caption || '').replace(/"/g, '""').substring(0, 100)}..."`,
+            post.like_count || 0,
+            post.comments_count || 0,
+            reach,
+            impressions,
+            engagement,
+            engagementRate,
+            post.permalink
+          ].join(',');
+        })
+      ];
+      
+      const csvContent = csvRows.join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const fileName = `instagram_posts_${client?.name?.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', fileName);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      console.log('✅ Dados exportados:', fileName);
     } catch (err) {
-      console.error('Erro ao atualizar métricas:', err);
-      setError('Erro ao atualizar métricas do Instagram');
-    } finally {
-      setRefreshing(false);
+      console.error('❌ Erro ao exportar dados:', err);
+      setError('Não foi possível exportar os dados.');
     }
   };
-
-  // Funções auxiliares
-  const getMediaTypeIcon = (mediaType: string) => {
-    switch (mediaType) {
-      case 'IMAGE':
-        return <ImageIcon />;
-      case 'VIDEO':
-        return <VideoIcon />;
-      case 'CAROUSEL_ALBUM':
-        return <CarouselIcon />;
-      default:
-        return <ImageIcon />;
-    }
-  };
-
-  const getMediaTypeLabel = (mediaType: string) => {
-    switch (mediaType) {
-      case 'IMAGE':
-        return 'Imagem';
-      case 'VIDEO':
-        return 'Vídeo';
-      case 'CAROUSEL_ALBUM':
-        return 'Carrossel';
-      default:
-        return mediaType;
-    }
-  };
-
+  
+  // Utility functions
   const formatTimestamp = (timestamp: string) => {
-    try {
-      return format(new Date(timestamp), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-    } catch (e) {
-      return timestamp;
-    }
+    return new Date(timestamp).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
-
+  
   const formatTimeAgo = (timestamp: string) => {
-    try {
-      return formatDistanceToNow(new Date(timestamp), { addSuffix: true, locale: ptBR });
-    } catch (e) {
-      return timestamp;
-    }
+    return formatDistanceToNow(new Date(timestamp), {
+      addSuffix: true,
+      locale: ptBR
+    });
   };
-
-  // Calcular métricas agregadas
-  const metrics = instagramMetricsService.calculateAggregatedMetrics(posts);
-
-  // Estados de carregamento e erro
+  
+  // Filter posts
+  const posts = cachedData?.posts || [];
+  const filteredPosts = posts.filter(post => {
+    // Filter by search
+    if (searchQuery && !post.caption?.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
+    
+    // Filter by date
+    if (filters.startDate && new Date(post.timestamp) < filters.startDate) {
+      return false;
+    }
+    
+    if (filters.endDate) {
+      const endDateWithTime = new Date(filters.endDate);
+      endDateWithTime.setHours(23, 59, 59, 999);
+      if (new Date(post.timestamp) > endDateWithTime) {
+        return false;
+      }
+    }
+    
+    // Filter by media type
+    if (filters.mediaType && filters.mediaType !== 'all' && post.media_type !== filters.mediaType) {
+      return false;
+    }
+    
+    return true;
+  }).sort((a, b) => {
+    // Sort posts
+    if (filters.sortBy === 'date') {
+      return filters.sortOrder === 'asc' 
+        ? new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        : new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    } else if (filters.sortBy === 'likes') {
+      return filters.sortOrder === 'asc' 
+        ? (a.like_count || 0) - (b.like_count || 0)
+        : (b.like_count || 0) - (a.like_count || 0);
+    } else if (filters.sortBy === 'comments') {
+      return filters.sortOrder === 'asc' 
+        ? (a.comments_count || 0) - (b.comments_count || 0)
+        : (b.comments_count || 0) - (a.comments_count || 0);
+    } else if (filters.sortBy === 'engagement') {
+      const engagementA = a.insights?.engagement || ((a.like_count || 0) + (a.comments_count || 0));
+      const engagementB = b.insights?.engagement || ((b.like_count || 0) + (b.comments_count || 0));
+      return filters.sortOrder === 'asc' 
+        ? engagementA - engagementB
+        : engagementB - engagementA;
+    } else if (filters.sortBy === 'reach') {
+      const reachA = a.insights?.reach || 0;
+      const reachB = b.insights?.reach || 0;
+      return filters.sortOrder === 'asc' 
+        ? reachA - reachB
+        : reachB - reachA;
+    }
+    
+    return 0;
+  });
+  
+  // Criar métricas compatíveis com o componente MetricsOverview
+  const legacyMetrics = dashboardData ? {
+    totalPosts: dashboardData.summary.total_posts,
+    totalLikes: dashboardData.engagement_breakdown.likes,
+    totalComments: dashboardData.engagement_breakdown.comments,
+    engagementRate: dashboardData.summary.engagement_rate,
+    postsByType: Object.keys(dashboardData.by_media_type).reduce((acc, key) => {
+      acc[key] = dashboardData.by_media_type[key].count;
+      return acc;
+    }, {} as Record<string, number>),
+    metricsByMonth: dashboardData.timeline.map(item => ({
+      month: item.date.substring(0, 7), // YYYY-MM
+      posts: item.posts,
+      likes: Math.round(item.engagement * 0.8), // Estimativa
+      comments: Math.round(item.engagement * 0.2), // Estimativa
+      engagement: item.engagement
+    })),
+    mostEngagedPost: dashboardData.top_posts[0] || null,
+    totalImpressions: dashboardData.summary.total_impressions,
+    totalReach: dashboardData.summary.total_reach
+  } : {
+    totalPosts: 0,
+    totalLikes: 0,
+    totalComments: 0,
+    engagementRate: 0,
+    postsByType: {},
+    metricsByMonth: [],
+    mostEngagedPost: null,
+    totalImpressions: 0,
+    totalReach: 0
+  };
+  
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4, textAlign: 'center' }}>
-        <CircularProgress />
-        <Typography sx={{ mt: 2 }}>Carregando dados do cliente...</Typography>
+      <Container maxWidth="lg" sx={{ mt: 4 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <CircularProgress />
+          <Typography variant="body1" color="text.secondary">
+            {syncInProgress ? 'Sincronizando dados do Instagram...' : 'Carregando dashboard...'}
+          </Typography>
+          {syncInProgress && (
+            <LinearProgress sx={{ width: '100%', maxWidth: 400 }} />
+          )}
+        </Box>
       </Container>
     );
   }
-
-  if (error || !client) {
+  
+  if (error && !cachedData) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Alert severity="error">{error || 'Cliente não encontrado'}</Alert>
-        <Button 
-          variant="contained" 
-          sx={{ mt: 2 }}
-          onClick={() => navigate('/clients')}
+      <Container maxWidth="lg" sx={{ mt: 4 }}>
+        <Alert 
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => window.location.reload()}>
+              Recarregar
+            </Button>
+          }
         >
-          Voltar para a lista de clientes
-        </Button>
+          {error}
+        </Alert>
       </Container>
     );
   }
-
-  const hasInstagramAuth = client.accessToken && client.instagramAccountId;
+  
+  if (!client) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4 }}>
+        <Alert severity="error">Cliente não encontrado</Alert>
+      </Container>
+    );
+  }
+  
+  const hasInstagramAuth = Boolean(client.accessToken && client.instagramAccountId);
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Cabeçalho do cliente */}
-      <Paper 
-        elevation={3} 
-        sx={{ 
-          p: 3, 
-          mb: 4, 
-          borderRadius: 2,
-          background: `linear-gradient(to right, ${theme.palette.primary.main}22, ${theme.palette.primary.main}11)`,
-        }}
-      >
-        <Box sx={{ display: 'flex', flexDirection: isTablet ? 'column' : 'row', alignItems: isTablet ? 'flex-start' : 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: isTablet ? 2 : 0 }}>
-            <Badge 
-              color={hasInstagramAuth ? "success" : "error"} 
-              overlap="circular"
-              badgeContent={hasInstagramAuth ? <InstagramIcon fontSize="small" /> : null}
-              anchorOrigin={{
-                vertical: 'bottom',
-                horizontal: 'right',
-              }}
-              sx={{ mr: 2 }}
-            >
-              <Avatar 
-                src={profile?.profile_picture_url || client.profilePicture || client.logoUrl} 
-                alt={client.name}
-                sx={{ width: 80, height: 80 }}
-              >
-                {client.name.charAt(0)}
-              </Avatar>
-            </Badge>
-            
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-                {client.name}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <InstagramIcon sx={{ fontSize: 18, mr: 0.5, color: '#E1306C' }} />
-                <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-                  @{profile?.username || client.instagram}
-                </Typography>
-                {client.username && client.username !== client.instagram && (
-                  <Chip 
-                    size="small" 
-                    label={client.username} 
-                    variant="outlined"
-                    sx={{ ml: 1 }}
-                  />
-                )}
-              </Box>
-            </Box>
-          </Box>
-          
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: isTablet ? 'flex-start' : 'flex-end' }}>
-            <Button 
-              variant="contained" 
-              startIcon={<PostAddIcon />}
-              onClick={handleCreatePost}
-              sx={{ color: '#ffffff' }}
-            >
-              Criar Post
-            </Button>
-            <Button 
-              variant="contained" 
-              startIcon={<StoryAddIcon />}
-              onClick={handleCreateStory}
-              sx={{ color: '#ffffff' }}
-            >
-              Criar Story
-            </Button>
-            <Button 
-              variant="outlined" 
-              startIcon={<CalendarIcon />}
-              onClick={handleViewCalendar}
-              sx={{ color: theme.palette.primary.main }}
-            >
-              Calendário
-            </Button>
-          </Box>
-        </Box>
-      </Paper>
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
+      <ClientHeader 
+        client={client} 
+        profile={cachedData?.profile || null} 
+        onCreatePost={handleCreatePost}
+        onCreateStory={handleCreateStory}
+        onViewCalendar={handleViewCalendar}
+      />
 
-      {/* Abas de navegação */}
+      {/* Erro não crítico */}
+      {error && cachedData && (
+        <Box sx={{ mb: 2 }}>
+          <Alert 
+            severity="warning"
+            onClose={() => setError(null)}
+          >
+            {error} (Usando dados em cache)
+          </Alert>
+        </Box>
+      )}
+
+      {/* Status do Cache */}
+      {hasInstagramAuth && cachedData && (
+        <Box sx={{ mb: 3 }}>
+          <Alert 
+            severity={cachedData.isStale ? "warning" : "success"}
+            action={
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button 
+                  color="inherit" 
+                  size="small" 
+                  startIcon={<RefreshIcon />}
+                  onClick={handleForceRefresh}
+                  disabled={syncInProgress}
+                >
+                  {syncInProgress ? 'Atualizando...' : 'Atualizar'}
+                </Button>
+                <Button 
+                  color="inherit" 
+                  size="small" 
+                  onClick={handleClearCache}
+                  disabled={syncInProgress}
+                >
+                  Limpar Cache
+                </Button>
+              </Box>
+            }
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {cachedData.cacheStatus.syncStatus === 'completed' ? (
+                  <CheckCircleIcon fontSize="small" />
+                ) : cachedData.cacheStatus.syncStatus === 'failed' ? (
+                  <ErrorIcon fontSize="small" />
+                ) : (
+                  <ScheduleIcon fontSize="small" />
+                )}
+                <Typography variant="body2">
+                  {cachedData.isStale 
+                    ? `Dados desatualizados (última sincronização: ${formatTimeAgo(cachedData.cacheStatus.lastFullSync.toISOString())})`
+                    : `Dados atualizados (${formatTimeAgo(cachedData.cacheStatus.lastFullSync.toISOString())})`
+                  }
+                </Typography>
+              </Box>
+              
+              <Chip 
+                size="small" 
+                label={`${cachedData.cacheStatus.postsCount} posts em cache`}
+                color={cachedData.isStale ? "warning" : "success"}
+                variant="outlined"
+              />
+              
+              {cachedData.cacheStatus.syncStatus === 'failed' && cachedData.cacheStatus.errorMessage && (
+                <Chip 
+                  size="small" 
+                  label={`Erro: ${cachedData.cacheStatus.errorMessage}`}
+                  color="error"
+                  variant="outlined"
+                />
+              )}
+            </Box>
+          </Alert>
+        </Box>
+      )}
+      
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs 
-          value={tabValue} 
-          onChange={handleTabChange} 
-          aria-label="client dashboard tabs"
-          variant={isMobile ? "scrollable" : "fullWidth"}
-          scrollButtons={isMobile ? "auto" : undefined}
-        >
-          <Tab 
-            icon={<DashboardIcon />} 
-            label="Dashboard" 
-            {...a11yProps(0)} 
-            sx={{ fontWeight: 'medium' }}
-          />
-          <Tab 
-            icon={<InstagramIcon />} 
-            label="Métricas" 
-            {...a11yProps(1)} 
-            sx={{ fontWeight: 'medium' }}
-            disabled={!hasInstagramAuth}
-          />
-          <Tab 
-            icon={<CalendarIcon />} 
-            label="Agendados" 
-            {...a11yProps(2)} 
-            sx={{ fontWeight: 'medium' }}
-          />
-          <Tab 
-            icon={<SettingsIcon />} 
-            label="Configurações" 
-            {...a11yProps(3)} 
-            sx={{ fontWeight: 'medium' }}
-          />
+        <Tabs value={tabValue} onChange={handleTabChange} aria-label="dashboard tabs">
+          <Tab icon={<DashboardIcon />} label="Dashboard" id="tab-0" aria-controls="tabpanel-0" />
+          <Tab icon={<InstagramIcon />} label="Instagram" id="tab-1" aria-controls="tabpanel-1" />
+          <Tab icon={<CalendarIcon />} label="Agendamentos" id="tab-2" aria-controls="tabpanel-2" />
+          <Tab icon={<SettingsIcon />} label="Configurações" id="tab-3" aria-controls="tabpanel-3" />
         </Tabs>
       </Box>
 
-      {/* Conteúdo das abas */}
       <TabPanel value={tabValue} index={0}>
-        <Typography variant="h5" sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
-          <DashboardIcon sx={{ mr: 1 }} /> Visão Geral
-        </Typography>
-        
-        <Grid container spacing={3}>
-          {/* Cards de ações rápidas */}
-          <Grid item xs={12} md={6}>
-            <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>Ações Rápidas</Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Card sx={{ height: '100%' }}>
-                    <CardActionArea onClick={handleCreatePost} sx={{ height: '100%', p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <PostAddIcon sx={{ fontSize: 40, mb: 1, color: theme.palette.primary.main }} />
-                      <Typography variant="subtitle1" align="center">Criar Post</Typography>
-                    </CardActionArea>
-                  </Card>
-                </Grid>
-                <Grid item xs={6}>
-                  <Card sx={{ height: '100%' }}>
-                    <CardActionArea onClick={handleCreateStory} sx={{ height: '100%', p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <StoryAddIcon sx={{ fontSize: 40, mb: 1, color: theme.palette.primary.main }} />
-                      <Typography variant="subtitle1" align="center">Criar Story</Typography>
-                    </CardActionArea>
-                  </Card>
-                </Grid>
-                <Grid item xs={6}>
-                  <Card sx={{ height: '100%' }}>
-                    <CardActionArea onClick={handleViewCalendar} sx={{ height: '100%', p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <CalendarIcon sx={{ fontSize: 40, mb: 1, color: theme.palette.primary.main }} />
-                      <Typography variant="subtitle1" align="center">Ver Calendário</Typography>
-                    </CardActionArea>
-                  </Card>
-                </Grid>
-                <Grid item xs={6}>
-                  <Card sx={{ height: '100%' }}>
-                    <CardActionArea onClick={() => setTabValue(3)} sx={{ height: '100%', p: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <SettingsIcon sx={{ fontSize: 40, mb: 1, color: theme.palette.primary.main }} />
-                      <Typography variant="subtitle1" align="center">Configurações</Typography>
-                    </CardActionArea>
-                  </Card>
-                </Grid>
-              </Grid>
-            </Paper>
-          </Grid>
-          
-          {/* Status da conta */}
-          <Grid item xs={12} md={6}>
-            <Paper elevation={2} sx={{ p: 2, borderRadius: 2, height: '100%' }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>Status da Conta</Typography>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Avatar 
-                  src={profile?.profile_picture_url || client.profilePicture} 
-                  alt={client.name}
-                  sx={{ width: 60, height: 60, mr: 2 }}
-                >
-                  {client.name.charAt(0)}
-                </Avatar>
-                <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
-                    {profile?.name || client.name}
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: '#E1306C' }} />
-                    <Typography variant="body2">
-                      @{profile?.username || client.instagram}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Box>
-              
-              <Divider sx={{ my: 2 }} />
-              
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>Status de Conexão:</Typography>
-                {hasInstagramAuth ? (
-                  <Chip 
-                    icon={<InstagramIcon />}
-                    label="Conectado ao Instagram" 
-                    color="success" 
-                    variant="outlined"
-                    sx={{ fontWeight: 'medium' }}
-                  />
-                ) : (
-                  <Chip 
-                    icon={<InstagramIcon />}
-                    label="Não conectado ao Instagram" 
-                    color="error" 
-                    variant="outlined"
-                    sx={{ fontWeight: 'medium' }}
-                  />
-                )}
-              </Box>
-              
-              {client.tokenExpiry && (
-                <Box>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Validade do Token:</Typography>
-                  <Chip 
-                    label={`Válido até ${new Date(client.tokenExpiry).toLocaleDateString()}`} 
-                    color="primary" 
-                    variant="outlined"
-                    size="small"
-                  />
-                </Box>
-              )}
-              
-              {profile && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Estatísticas do Instagram:</Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={4}>
-                      <Paper elevation={0} sx={{ p: 1, textAlign: 'center', bgcolor: 'primary.light' }}>
-                        <Typography variant="h6">{profile.followers_count}</Typography>
-                        <Typography variant="caption">Seguidores</Typography>
-                      </Paper>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Paper elevation={0} sx={{ p: 1, textAlign: 'center', bgcolor: 'primary.light' }}>
-                        <Typography variant="h6">{profile.follows_count}</Typography>
-                        <Typography variant="caption">Seguindo</Typography>
-                      </Paper>
-                    </Grid>
-                    <Grid item xs={4}>
-                      <Paper elevation={0} sx={{ p: 1, textAlign: 'center', bgcolor: 'primary.light' }}>
-                        <Typography variant="h6">{profile.media_count}</Typography>
-                        <Typography variant="caption">Posts</Typography>
-                      </Paper>
-                    </Grid>
-                  </Grid>
-                </Box>
-              )}
-              
-              {!hasInstagramAuth && (
-                <Button 
-                  variant="contained" 
-                  startIcon={<InstagramIcon />} 
-                  fullWidth
-                  sx={{ mt: 2, color: '#ffffff' }}
-                  onClick={() => setTabValue(3)}
-                >
-                  Conectar ao Instagram
-                </Button>
-              )}
-            </Paper>
-          </Grid>
-          
-          {/* Resumo de métricas (se conectado ao Instagram) */}
-          {hasInstagramAuth && posts.length > 0 && (
-            <Grid item xs={12}>
-              <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">Resumo de Métricas</Typography>
-                  <Button 
-                    startIcon={<ChartIcon />}
-                    onClick={() => setTabValue(1)}
-                    size="small"
-                  >
-                    Ver Detalhes
-                  </Button>
-                </Box>
-                
-                <Grid container spacing={3}>
-                  <Grid item xs={6} sm={3}>
-                    <Card sx={{ bgcolor: 'primary.light', color: 'primary.contrastText', borderRadius: 2 }}>
-                      <CardContent>
-                        <Typography variant="overline" sx={{ opacity: 0.8 }}>Posts</Typography>
-                        <Typography variant="h4">{metrics.totalPosts}</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Card sx={{ bgcolor: 'secondary.light', color: 'secondary.contrastText', borderRadius: 2 }}>
-                      <CardContent>
-                        <Typography variant="overline" sx={{ opacity: 0.8 }}>Curtidas</Typography>
-                        <Typography variant="h4">{metrics.totalLikes}</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Card sx={{ bgcolor: 'success.light', color: 'success.contrastText', borderRadius: 2 }}>
-                      <CardContent>
-                        <Typography variant="overline" sx={{ opacity: 0.8 }}>Comentários</Typography>
-                        <Typography variant="h4">{metrics.totalComments}</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Card sx={{ bgcolor: 'info.light', color: 'info.contrastText', borderRadius: 2 }}>
-                      <CardContent>
-                        <Typography variant="overline" sx={{ opacity: 0.8 }}>Engajamento</Typography>
-                        <Typography variant="h4">{metrics.engagementRate.toFixed(1)}</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                </Grid>
-              </Paper>
-            </Grid>
-          )}
-        </Grid>
-      </TabPanel>
-
-      <TabPanel value={tabValue} index={1}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h5" sx={{ display: 'flex', alignItems: 'center' }}>
-            <InstagramIcon sx={{ mr: 1 }} /> Métricas do Instagram
-          </Typography>
-          
-          <Tooltip title="Atualizar métricas">
-            <IconButton onClick={handleRefreshMetrics} disabled={refreshing}>
-              {refreshing ? <CircularProgress size={24} /> : <RefreshIcon />}
-            </IconButton>
-          </Tooltip>
-        </Box>
-        
         {!hasInstagramAuth ? (
           <Alert 
-            severity="warning" 
-            sx={{ mb: 3 }}
+            severity="info" 
             action={
-              <Button color="inherit" size="small" onClick={() => setTabValue(3)}>
+              <Button color="inherit" size="small" onClick={handleConnectInstagram}>
                 Conectar
               </Button>
             }
           >
-            Esta conta não está conectada ao Instagram. Conecte para ver as métricas.
+            Conecte a conta do Instagram para visualizar o dashboard completo.
+          </Alert>
+        ) : loadingDashboard ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : !dashboardData ? (
+          <Alert severity="info">
+            Não foram encontrados dados suficientes para gerar o dashboard.
+          </Alert>
+        ) : (
+          <MetricsOverview metrics={legacyMetrics} />
+        )}
+      </TabPanel>
+
+      <TabPanel value={tabValue} index={1}>
+        {!hasInstagramAuth ? (
+          <Alert 
+            severity="info" 
+            action={
+              <Button color="inherit" size="small" onClick={handleConnectInstagram}>
+                Conectar
+              </Button>
+            }
+          >
+            Conecte a conta do Instagram para visualizar os posts.
           </Alert>
         ) : posts.length === 0 ? (
-          <Alert severity="info">Nenhum post encontrado para este cliente.</Alert>
+          <Alert 
+            severity="info"
+            action={
+              <Button color="inherit" size="small" onClick={handleForceRefresh}>
+                Tentar Novamente
+              </Button>
+            }
+          >
+            Não foram encontrados posts no Instagram deste cliente.
+          </Alert>
         ) : (
-          <Grid container spacing={3}>
-            {/* Métricas gerais */}
-            <Grid item xs={12}>
-              <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
-                <Typography variant="h6" sx={{ mb: 2 }}>Métricas Gerais</Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={6} sm={3}>
-                    <Card sx={{ bgcolor: 'primary.light', color: 'primary.contrastText', borderRadius: 2 }}>
-                      <CardContent>
-                        <Typography variant="overline" sx={{ opacity: 0.8 }}>Posts</Typography>
-                        <Typography variant="h4">{metrics.totalPosts}</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Card sx={{ bgcolor: 'secondary.light', color: 'secondary.contrastText', borderRadius: 2 }}>
-                      <CardContent>
-                        <Typography variant="overline" sx={{ opacity: 0.8 }}>Curtidas</Typography>
-                        <Typography variant="h4">{metrics.totalLikes}</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Card sx={{ bgcolor: 'success.light', color: 'success.contrastText', borderRadius: 2 }}>
-                      <CardContent>
-                        <Typography variant="overline" sx={{ opacity: 0.8 }}>Comentários</Typography>
-                        <Typography variant="h4">{metrics.totalComments}</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                  <Grid item xs={6} sm={3}>
-                    <Card sx={{ bgcolor: 'info.light', color: 'info.contrastText', borderRadius: 2 }}>
-                      <CardContent>
-                        <Typography variant="overline" sx={{ opacity: 0.8 }}>Engajamento</Typography>
-                        <Typography variant="h4">{metrics.engagementRate.toFixed(1)}</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                </Grid>
-              </Paper>
-            </Grid>
+          <>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+              <TextField
+                placeholder="Buscar por legenda..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                size="small"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                  endAdornment: searchQuery && (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={() => setSearchQuery('')}>
+                        <ClearIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }}
+                sx={{ flexGrow: 1, maxWidth: { xs: '100%', sm: 300 } }}
+              />
+              
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button 
+                  variant="outlined" 
+                  startIcon={<FilterIcon />}
+                  onClick={handleOpenFilterDialog}
+                >
+                  Filtros
+                </Button>
+                
+                <Button 
+                  variant="outlined" 
+                  startIcon={<ExportIcon />}
+                  onClick={handleExportData}
+                  disabled={filteredPosts.length === 0}
+                >
+                  Exportar
+                </Button>
+              </Box>
+            </Box>
             
-            {/* Perfil do Instagram */}
-            {profile && (
+            <Grid container spacing={3}>
               <Grid item xs={12}>
-                <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
-                  <Typography variant="h6" sx={{ mb: 2 }}>Perfil do Instagram</Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={4}>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <Avatar 
-                          src={profile.profile_picture_url} 
-                          alt={profile.username}
-                          sx={{ width: 120, height: 120, mb: 2 }}
-                        />
-                        <Typography variant="h6">{profile.name}</Typography>
-                        <Typography variant="subtitle1" sx={{ display: 'flex', alignItems: 'center' }}>
-                          <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: '#E1306C' }} />
-                          @{profile.username}
-                        </Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12} md={8}>
-                      <Typography variant="subtitle2" sx={{ mb: 1 }}>Biografia:</Typography>
-                      <Typography variant="body2" sx={{ mb: 2 }}>
-                        {profile.biography || "Sem biografia."}
-                      </Typography>
-                      
-                      {profile.website && (
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Website:</Typography>
-                          <Button 
-                            variant="outlined" 
-                            size="small"
-                            href={profile.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {profile.website}
-                          </Button>
-                        </Box>
-                      )}
-                      
-                      <Grid container spacing={2} sx={{ mt: 1 }}>
-                        <Grid item xs={4}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.light', color: 'primary.contrastText' }}>
-                            <Typography variant="h5">{profile.followers_count}</Typography>
-                            <Typography variant="body2">Seguidores</Typography>
-                          </Paper>
-                        </Grid>
-                        <Grid item xs={4}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'secondary.light', color: 'secondary.contrastText' }}>
-                            <Typography variant="h5">{profile.follows_count}</Typography>
-                            <Typography variant="body2">Seguindo</Typography>
-                          </Paper>
-                        </Grid>
-                        <Grid item xs={4}>
-                          <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'success.light', color: 'success.contrastText' }}>
-                            <Typography variant="h5">{profile.media_count}</Typography>
-                            <Typography variant="body2">Posts</Typography>
-                          </Paper>
-                        </Grid>
-                      </Grid>
-                    </Grid>
-                  </Grid>
-                </Paper>
+                <MetricsOverview metrics={legacyMetrics} />
               </Grid>
-            )}
-            
-            {/* Tipos de mídia */}
-            <Grid item xs={12} md={6}>
-              <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
-                <Typography variant="h6" sx={{ mb: 2 }}>Tipos de Mídia</Typography>
-                <Grid container spacing={2}>
-                  {Object.entries(metrics.postsByType).map(([type, count]) => (
-                    <Grid item xs={4} key={type}>
-                      <Card sx={{ p: 2, textAlign: 'center' }}>
-                        {getMediaTypeIcon(type)}
-                        <Typography variant="h6">{count}</Typography>
-                        <Typography variant="caption">{getMediaTypeLabel(type)}</Typography>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-              </Paper>
-            </Grid>
-            
-            {/* Post mais engajado */}
-            {metrics.mostEngagedPost && (
-              <Grid item xs={12} md={6}>
-                <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
-                  <Typography variant="h6" sx={{ mb: 2 }}>Post Mais Engajado</Typography>
-                  <Card sx={{ display: 'flex', flexDirection: isTablet ? 'column' : 'row' }}>
-                    <CardMedia
-                      component="img"
-                      sx={{ 
-                        width: isTablet ? '100%' : 200,
-                        height: isTablet ? 200 : '100%',
-                        objectFit: 'cover'
-                      }}
-                      image={metrics.mostEngagedPost.thumbnail_url || metrics.mostEngagedPost.media_url}
-                      alt={metrics.mostEngagedPost.caption}
-                    />
-                    <CardContent sx={{ flex: '1 0 auto' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                        <Chip 
-                          icon={getMediaTypeIcon(metrics.mostEngagedPost.media_type)}
-                          label={getMediaTypeLabel(metrics.mostEngagedPost.media_type)}
-                          size="small"
-                          sx={{ mr: 1 }}
-                        />
-                        <Typography variant="caption" color="text.secondary">
-                          {formatTimeAgo(metrics.mostEngagedPost.timestamp)}
-                        </Typography>
-                      </Box>
-                      
-                      <Typography variant="subtitle1" sx={{ mb: 2 }}>
-                        {metrics.mostEngagedPost.caption}
-                      </Typography>
-                      
-                      <Box sx={{ display: 'flex', gap: 2 }}>
-                        <Chip 
-                          icon={<LikeIcon />}
-                          label={`${metrics.mostEngagedPost.like_count} curtidas`}
-                          variant="outlined"
-                          size="small"
-                        />
-                        <Chip 
-                          icon={<CommentIcon />}
-                          label={`${metrics.mostEngagedPost.comments_count} comentários`}
-                          variant="outlined"
-                          size="small"
-                        />
-                      </Box>
-                      
-                      <Button 
-                        startIcon={<LinkIcon />}
-                        href={metrics.mostEngagedPost.permalink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        sx={{ mt: 2 }}
-                      >
-                        Ver no Instagram
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </Paper>
+              
+              {legacyMetrics.mostEngagedPost && (
+                <FeaturedPost 
+                  post={legacyMetrics.mostEngagedPost}
+                  onViewDetails={handleViewPostDetails}
+                  formatTimeAgo={formatTimeAgo}
+                />
+              )}
+              
+              <Grid item xs={12}>
+                <PostsTable 
+                  posts={filteredPosts}
+                  onViewDetails={handleViewPostDetails}
+                  formatTimestamp={formatTimestamp}
+                />
               </Grid>
-            )}
-            
-            {/* Lista de posts */}
-            <Grid item xs={12}>
-              <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
-                <Typography variant="h6" sx={{ mb: 2 }}>Posts do Instagram</Typography>
-                <List>
-                  {posts.map((post) => (
-                    <React.Fragment key={post.id}>
-                      <ListItem
-                        secondaryAction={
-                          <Tooltip title="Ver no Instagram">
-                            <IconButton 
-                              edge="end" 
-                              href={post.permalink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <VisibilityIcon />
-                            </IconButton>
-                          </Tooltip>
-                        }
-                      >
-                        <ListItemAvatar>
-                          <Avatar 
-                            variant="rounded"
-                            src={post.thumbnail_url || post.media_url}
-                            alt={post.caption}
-                          >
-                            {getMediaTypeIcon(post.media_type)}
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText 
-                          primary={post.caption.length > 50 ? post.caption.substring(0, 50) + '...' : post.caption}
-                          secondary={
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 0.5 }}>
-                              <Typography variant="caption" color="text.secondary">
-                                {formatTimestamp(post.timestamp)}
-                              </Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <LikeIcon sx={{ fontSize: 14, mr: 0.5 }} />
-                                <Typography variant="caption">{post.like_count}</Typography>
-                              </Box>
-                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <CommentIcon sx={{ fontSize: 14, mr: 0.5 }} />
-                                <Typography variant="caption">{post.comments_count}</Typography>
-                              </Box>
-                              <Chip 
-                                label={getMediaTypeLabel(post.media_type)}
-                                size="small"
-                                variant="outlined"
-                                sx={{ height: 20, fontSize: '0.7rem' }}
-                              />
-                            </Box>
-                          }
-                        />
-                      </ListItem>
-                      <Divider variant="inset" component="li" />
-                    </React.Fragment>
-                  ))}
-                </List>
-              </Paper>
             </Grid>
-          </Grid>
+          </>
         )}
       </TabPanel>
 
       <TabPanel value={tabValue} index={2}>
-        <Typography variant="h5" sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
-          <CalendarIcon sx={{ mr: 1 }} /> Posts Agendados
-        </Typography>
-        
-        <Grid container spacing={3}>
-          <Grid item xs={12}>
-            <Button 
-              variant="contained" 
-              startIcon={<CalendarIcon />}
-              onClick={handleViewCalendar}
-              sx={{ mb: 2, color: '#ffffff' }}
-            >
-              Ver Calendário Completo
-            </Button>
-            
-            {scheduledPosts.length === 0 ? (
-              <Alert severity="info">
-                Não há posts agendados para este cliente.
-              </Alert>
-            ) : (
-              <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
-                <List>
-                  {scheduledPosts.map((post) => (
-                    <ListItem key={post.id}>
-                      <ListItemAvatar>
-                        <Avatar 
-                          variant="rounded"
-                          src={post.mediaUrl || post.thumbnailUrl}
-                        >
-                          {post.type === 'image' ? <ImageIcon /> : <VideoIcon />}
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText 
-                        primary={post.caption.length > 50 ? post.caption.substring(0, 50) + '...' : post.caption}
-                        secondary={`Agendado para ${formatTimestamp(post.scheduledDate)}`}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              </Paper>
-            )}
-          </Grid>
-        </Grid>
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>Posts Agendados</Typography>
+          <ScheduledPostsList 
+            posts={scheduledPosts}
+            onEditPost={(post) => {
+              navigate(`/clients/${clientId}/edit-post/${post.id}`);
+            }}
+            onDeletePost={async (postId) => {
+              try {
+                const { error } = await supabase
+                  .from('scheduled_posts')
+                  .delete()
+                  .eq('id', postId);
+                
+                if (error) throw error;
+                
+                setScheduledPosts(prev => prev.filter(p => p.id !== postId));
+                console.log('✅ Post agendado excluído:', postId);
+              } catch (err: any) {
+                console.error('❌ Erro ao excluir post:', err);
+                setError('Não foi possível excluir o post agendado.');
+              }
+            }}
+          />
+        </Box>
       </TabPanel>
 
       <TabPanel value={tabValue} index={3}>
-        <Typography variant="h5" sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
-          <SettingsIcon sx={{ mr: 1 }} /> Configurações da Conta
-        </Typography>
-        
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>Informações do Cliente</Typography>
-              
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Nome:</Typography>
-                <Typography variant="body1">{client.name}</Typography>
-              </Box>
-              
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Instagram:</Typography>
-                <Typography variant="body1">@{client.instagram}</Typography>
-              </Box>
-              
-              {client.username && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Nome de usuário:</Typography>
-                  <Typography variant="body1">{client.username}</Typography>
-                </Box>
-              )}
-              
-              <Button 
-                variant="contained" 
-                startIcon={<EditIcon />}
-                sx={{ mt: 1, color: '#ffffff' }}
-              >
-                Editar Informações
-              </Button>
-            </Paper>
-          </Grid>
-          
-          <Grid item xs={12} md={6}>
-            <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>Conexão com Instagram</Typography>
-              
-              {hasInstagramAuth ? (
-                <>
-                  <Alert severity="success" sx={{ mb: 2 }}>
-                    Esta conta está conectada ao Instagram.
-                  </Alert>
-                  
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 0.5 }}>ID da conta:</Typography>
-                    <Typography variant="body1">{client.instagramAccountId}</Typography>
-                  </Box>
-                  
-                  {client.tokenExpiry && (
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Validade do token:</Typography>
-                      <Typography variant="body1">{new Date(client.tokenExpiry).toLocaleDateString()}</Typography>
-                    </Box>
-                  )}
-                  
-                  <Button 
-                    variant="outlined" 
-                    color="error"
-                    sx={{ mt: 1 }}
-                  >
-                    Desconectar
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Alert severity="warning" sx={{ mb: 2 }}>
-                    Esta conta não está conectada ao Instagram.
-                  </Alert>
-                  
-                  <Button 
-                    variant="contained" 
-                    startIcon={<InstagramIcon />}
-                    sx={{ mt: 1, color: '#ffffff' }}
-                  >
-                    Conectar ao Instagram
-                  </Button>
-                </>
-              )}
-            </Paper>
-          </Grid>
-        </Grid>
+        <ClientSettings 
+          client={client}
+          hasInstagramAuth={hasInstagramAuth}
+          onEditClient={handleEditClient}
+          onConnectInstagram={handleConnectInstagram}
+          onDisconnectInstagram={handleDisconnectInstagram}
+        />
       </TabPanel>
+
+      {/* Dialogs */}
+      <PostFilters 
+        open={filterDialogOpen}
+        filters={filters}
+        onClose={handleCloseFilterDialog}
+        onApply={handleApplyFilters}
+        onReset={handleResetFilters}
+      />
+      
+      <PostDetails 
+        open={postDetailsOpen}
+        post={selectedPost}
+        onClose={handleClosePostDetails}
+        formatTimestamp={formatTimestamp}
+      />
     </Container>
   );
 };

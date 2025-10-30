@@ -29,7 +29,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { 
   Add as AddIcon,
-  Search as SearchIcon,
+  SearchOutlined as SearchIcon,
   Instagram as InstagramIcon,
   CalendarMonth as CalendarIcon,
   Edit as EditIcon,
@@ -43,6 +43,8 @@ import {
 import { clientService, postService } from '../services/supabaseClient';
 import { Client } from '../types';
 import ClientManager from '../components/ClientManager';
+
+// ... resto do arquivo permanece igual
 
 const ClientDashboard: React.FC = () => {
   const theme = useTheme();

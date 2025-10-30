@@ -366,7 +366,7 @@ const CreatePost: React.FC = () => {
               return (
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
                   <Avatar 
-                    src={client.logoUrl} 
+                    src={client.profilePicture || client.logoUrl} 
                     alt={client.name}
                     sx={{ width: 24, height: 24, mr: 1 }}
                   >
@@ -400,7 +400,7 @@ const CreatePost: React.FC = () => {
                       }}
                     >
                       <Avatar 
-                        src={client.logoUrl || client.profilePicture} 
+                        src={client.profilePicture || client.logoUrl} 
                         alt={client.name}
                         sx={{ width: 24, height: 24 }}
                       >
