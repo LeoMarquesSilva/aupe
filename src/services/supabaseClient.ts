@@ -14,6 +14,16 @@ if (!supabaseUrl || !supabaseKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Interface para perfil de usuário
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name?: string;
+  avatar_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Mapeamento específico para corrigir erros de ortografia ou discrepâncias
 const columnMapping: Record<string, string> = {
   'accessToken': 'access_token',
@@ -27,7 +37,11 @@ const columnMapping: Record<string, string> = {
   'tokenExpiry': 'token_expiry',
   'pageId': 'page_id',
   'pageName': 'page_name',
-  'username': 'instagram_username' // Mapeamento para o campo instagram_username
+  'username': 'instagram_username',
+  'fullName': 'full_name',
+  'avatarUrl': 'avatar_url',
+  'createdAt': 'created_at',
+  'updatedAt': 'updated_at'
 };
 
 // Função para converter camelCase para snake_case com mapeamento específico
@@ -67,7 +81,7 @@ const convertFromDbFormat = (obj: Record<string, any>) => {
       const jsKey = reverseMapping[key] || key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
       
       // Converter strings de data para objetos Date
-      if (key === 'token_expiry' && obj[key]) {
+      if ((key === 'token_expiry' || key === 'created_at' || key === 'updated_at') && obj[key]) {
         try {
           result[jsKey] = new Date(obj[key]);
         } catch (e) {
@@ -83,57 +97,134 @@ const convertFromDbFormat = (obj: Record<string, any>) => {
   return result;
 };
 
+// Função auxiliar para obter o usuário atual
+const getCurrentUser = async () => {
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error) {
+    console.error('Erro ao obter usuário atual:', error);
+    throw new Error('Usuário não autenticado');
+  }
+  return user;
+};
+
+// Serviços para gerenciar perfis de usuário
+export const userProfileService = {
+  // Buscar perfil do usuário atual
+  async getCurrentUserProfile(): Promise<UserProfile | null> {
+    try {
+      const user = await getCurrentUser();
+      if (!user) return null;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Erro ao buscar perfil do usuário:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Erro ao buscar perfil do usuário:', error);
+      return null;
+    }
+  },
+
+  // Atualizar perfil do usuário atual
+  async updateCurrentUserProfile(updates: Partial<Omit<UserProfile, 'id' | 'email' | 'created_at' | 'updated_at'>>): Promise<UserProfile> {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erro ao atualizar perfil:', error);
+        throw new Error(`Não foi possível atualizar o perfil: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Erro ao atualizar perfil:', error);
+      throw error;
+    }
+  }
+};
+
 // Serviços para gerenciar clientes
 export const clientService = {
-  // Buscar todos os clientes
+  // Buscar todos os clientes do usuário atual
   async getClients(): Promise<Client[]> {
-    const { data, error } = await supabase
-      .from('clients')
-      .select('*')
-      .order('name');
-    
-    if (error) {
-      console.error('Erro ao buscar clientes:', error);
-      throw new Error('Não foi possível buscar os clientes');
-    }
-    
-    // Converter cada cliente manualmente para garantir que funcione
-    return (data || []).map(client => {
-      // Verificar se o cliente tem app_id mas não tem instagram_account_id
-      if (client.app_id && !client.instagram_account_id) {
-        console.log(`Cliente ${client.id} tem app_id mas não tem instagram_account_id. Usando app_id como instagram_account_id.`);
-        client.instagram_account_id = client.app_id;
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name');
+      
+      if (error) {
+        console.error('Erro ao buscar clientes:', error);
+        throw new Error('Não foi possível buscar os clientes');
       }
       
-      // CONVERSÃO MANUAL IGUAL À saveInstagramAuth
-      const convertedClient: Client = {
-        id: client.id,
-        name: client.name,
-        instagram: client.instagram,
-        logoUrl: client.logo_url,
-        accessToken: client.access_token,
-        userId: client.user_id,
-        appId: client.app_id,
-        // *** CONVERSÃO MANUAL DOS CAMPOS CRÍTICOS DO INSTAGRAM ***
-        instagramAccountId: client.instagram_account_id,
-        username: client.instagram_username,              // <- ESTE CAMPO ESTAVA FALHANDO
-        profilePicture: client.profile_picture,           // <- ESTE TAMBÉM
-        tokenExpiry: client.token_expiry ? new Date(client.token_expiry) : undefined, // <- E ESTE
-        pageId: client.page_id,                           // <- E ESTE
-        pageName: client.page_name                        // <- E ESTE
-      };
-      
-      return convertedClient;
-    });
+      // Converter cada cliente manualmente para garantir que funcione
+      return (data || []).map(client => {
+        // Verificar se o cliente tem app_id mas não tem instagram_account_id
+        if (client.app_id && !client.instagram_account_id) {
+          console.log(`Cliente ${client.id} tem app_id mas não tem instagram_account_id. Usando app_id como instagram_account_id.`);
+          client.instagram_account_id = client.app_id;
+        }
+        
+        // CONVERSÃO MANUAL IGUAL À saveInstagramAuth
+        const convertedClient: Client = {
+          id: client.id,
+          name: client.name,
+          instagram: client.instagram,
+          logoUrl: client.logo_url,
+          accessToken: client.access_token,
+          userId: client.user_id,
+          appId: client.app_id,
+          // *** CONVERSÃO MANUAL DOS CAMPOS CRÍTICOS DO INSTAGRAM ***
+          instagramAccountId: client.instagram_account_id,
+          username: client.instagram_username,
+          profilePicture: client.profile_picture,
+          tokenExpiry: client.token_expiry ? new Date(client.token_expiry) : undefined,
+          pageId: client.page_id,
+          pageName: client.page_name
+        };
+        
+        return convertedClient;
+      });
+    } catch (error) {
+      console.error('Erro ao buscar clientes:', error);
+      throw error;
+    }
   },
   
   // Adicionar um novo cliente
   async addClient(client: Omit<Client, 'id'>): Promise<Client> {
     try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
       // Remover campos vazios para evitar problemas de validação
       const filteredClient = Object.fromEntries(
         Object.entries(client).filter(([_, value]) => value !== '')
       );
+      
+      // Adicionar user_id
+      filteredClient.userId = user.id;
       
       // Converter camelCase para snake_case com mapeamento específico
       const clientData = convertToDbFormat(filteredClient);
@@ -175,13 +266,16 @@ export const clientService = {
       return convertedClient;
     } catch (err) {
       console.error('Erro ao adicionar cliente:', err);
-      throw new Error('Não foi possível adicionar o cliente');
+      throw err;
     }
   },
   
   // Atualizar um cliente existente
   async updateClient(client: Partial<Client> & { id: string }): Promise<Client> {
     try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
       // Remover campos vazios E campos do Instagram para não sobrescrever
       const filteredClient = Object.fromEntries(
         Object.entries(client).filter(([key, value]) => {
@@ -207,6 +301,7 @@ export const clientService = {
         .from('clients')
         .update(clientData)
         .eq('id', client.id)
+        .eq('user_id', user.id) // Garantir que só atualiza clientes do usuário atual
         .select()
         .single();
       
@@ -235,26 +330,38 @@ export const clientService = {
       return convertedClient;
     } catch (err) {
       console.error('Erro ao atualizar cliente:', err);
-      throw new Error('Não foi possível atualizar o cliente');
+      throw err;
     }
   },
   
   // Excluir um cliente
   async deleteClient(clientId: string): Promise<void> {
-    const { error } = await supabase
-      .from('clients')
-      .delete()
-      .eq('id', clientId);
-    
-    if (error) {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientId)
+        .eq('user_id', user.id); // Garantir que só exclui clientes do usuário atual
+      
+      if (error) {
+        console.error('Erro ao excluir cliente:', error);
+        throw new Error(`Não foi possível excluir o cliente: ${error.message}`);
+      }
+    } catch (error) {
       console.error('Erro ao excluir cliente:', error);
-      throw new Error(`Não foi possível excluir o cliente: ${error.message}`);
+      throw error;
     }
   },
   
   // Salvar dados de autenticação do Instagram para um cliente
   async saveInstagramAuth(clientId: string, authData: InstagramAuthData): Promise<Client> {
     try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
       console.log('=== SALVANDO DADOS DO INSTAGRAM ===');
       console.log('Cliente ID:', clientId);
       console.log('Dados recebidos:', authData);
@@ -277,6 +384,7 @@ export const clientService = {
         .from('clients')
         .update(updateData)
         .eq('id', clientId)
+        .eq('user_id', user.id) // Garantir que só atualiza clientes do usuário atual
         .select('*')
         .single();
       
@@ -312,7 +420,7 @@ export const clientService = {
       
     } catch (err: any) {
       console.error('ERRO FATAL ao salvar dados do Instagram:', err);
-      throw new Error(`Falha ao salvar dados: ${err.message}`);
+      throw err;
     }
   },
   
@@ -342,6 +450,9 @@ export const clientService = {
   // Remover dados de autenticação do Instagram para um cliente
   async removeInstagramAuth(clientId: string): Promise<Client> {
     try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
       console.log('Removendo dados de autenticação do Instagram para o cliente:', clientId);
       
       // Usar o convertToDbFormat para garantir que os campos sejam mapeados corretamente
@@ -361,6 +472,7 @@ export const clientService = {
         .from('clients')
         .update(updateData)
         .eq('id', clientId)
+        .eq('user_id', user.id) // Garantir que só atualiza clientes do usuário atual
         .select()
         .single();
       
@@ -389,19 +501,23 @@ export const clientService = {
       return convertedClient;
     } catch (err) {
       console.error('Erro ao remover dados de autenticação do Instagram:', err);
-      throw new Error('Não foi possível remover os dados de autenticação do Instagram');
+      throw err;
     }
   },
   
   // Corrigir dados de autenticação do Instagram para clientes existentes
   async fixInstagramAuthData(): Promise<void> {
     try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
       console.log('Corrigindo dados de autenticação do Instagram para clientes existentes...');
       
-      // Buscar todos os clientes que têm app_id mas não têm instagram_account_id
+      // Buscar todos os clientes do usuário que têm app_id mas não têm instagram_account_id
       const { data, error } = await supabase
         .from('clients')
         .select('*')
+        .eq('user_id', user.id)
         .is('instagram_account_id', null)
         .not('app_id', 'is', null);
       
@@ -419,7 +535,8 @@ export const clientService = {
         const { error: updateError } = await supabase
           .from('clients')
           .update({ instagram_account_id: client.app_id })
-          .eq('id', client.id);
+          .eq('id', client.id)
+          .eq('user_id', user.id);
         
         if (updateError) {
           console.error(`Erro ao corrigir cliente ${client.id}:`, updateError);
@@ -431,7 +548,7 @@ export const clientService = {
       console.log('Correção concluída');
     } catch (err) {
       console.error('Erro ao corrigir dados de autenticação:', err);
-      throw new Error('Não foi possível corrigir os dados de autenticação do Instagram');
+      throw err;
     }
   }
 };
@@ -440,63 +557,342 @@ export const clientService = {
 export const postService = {
   // Salvar um post agendado
   async saveScheduledPost(post: any): Promise<any> {
-    // Converter camelCase para snake_case com mapeamento específico
-    const postData = convertToDbFormat(post);
-    
-    const { data, error } = await supabase
-      .from('scheduled_posts')
-      .insert([postData])
-      .select()
-      .single();
-    
-    if (error) {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      // Adicionar user_id ao post
+      post.userId = user.id;
+      
+      // Converter camelCase para snake_case com mapeamento específico
+      const postData = convertToDbFormat(post);
+      
+      const { data, error } = await supabase
+        .from('scheduled_posts')
+        .insert([postData])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Erro ao salvar post agendado:', error);
+        throw new Error('Não foi possível salvar o post agendado');
+      }
+      
+      // Converter snake_case para camelCase com mapeamento específico
+      return convertFromDbFormat(data);
+    } catch (error) {
       console.error('Erro ao salvar post agendado:', error);
-      throw new Error('Não foi possível salvar o post agendado');
+      throw error;
     }
-    
-    // Converter snake_case para camelCase com mapeamento específico
-    return convertFromDbFormat(data);
   },
   
   // Buscar posts agendados por cliente
   async getScheduledPostsByClient(clientId: string): Promise<any[]> {
-    const { data, error } = await supabase
-      .from('scheduled_posts')
-      .select('*')
-      .eq('client_id', clientId) // Usando snake_case para a coluna
-      .order('scheduled_date', { ascending: true }); // Usando snake_case para a coluna
-    
-    if (error) {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { data, error } = await supabase
+        .from('scheduled_posts')
+        .select('*')
+        .eq('client_id', clientId)
+        .eq('user_id', user.id) // Garantir que só busca posts do usuário atual
+        .order('scheduled_date', { ascending: true });
+      
+      if (error) {
+        console.error('Erro ao buscar posts agendados:', error);
+        throw new Error('Não foi possível buscar os posts agendados');
+      }
+      
+      // Converter snake_case para camelCase com mapeamento específico
+      return (data || []).map(post => convertFromDbFormat(post));
+    } catch (error) {
       console.error('Erro ao buscar posts agendados:', error);
-      throw new Error('Não foi possível buscar os posts agendados');
+      throw error;
     }
-    
-    // Converter snake_case para camelCase com mapeamento específico
-    return (data || []).map(post => convertFromDbFormat(post));
   },
   
-  // Buscar todos os posts agendados
+  // Buscar todos os posts agendados do usuário atual
   async getAllScheduledPosts(): Promise<any[]> {
-    const { data, error } = await supabase
-      .from('scheduled_posts')
-      .select(`
-        *,
-        clients (*)
-      `)
-      .order('scheduled_date', { ascending: true }); // Usando snake_case para a coluna
-    
-    if (error) {
-      console.error('Erro ao buscar todos os posts agendados:', error);
-      throw new Error('Não foi possível buscar os posts agendados');
-    }
-    
-    // Converter snake_case para camelCase com mapeamento específico (incluindo os dados do cliente)
-    return (data || []).map(post => {
-      const result = convertFromDbFormat(post);
-      if (post.clients) {
-        result.clients = convertFromDbFormat(post.clients);
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { data, error } = await supabase
+        .from('scheduled_posts')
+        .select(`
+          *,
+          clients (*)
+        `)
+        .eq('user_id', user.id) // Garantir que só busca posts do usuário atual
+        .order('scheduled_date', { ascending: true });
+      
+      if (error) {
+        console.error('Erro ao buscar todos os posts agendados:', error);
+        throw new Error('Não foi possível buscar os posts agendados');
       }
-      return result;
+      
+      // Converter snake_case para camelCase com mapeamento específico (incluindo os dados do cliente)
+      return (data || []).map(post => {
+        const result = convertFromDbFormat(post);
+        if (post.clients) {
+          result.clients = convertFromDbFormat(post.clients);
+        }
+        return result;
+      });
+    } catch (error) {
+      console.error('Erro ao buscar todos os posts agendados:', error);
+      throw error;
+    }
+  },
+
+  // Atualizar um post agendado
+  async updateScheduledPost(postId: string, updates: any): Promise<any> {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      // Converter camelCase para snake_case com mapeamento específico
+      const postData = convertToDbFormat(updates);
+      
+      const { data, error } = await supabase
+        .from('scheduled_posts')
+        .update(postData)
+        .eq('id', postId)
+        .eq('user_id', user.id) // Garantir que só atualiza posts do usuário atual
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Erro ao atualizar post agendado:', error);
+        throw new Error('Não foi possível atualizar o post agendado');
+      }
+      
+      // Converter snake_case para camelCase com mapeamento específico
+      return convertFromDbFormat(data);
+    } catch (error) {
+      console.error('Erro ao atualizar post agendado:', error);
+      throw error;
+    }
+  },
+
+  // Excluir um post agendado
+  async deleteScheduledPost(postId: string): Promise<void> {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { error } = await supabase
+        .from('scheduled_posts')
+        .delete()
+        .eq('id', postId)
+        .eq('user_id', user.id); // Garantir que só exclui posts do usuário atual
+      
+      if (error) {
+        console.error('Erro ao excluir post agendado:', error);
+        throw new Error('Não foi possível excluir o post agendado');
+      }
+    } catch (error) {
+      console.error('Erro ao excluir post agendado:', error);
+      throw error;
+    }
+  }
+};
+
+// Serviços de autenticação
+export const authService = {
+  // Login com email e senha
+  async signIn(email: string, password: string) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
+
+    if (error) {
+      console.error('Erro ao fazer login:', error);
+      throw error;
+    }
+
+    return data;
+  },
+
+  // Registro com email e senha
+  async signUp(email: string, password: string, fullName?: string) {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+        },
+      },
+    });
+
+    if (error) {
+      console.error('Erro ao criar conta:', error);
+      throw error;
+    }
+
+    return data;
+  },
+
+  // Logout
+  async signOut() {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.error('Erro ao fazer logout:', error);
+      throw error;
+    }
+  },
+
+  // Resetar senha
+  async resetPassword(email: string) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    if (error) {
+      console.error('Erro ao resetar senha:', error);
+      throw error;
+    }
+  },
+
+  // Atualizar senha
+  async updatePassword(newPassword: string) {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) {
+      console.error('Erro ao atualizar senha:', error);
+      throw error;
+    }
+  },
+
+  // Obter usuário atual
+  async getCurrentUser() {
+    const { data: { user }, error } = await supabase.auth.getUser();
+
+    if (error) {
+      console.error('Erro ao obter usuário atual:', error);
+      return null;
+    }
+
+    return user;
+  },
+
+  // Obter sessão atual
+  async getCurrentSession() {
+    const { data: { session }, error } = await supabase.auth.getSession();
+
+    if (error) {
+      console.error('Erro ao obter sessão atual:', error);
+      return null;
+    }
+
+    return session;
+  },
+
+  // Escutar mudanças de autenticação
+  onAuthStateChange(callback: (event: string, session: any) => void) {
+    return supabase.auth.onAuthStateChange(callback);
+  }
+};
+
+// Serviço para migração de dados
+export const migrationService = {
+  // Migrar clientes existentes para associá-los ao usuário atual
+  async migrateExistingClientsToCurrentUser(): Promise<void> {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      console.log('Migrando clientes existentes para o usuário atual...');
+
+      // Buscar clientes que não têm user_id definido
+      const { data: clientsWithoutUser, error: fetchError } = await supabase
+        .from('clients')
+        .select('*')
+        .is('user_id', null);
+
+      if (fetchError) {
+        console.error('Erro ao buscar clientes sem usuário:', fetchError);
+        throw new Error('Não foi possível buscar clientes para migração');
+      }
+
+      if (!clientsWithoutUser || clientsWithoutUser.length === 0) {
+        console.log('Nenhum cliente encontrado para migração');
+        return;
+      }
+
+      console.log(`Encontrados ${clientsWithoutUser.length} clientes para migrar`);
+
+      // Atualizar cada cliente para associá-lo ao usuário atual
+      for (const client of clientsWithoutUser) {
+        const { error: updateError } = await supabase
+          .from('clients')
+          .update({ user_id: user.id })
+          .eq('id', client.id);
+
+        if (updateError) {
+          console.error(`Erro ao migrar cliente ${client.id}:`, updateError);
+        } else {
+          console.log(`Cliente ${client.name} (${client.id}) migrado com sucesso`);
+        }
+      }
+
+      console.log('Migração de clientes concluída');
+    } catch (error) {
+      console.error('Erro durante migração de clientes:', error);
+      throw error;
+    }
+  },
+
+  // Migrar posts existentes para associá-los ao usuário atual
+  async migrateExistingPostsToCurrentUser(): Promise<void> {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      console.log('Migrando posts existentes para o usuário atual...');
+
+      // Buscar posts que não têm user_id definido
+      const { data: postsWithoutUser, error: fetchError } = await supabase
+        .from('scheduled_posts')
+        .select('*')
+        .is('user_id', null);
+
+      if (fetchError) {
+        console.error('Erro ao buscar posts sem usuário:', fetchError);
+        throw new Error('Não foi possível buscar posts para migração');
+      }
+
+      if (!postsWithoutUser || postsWithoutUser.length === 0) {
+        console.log('Nenhum post encontrado para migração');
+        return;
+      }
+
+      console.log(`Encontrados ${postsWithoutUser.length} posts para migrar`);
+
+      // Atualizar cada post para associá-lo ao usuário atual
+      for (const post of postsWithoutUser) {
+        const { error: updateError } = await supabase
+          .from('scheduled_posts')
+          .update({ user_id: user.id })
+          .eq('id', post.id);
+
+        if (updateError) {
+          console.error(`Erro ao migrar post ${post.id}:`, updateError);
+        } else {
+          console.log(`Post ${post.id} migrado com sucesso`);
+        }
+      }
+
+      console.log('Migração de posts concluída');
+    } catch (error) {
+      console.error('Erro durante migração de posts:', error);
+      throw error;
+    }
   }
 };

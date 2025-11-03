@@ -13,7 +13,8 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
-  Avatar
+  Avatar,
+  Chip
 } from '@mui/material';
 import { 
   Menu as MenuIcon, 
@@ -23,12 +24,17 @@ import {
   Home as HomeIcon,
   Settings as SettingsIcon,
   AccountCircle as AccountIcon,
-  Dashboard as DashboardIcon
+  Dashboard as DashboardIcon,
+  ExitToApp as LogoutIcon,
+  AdminPanelSettings as AdminIcon
 } from '@mui/icons-material';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { roleService } from '../services/roleService'; // Nova importação
 
 // URL da logo da agência
 const AGENCY_LOGO_URL = "/LOGO-AUPE.jpg";
+
 // Nome da agência
 const AGENCY_NAME = "AUPE";
 
@@ -48,26 +54,85 @@ const Header: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   
   const [menuAnchorEl, setMenuAnchorEl] = React.useState<null | HTMLElement>(null);
   const [userMenuAnchorEl, setUserMenuAnchorEl] = React.useState<null | HTMLElement>(null);
   
+  // Estados para verificação de admin
+  const [isAdmin, setIsAdmin] = React.useState(false);
+  const [loadingRole, setLoadingRole] = React.useState(true);
+
+  // Verificar role do usuário quando o componente monta ou usuário muda
+  React.useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (user) {
+        setLoadingRole(true);
+        try {
+          const adminStatus = await roleService.isCurrentUserAdmin();
+          setIsAdmin(adminStatus);
+          
+          // Removido: Debug teste que não existe mais
+          // if (process.env.NODE_ENV === 'development') {
+          //   await roleService.testRoleSystem();
+          // }
+        } catch (error) {
+          console.error('❌ Erro ao verificar status de admin:', error);
+          setIsAdmin(false);
+        } finally {
+          setLoadingRole(false);
+        }
+      } else {
+        setIsAdmin(false);
+        setLoadingRole(false);
+      }
+    };
+    
+    checkAdminStatus();
+  }, [user]);
+
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setMenuAnchorEl(event.currentTarget);
   };
-  
+
   const handleMenuClose = () => {
     setMenuAnchorEl(null);
   };
-  
+
   const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setUserMenuAnchorEl(event.currentTarget);
   };
-  
+
   const handleUserMenuClose = () => {
     setUserMenuAnchorEl(null);
   };
-  
+
+  const handleLogout = async () => {
+    handleUserMenuClose();
+    try {
+      console.log('🚪 Fazendo logout...');
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('❌ Erro ao fazer logout:', error);
+    }
+  };
+
+  const handleAdminSettings = () => {
+    navigate('/admin');
+    handleUserMenuClose();
+  };
+
+  const getUserInitials = (email: string) => {
+    return email.split('@')[0].substring(0, 2).toUpperCase();
+  };
+
+  // Se não há usuário logado, não mostrar header
+  if (!user) {
+    return null;
+  }
+
   return (
     <AppBar 
       position="static" 
@@ -90,7 +155,7 @@ const Header: React.FC = () => {
             <MenuIcon />
           </IconButton>
         )}
-        
+
         <Box 
           component={Link} 
           to="/"
@@ -114,7 +179,7 @@ const Header: React.FC = () => {
               display: { xs: 'none', sm: 'flex' }
             }}
           />
-          
+
           {/* Ícone e nome do app */}
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Avatar sx={{ 
@@ -125,6 +190,7 @@ const Header: React.FC = () => {
             }}>
               <DashboardIcon sx={{ color: COLORS.offWhite }} />
             </Avatar>
+            
             <Box>
               <Typography 
                 variant="h6" 
@@ -155,9 +221,58 @@ const Header: React.FC = () => {
             </Box>
           </Box>
         </Box>
-        
+
         <Box sx={{ flexGrow: 1 }} />
-        
+
+        {/* Badge de Admin (apenas para administradores) */}
+        {!loadingRole && isAdmin && (
+          <Chip
+            icon={<AdminIcon />}
+            label="Admin"
+            size="small"
+            sx={{
+              backgroundColor: 'rgba(237, 235, 233, 0.2)',
+              color: COLORS.offWhite,
+              mr: 2,
+              '& .MuiChip-icon': {
+                color: COLORS.offWhite
+              },
+              fontFamily: '"Poppins", sans-serif',
+              fontWeight: 500,
+              animation: 'pulse 2s infinite'
+            }}
+          />
+        )}
+
+        {/* Informações do usuário (apenas desktop) */}
+        {!isMobile && (
+          <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', mr: 2 }}>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: COLORS.offWhite, 
+                  opacity: 0.9,
+                  fontFamily: '"Poppins", sans-serif',
+                  fontWeight: 400
+                }}
+              >
+                {user.email}
+              </Typography>
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  color: COLORS.lightGray,
+                  fontFamily: '"Poppins", sans-serif',
+                  fontWeight: 300
+                }}
+              >
+                {loadingRole ? 'Verificando...' : 'Online'}
+              </Typography>
+            </Box>
+          </Box>
+        )}
+
         {!isMobile && (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Button 
@@ -179,7 +294,7 @@ const Header: React.FC = () => {
             >
               Clientes
             </Button>
-            
+
             <Button 
               component={Link} 
               to="/calendar" 
@@ -199,7 +314,7 @@ const Header: React.FC = () => {
             >
               Calendário
             </Button>
-            
+
             <Button 
               component={Link} 
               to="/create-post" 
@@ -222,7 +337,7 @@ const Header: React.FC = () => {
             </Button>
           </Box>
         )}
-        
+
         <IconButton 
           onClick={handleUserMenuOpen}
           sx={{ 
@@ -237,16 +352,19 @@ const Header: React.FC = () => {
               height: 36, 
               bgcolor: 'rgba(215,207,207,0.2)',
               transition: 'all 0.3s ease',
+              fontFamily: '"Poppins", sans-serif',
+              fontWeight: 'bold',
+              fontSize: '0.9rem',
               '&:hover': {
                 transform: 'scale(1.05)'
               }
             }}
           >
-            <AccountIcon sx={{ color: COLORS.offWhite }} />
+            {getUserInitials(user.email || 'U')}
           </Avatar>
         </IconButton>
       </Toolbar>
-      
+
       {/* Menu mobile */}
       <Menu
         anchorEl={menuAnchorEl}
@@ -281,7 +399,7 @@ const Header: React.FC = () => {
             }} 
           />
         </MenuItem>
-        
+
         <MenuItem 
           component={Link} 
           to="/calendar"
@@ -303,9 +421,9 @@ const Header: React.FC = () => {
             }} 
           />
         </MenuItem>
-        
+
         <Divider sx={{ my: 1, bgcolor: COLORS.neutralGray }} />
-        
+
         <MenuItem 
           component={Link} 
           to="/create-post"
@@ -327,7 +445,7 @@ const Header: React.FC = () => {
             }} 
           />
         </MenuItem>
-        
+
         <MenuItem 
           component={Link} 
           to="/create-story"
@@ -349,8 +467,48 @@ const Header: React.FC = () => {
             }} 
           />
         </MenuItem>
+
+        {/* Menu de Admin no mobile (apenas para administradores) */}
+        {!loadingRole && isAdmin && (
+          <>
+            <Divider sx={{ my: 1, bgcolor: COLORS.neutralGray }} />
+            <MenuItem 
+              component={Link} 
+              to="/admin"
+              onClick={handleMenuClose}
+              sx={{ 
+                borderRadius: '8px', 
+                m: 0.5,
+                fontFamily: '"Poppins", sans-serif',
+                bgcolor: 'rgba(81, 0, 0, 0.05)'
+              }}
+            >
+              <ListItemIcon>
+                <AdminIcon fontSize="small" sx={{ color: COLORS.primary }} />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Painel Admin" 
+                primaryTypographyProps={{ 
+                  fontFamily: '"Poppins", sans-serif',
+                  fontWeight: 500,
+                  color: COLORS.primary
+                }} 
+              />
+              <Chip
+                label="Admin"
+                size="small"
+                sx={{
+                  backgroundColor: COLORS.primary,
+                  color: COLORS.offWhite,
+                  fontSize: '0.7rem',
+                  height: '20px'
+                }}
+              />
+            </MenuItem>
+          </>
+        )}
       </Menu>
-      
+
       {/* Menu do usuário */}
       <Menu
         anchorEl={userMenuAnchorEl}
@@ -360,31 +518,51 @@ const Header: React.FC = () => {
           sx: {
             borderRadius: '12px',
             boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
-            bgcolor: COLORS.offWhite
+            bgcolor: COLORS.offWhite,
+            minWidth: 200
           }
         }}
       >
-        <MenuItem 
-          onClick={handleUserMenuClose}
-          sx={{ 
-            borderRadius: '8px', 
-            m: 0.5,
-            fontFamily: '"Poppins", sans-serif'
-          }}
-        >
-          <ListItemIcon>
-            <AccountIcon fontSize="small" sx={{ color: COLORS.primary }} />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Minha Conta" 
-            primaryTypographyProps={{ 
+        {/* Informações do usuário */}
+        <Box sx={{ px: 2, py: 1, borderBottom: `1px solid ${COLORS.neutralGray}` }}>
+          <Typography 
+            variant="body2" 
+            sx={{ 
               fontFamily: '"Poppins", sans-serif',
-              fontWeight: 400
-            }} 
-          />
-        </MenuItem>
-        
+              fontWeight: 500,
+              color: COLORS.primary
+            }}
+          >
+            {user.email}
+          </Typography>
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              fontFamily: '"Poppins", sans-serif',
+              fontWeight: 300,
+              color: COLORS.secondary
+            }}
+          >
+            {loadingRole ? 'Verificando...' : 'Logado'}
+            {!loadingRole && isAdmin && (
+              <Chip
+                label="Admin"
+                size="small"
+                sx={{
+                  ml: 1,
+                  backgroundColor: COLORS.primary,
+                  color: COLORS.offWhite,
+                  fontSize: '0.7rem',
+                  height: '18px'
+                }}
+              />
+            )}
+          </Typography>
+        </Box>
+
         <MenuItem 
+          component={Link}
+          to="/settings"
           onClick={handleUserMenuClose}
           sx={{ 
             borderRadius: '8px', 
@@ -403,24 +581,72 @@ const Header: React.FC = () => {
             }} 
           />
         </MenuItem>
-        
+
+        {/* Menu de Admin (apenas para administradores) */}
+        {!loadingRole && isAdmin && (
+          <>
+            <Divider sx={{ my: 1, bgcolor: COLORS.neutralGray }} />
+            <MenuItem 
+              onClick={handleAdminSettings}
+              sx={{ 
+                borderRadius: '8px', 
+                m: 0.5,
+                fontFamily: '"Poppins", sans-serif',
+                bgcolor: 'rgba(81, 0, 0, 0.05)',
+                '&:hover': {
+                  bgcolor: 'rgba(81, 0, 0, 0.1)'
+                }
+              }}
+            >
+              <ListItemIcon>
+                <AdminIcon fontSize="small" sx={{ color: COLORS.primary }} />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Painel Admin" 
+                primaryTypographyProps={{ 
+                  fontFamily: '"Poppins", sans-serif',
+                  fontWeight: 500,
+                  color: COLORS.primary
+                }} 
+              />
+              <Chip
+                label="Admin"
+                size="small"
+                sx={{
+                  backgroundColor: COLORS.primary,
+                  color: COLORS.offWhite,
+                  fontSize: '0.7rem',
+                  height: '20px'
+                }}
+              />
+            </MenuItem>
+          </>
+        )}
+
         <Divider sx={{ my: 1, bgcolor: COLORS.neutralGray }} />
-        
+
         <MenuItem 
-          onClick={handleUserMenuClose}
+          onClick={handleLogout}
           sx={{ 
             borderRadius: '8px', 
             m: 0.5, 
             color: COLORS.primary,
             fontFamily: '"Poppins", sans-serif',
-            fontWeight: 500
+            fontWeight: 500,
+            '&:hover': {
+              bgcolor: 'rgba(81, 0, 0, 0.1)'
+            }
           }}
         >
+          <ListItemIcon>
+            <LogoutIcon fontSize="small" sx={{ color: COLORS.primary }} />
+          </ListItemIcon>
           <ListItemText 
             primary="Sair" 
             primaryTypographyProps={{ 
               fontFamily: '"Poppins", sans-serif',
-              fontWeight: 500
+              fontWeight: 500,
+              color: COLORS.primary
             }} 
           />
         </MenuItem>

@@ -1,19 +1,33 @@
 import React from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { CssBaseline, Box } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { ptBR } from 'date-fns/locale';
+
+// Context e Componentes de Auth
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+
+// Components
+import Header from './components/Header';
+
+// Pages - Public
+import Login from './pages/Login';
+import ResetPassword from './pages/ResetPassword';
+
+// Pages - Protected
 import CreatePost from './pages/CreatePost';
 import CreateStory from './pages/CreateStory';
 import InstagramCallback from './pages/InstagramCallback';
 import StoryCalendar from './pages/StoryCalendar';
 import EditStory from './pages/EditStory';
 import ClientDashboard from './pages/ClientDashboard';
-import { LocalizationProvider } from '@mui/x-date-pickers';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { ptBR } from 'date-fns/locale';
-import Header from './components/Header';
 import SingleClientDashboard from './pages/SingleClientDashboard';
+import Settings from './pages/Settings';
+import AdminSettings from './pages/AdminSettings';
 
-// Layout compartilhado para todas as páginas
+// Layout compartilhado para todas as páginas protegidas
 const PageLayout = ({ children }: { children: React.ReactNode }) => (
   <Box 
     sx={{ 
@@ -53,59 +67,134 @@ const CallbackLayout = ({ children }: { children: React.ReactNode }) => (
   </Box>
 );
 
-// Configuração do router
-const router = createBrowserRouter(
-  [
-    {
-      path: "/",
-      element: <PageLayout><ClientDashboard /></PageLayout>,
-    },
-    {
-      path: "/clients",
-      element: <PageLayout><ClientDashboard /></PageLayout>,
-    },
-    {
-      path: "/calendar",
-      element: <PageLayout><StoryCalendar /></PageLayout>,
-    },
-    {
-      path: "/calendar/:clientId",
-      element: <PageLayout><StoryCalendar /></PageLayout>,
-    },
-    {
-      path: "/create-post",
-      element: <PageLayout><CreatePost /></PageLayout>,
-    },
-    {
-      path: "/create-story",
-      element: <PageLayout><CreateStory /></PageLayout>,
-    },
-    {
-      path: "/edit-story/:id",
-      element: <PageLayout><EditStory /></PageLayout>,
-    },
-    {
-      path: "/client/:clientId",
-      element: <PageLayout><SingleClientDashboard /></PageLayout>,
-    },
-    {
-      path: "/api/instagram-auth/callback",
-      element: <CallbackLayout><InstagramCallback /></CallbackLayout>,
-    },
-    // Rota principal do callback configurada no Facebook Developer
-    // Agora usa o novo componente com seletor de contas
-    {
-      path: "/callback",
-      element: <CallbackLayout><InstagramCallback /></CallbackLayout>,
-    },
-  ]
+// Layout para páginas públicas (login, etc)
+const PublicLayout = ({ children }: { children: React.ReactNode }) => (
+  <Box 
+    sx={{ 
+      minHeight: '100vh',
+      bgcolor: 'background.default',
+      display: 'flex',
+      flexDirection: 'column'
+    }}
+  >
+    {children}
+  </Box>
 );
 
+// Componente para verificar se o usuário está logado antes de renderizar rotas protegidas
+const ProtectedPageLayout = ({ children }: { children: React.ReactNode }) => (
+  <ProtectedRoute>
+    <PageLayout>
+      {children}
+    </PageLayout>
+  </ProtectedRoute>
+);
+
+// Componente para páginas que requerem role de admin
+const AdminPageLayout = ({ children }: { children: React.ReactNode }) => (
+  <ProtectedRoute requiredRole="admin">
+    <PageLayout>
+      {children}
+    </PageLayout>
+  </ProtectedRoute>
+);
+
+// Componente para callback que precisa de autenticação
+const ProtectedCallbackLayout = ({ children }: { children: React.ReactNode }) => (
+  <ProtectedRoute>
+    <CallbackLayout>
+      {children}
+    </CallbackLayout>
+  </ProtectedRoute>
+);
+
+// Configuração do router com autenticação
+const router = createBrowserRouter([
+  // Rotas públicas
+  {
+    path: "/login",
+    element: <PublicLayout><Login /></PublicLayout>,
+  },
+  {
+    path: "/reset-password",
+    element: <PublicLayout><ResetPassword /></PublicLayout>,
+  },
+  
+  // Rotas protegidas - Dashboard
+  {
+    path: "/",
+    element: <ProtectedPageLayout><ClientDashboard /></ProtectedPageLayout>,
+  },
+  {
+    path: "/clients",
+    element: <ProtectedPageLayout><ClientDashboard /></ProtectedPageLayout>,
+  },
+  {
+    path: "/client/:clientId",
+    element: <ProtectedPageLayout><SingleClientDashboard /></ProtectedPageLayout>,
+  },
+  
+  // Rotas protegidas - Calendário
+  {
+    path: "/calendar",
+    element: <ProtectedPageLayout><StoryCalendar /></ProtectedPageLayout>,
+  },
+  {
+    path: "/calendar/:clientId",
+    element: <ProtectedPageLayout><StoryCalendar /></ProtectedPageLayout>,
+  },
+  
+  // Rotas protegidas - Criação de conteúdo
+  {
+    path: "/create-post",
+    element: <ProtectedPageLayout><CreatePost /></ProtectedPageLayout>,
+  },
+  {
+    path: "/create-story",
+    element: <ProtectedPageLayout><CreateStory /></ProtectedPageLayout>,
+  },
+  {
+    path: "/edit-story/:id",
+    element: <ProtectedPageLayout><EditStory /></ProtectedPageLayout>,
+  },
+  
+  // Rotas protegidas - Configurações
+  {
+    path: "/settings",
+    element: <ProtectedPageLayout><Settings /></ProtectedPageLayout>,
+  },
+  
+  // Rota administrativa - APENAS ADMINS
+  {
+    path: "/admin",
+    element: <AdminPageLayout><AdminSettings /></AdminPageLayout>,
+  },
+  
+  // Rotas protegidas - Callbacks do Instagram
+  {
+    path: "/api/instagram-auth/callback",
+    element: <ProtectedCallbackLayout><InstagramCallback /></ProtectedCallbackLayout>,
+  },
+  {
+    path: "/callback",
+    element: <ProtectedCallbackLayout><InstagramCallback /></ProtectedCallbackLayout>,
+  },
+  
+  // Rota catch-all - redireciona para dashboard se logado, senão para login
+  {
+    path: "*",
+    element: <Navigate to="/" replace />,
+  },
+]);
+
+// Componente principal da aplicação
 function App() {
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ptBR}>
       <CssBaseline />
-      <RouterProvider router={router} />
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
     </LocalizationProvider>
   );
 }
