@@ -19,6 +19,7 @@ import ResetPassword from './pages/ResetPassword';
 // Pages - Protected
 import CreatePost from './pages/CreatePost';
 import CreateStory from './pages/CreateStory';
+import CreateReels from './pages/CreateReels'; // ✅ Nova importação
 import InstagramCallback from './pages/InstagramCallback';
 import StoryCalendar from './pages/StoryCalendar';
 import EditStory from './pages/EditStory';
@@ -152,6 +153,10 @@ const router = createBrowserRouter([
   {
     path: "/create-story",
     element: <ProtectedPageLayout><CreateStory /></ProtectedPageLayout>,
+  },
+  {
+    path: "/create-reels", // ✅ Nova rota para Reels
+    element: <ProtectedPageLayout><CreateReels /></ProtectedPageLayout>,
   },
   {
     path: "/edit-story/:id",

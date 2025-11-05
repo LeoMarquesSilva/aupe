@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { clientService, postService } from '../services/supabaseClient';
+import { clientService } from '../services/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { 
   Box, 
@@ -19,7 +19,6 @@ import {
   ListItemAvatar,
   useTheme,
   useMediaQuery,
-  Fab,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -28,34 +27,39 @@ import {
   CardContent,
   Badge,
   Tooltip,
-  Stack
+  Stack,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import { 
-  Add as AddIcon, 
-  Instagram as InstagramIcon, 
+  VideoLibrary as ReelsIcon, 
   Schedule as ScheduleIcon, 
   Send as SendIcon,
-  VideoLibrary as StoryIcon,
+  Add as AddIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
   Info as InfoIcon,
-  VideoLibrary as ReelsIcon
+  Instagram as InstagramIcon,
+  Image as ImageIcon,
+  PlayArrow as PlayIcon
 } from '@mui/icons-material';
-import { Client, Post, PostImage, PostData, PostStatus } from '../types';
+import { Client, ReelVideo, ReelData, PostImage } from '../types';
+import { scheduleInstagramPost } from '../services/postService';
 import ClientManager from '../components/ClientManager';
+import VideoUploader from '../components/VideoUploader';
 import ImageUploader from '../components/ImageUploader';
 import CaptionEditor from '../components/CaptionEditor';
 import DateTimePicker from '../components/DateTimePicker';
-import { scheduleInstagramPost, uploadImagesToSupabaseStorage } from '../services/postService';
 
-const CreatePost: React.FC = () => {
-  // ... resto do código permanece exatamente igual
+const CreateReels: React.FC = () => {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
-  const [images, setImages] = useState<PostImage[]>([]);
+  const [video, setVideo] = useState<ReelVideo | null>(null);
+  const [coverImage, setCoverImage] = useState<PostImage[]>([]); // Usar array para compatibilidade com ImageUploader
   const [caption, setCaption] = useState<string>('');
   const [scheduledDate, setScheduledDate] = useState<string>('');
+  const [shareToFeed, setShareToFeed] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
   const [postNowLoading, setPostNowLoading] = useState<boolean>(false);
   const [clientDialogOpen, setClientDialogOpen] = useState<boolean>(false);
@@ -86,10 +90,6 @@ const CreatePost: React.FC = () => {
     loadClients();
   }, []);
 
-  useEffect(() => {
-    console.log("Estado de imagens atualizado:", images.length);
-  }, [images]);
-
   const handleAddClient = async (client: Client) => {
     setSelectedClientId(client.id);
     setClientDialogOpen(false);
@@ -99,10 +99,14 @@ const CreatePost: React.FC = () => {
     setSelectedClientId(clientId);
   };
 
-  const handleImagesChange = (newImages: PostImage[]) => {
-    console.log('Novas imagens recebidas:', newImages.length);
-    console.log('Primeira imagem URL:', newImages.length > 0 ? newImages[0].url.substring(0, 50) + "..." : "nenhuma");
-    setImages([...newImages]);
+  const handleVideoChange = (newVideo: ReelVideo | null) => {
+    console.log('🎬 Novo vídeo recebido:', newVideo);
+    setVideo(newVideo);
+  };
+
+  const handleCoverImageChange = (images: PostImage[]) => {
+    console.log('🖼️ Nova capa recebida:', images);
+    setCoverImage(images);
   };
 
   const handleCaptionChange = (newCaption: string) => {
@@ -129,7 +133,7 @@ const CreatePost: React.FC = () => {
     return clients.find(client => client.id === selectedClientId);
   };
 
-  const validatePostData = () => {
+  const validateReelData = () => {
     if (!selectedClientId) {
       showNotification('Selecione um cliente', 'warning');
       return false;
@@ -141,26 +145,26 @@ const CreatePost: React.FC = () => {
       return false;
     }
 
-    if (images.length === 0) {
-      showNotification('Adicione pelo menos uma imagem', 'warning');
+    if (!video) {
+      showNotification('Adicione um vídeo para o Reel', 'warning');
       return false;
     }
 
     if (!caption.trim()) {
-      showNotification('Adicione uma legenda para a postagem', 'warning');
+      showNotification('Adicione uma legenda para o Reel', 'warning');
       return false;
     }
 
     // ✅ Verificar credenciais do Instagram
     if (!selectedClient.accessToken || !selectedClient.instagramAccountId) {
-      showNotification('Esta conta não está conectada ao Instagram. Conecte-a antes de agendar posts.', 'error');
+      showNotification('Esta conta não está conectada ao Instagram. Conecte-a antes de agendar Reels.', 'error');
       return false;
     }
 
     return true;
   };
 
-  // ✅ ADICIONAR: Validação específica para agendamento
+  // ✅ Validação específica para agendamento
   const validateScheduling = () => {
     if (!scheduledDate) {
       showNotification('Defina uma data e hora para agendamento', 'warning');
@@ -190,126 +194,111 @@ const CreatePost: React.FC = () => {
   };
 
   const resetForm = () => {
-    setImages([]);
+    setVideo(null);
+    setCoverImage([]);
     setCaption('');
     setScheduledDate('');
+    setShareToFeed(true);
   };
 
   const handleSubmit = async () => {
-    if (!validatePostData()) return;
-    if (!validateScheduling()) return; // ✅ Agora a função existe
+    if (!validateReelData()) return;
+    if (!validateScheduling()) return;
 
     setLoading(true);
 
     try {
       const selectedClient = getSelectedClient();
-      if (!selectedClient) {
-        showNotification('Cliente não encontrado', 'error');
+      if (!selectedClient || !video) {
+        showNotification('Dados inválidos', 'error');
         return;
       }
 
-      showNotification('Enviando imagens para Supabase Storage...', 'info');
-      
-      console.log(`📦 Preparando upload de ${images.length} imagens para Supabase Storage`);
-      
-      // ✅ USAR SUPABASE STORAGE em vez de ImgBB
-      const imageUrls = await uploadImagesToSupabaseStorage(images);
-      
-      if (imageUrls.length === 0) {
-        showNotification('Falha ao fazer upload das imagens', 'error');
-        return;
-      }
-      
-      if (imageUrls.length < images.length) {
-        showNotification(`Atenção: Apenas ${imageUrls.length} de ${images.length} imagens foram processadas`, 'warning');
-      }
-      
-      const postType = imageUrls.length > 1 ? 'carousel' : 'post';
-      
-      const postData: PostData = {
+      console.log('🎬 Agendando Reel:', {
+        clientId: selectedClientId,
+        videoUrl: video.publicUrl,
+        coverImageUrl: coverImage.length > 0 ? coverImage[0].url : null,
+        caption: caption,
+        scheduledDate: scheduledDate,
+        shareToFeed: shareToFeed
+      });
+
+      // ✅ Usar a capa personalizada se disponível, senão usar thumbnail do vídeo
+      const finalCoverImage = coverImage.length > 0 ? coverImage[0].url : video.thumbnail;
+
+      await scheduleInstagramPost({
         clientId: selectedClientId,
         caption: caption,
-        images: imageUrls, // ✅ URLs do Supabase Storage
+        images: [video.publicUrl], // Para Reels, o vídeo vai no campo images
         scheduledDate: scheduledDate,
-        postType: postType,
-        immediate: false
-      };
-
-      console.log(`📝 Post será criado como: ${postType} (${imageUrls.length} imagem(s))`);
-      console.log('📅 Data de agendamento:', scheduledDate);
-      console.log('🔗 URLs das imagens:', imageUrls);
-
-      await scheduleInstagramPost(postData, selectedClient);
+        postType: 'reels',
+        immediate: false,
+        video: video.publicUrl,
+        shareToFeed: shareToFeed,
+        coverImage: finalCoverImage
+      }, selectedClient);
 
       resetForm();
-      showNotification(`${postType === 'carousel' ? 'Carrossel' : 'Postagem'} agendado com sucesso! Imagens salvas no Supabase Storage.`, 'success');
+      showNotification('Reel agendado com sucesso!', 'success');
     } catch (error) {
-      console.error('Erro ao agendar postagem:', error);
-      showNotification(`Erro ao agendar postagem: ${(error as Error).message}`, 'error');
+      console.error('Erro ao agendar Reel:', error);
+      showNotification(`Erro ao agendar Reel: ${(error as Error).message}`, 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const handlePostNow = async () => {
-    if (!validatePostData()) return;
+    if (!validateReelData()) return;
     
     setPostNowLoading(true);
 
     try {
       const selectedClient = getSelectedClient();
-      if (!selectedClient) {
-        showNotification('Cliente não encontrado', 'error');
+      if (!selectedClient || !video) {
+        showNotification('Dados inválidos', 'error');
         return;
       }
 
-      showNotification('Enviando imagens para Supabase Storage...', 'info');
-      
-      console.log(`Preparando upload de ${images.length} imagens para Supabase Storage`);
-      
-      // ✅ USAR SUPABASE STORAGE também para "Postar Agora"
-      const imageUrls = await uploadImagesToSupabaseStorage(images);
-      
-      if (imageUrls.length === 0) {
-        showNotification('Falha ao fazer upload das imagens', 'error');
-        return;
-      }
-      
-      if (imageUrls.length < images.length) {
-        showNotification(`Atenção: Apenas ${imageUrls.length} de ${images.length} imagens foram processadas`, 'warning');
-      }
-      
-      const postType = imageUrls.length > 1 ? 'carousel' : 'post';
-      
-      const postData: PostData = {
+      console.log('🎬 Publicando Reel imediatamente:', {
+        clientId: selectedClientId,
+        videoUrl: video.publicUrl,
+        coverImageUrl: coverImage.length > 0 ? coverImage[0].url : null,
+        caption: caption,
+        shareToFeed: shareToFeed
+      });
+
+      // ✅ Usar a capa personalizada se disponível, senão usar thumbnail do vídeo
+      const finalCoverImage = coverImage.length > 0 ? coverImage[0].url : video.thumbnail;
+
+      await scheduleInstagramPost({
         clientId: selectedClientId,
         caption: caption,
-        images: imageUrls,
+        images: [video.publicUrl], // Para Reels, o vídeo vai no campo images
         scheduledDate: new Date().toISOString(),
-        postType: postType,
-        immediate: true
-      };
-
-      console.log(`Post será criado como: ${postType} (${imageUrls.length} imagem(s))`);
-
-      await scheduleInstagramPost(postData, selectedClient);
+        postType: 'reels',
+        immediate: true,
+        video: video.publicUrl,
+        shareToFeed: shareToFeed,
+        coverImage: finalCoverImage
+      }, selectedClient);
 
       resetForm();
-      showNotification(`${postType === 'carousel' ? 'Carrossel' : 'Postagem'} enviado com sucesso! Imagens salvas no Supabase Storage.`, 'success');
+      showNotification('Reel enviado com sucesso!', 'success');
     } catch (error) {
-      console.error('Erro ao enviar postagem:', error);
-      showNotification(`Erro ao enviar postagem: ${(error as Error).message}`, 'error');
+      console.error('Erro ao enviar Reel:', error);
+      showNotification(`Erro ao enviar Reel: ${(error as Error).message}`, 'error');
     } finally {
       setPostNowLoading(false);
     }
   };
 
-  const handleCreateStory = () => {
-    navigate('/create-story');
+  const handleCreatePost = () => {
+    navigate('/create-post');
   };
 
-  const handleCreateReels = () => {
-    navigate('/create-reels');
+  const handleCreateStory = () => {
+    navigate('/create-story');
   };
 
   const selectedClient = getSelectedClient();
@@ -325,50 +314,35 @@ const CreatePost: React.FC = () => {
             fontFamily: '"Montserrat", sans-serif',
             color: '#121212'
           }}>
-            Agendamento de Posts
+            Criar Reels
           </Typography>
           <Typography variant="subtitle1" color="text.secondary">
-            Crie e agende posts para o Instagram dos seus clientes
+            Crie e agende Reels para o Instagram com suporte a arquivos de até 2GB
           </Typography>
         </Box>
-        
+
         <Stack direction="row" spacing={2}>
           <Button
             variant="outlined"
             color="secondary"
-            startIcon={<ReelsIcon />}
-            onClick={handleCreateReels}
+            startIcon={<ImageIcon />}
+            onClick={handleCreatePost}
             sx={{ 
               borderRadius: 2,
               textTransform: 'none',
               px: 3,
               py: 1,
-              color: '#E91E63',
-              borderColor: '#E91E63',
-              '&:hover': {
-                backgroundColor: 'rgba(233, 30, 99, 0.04)',
-                borderColor: '#C2185B'
-              }
+              color: theme.palette.secondary.main,
+              borderColor: theme.palette.secondary.main
             }}
           >
-            Criar Reels
-            <Chip
-              label="Novo"
-              size="small"
-              sx={{
-                ml: 1,
-                backgroundColor: '#E91E63',
-                color: 'white',
-                fontSize: '0.7rem',
-                height: '18px'
-              }}
-            />
+            Criar Post
           </Button>
 
           <Button
             variant="outlined"
             color="secondary"
-            startIcon={<StoryIcon />}
+            startIcon={<PlayIcon />}
             onClick={handleCreateStory}
             sx={{ 
               borderRadius: 2,
@@ -599,14 +573,14 @@ const CreatePost: React.FC = () => {
                 variant="filled"
                 sx={{ borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
               >
-                Esta conta não está conectada ao Instagram. Conecte-a antes de agendar posts.
+                Esta conta não está conectada ao Instagram. Conecte-a antes de agendar Reels.
               </Alert>
             )}
           </Card>
         )}
       </Paper>
 
-      {/* Formulário de criação de post */}
+      {/* Formulário de criação de Reel */}
       <Paper 
         elevation={0} 
         sx={{ 
@@ -624,9 +598,9 @@ const CreatePost: React.FC = () => {
           pb: 2, 
           borderBottom: '1px solid rgba(0,0,0,0.08)' 
         }}>
-          <InstagramIcon sx={{ mr: 1.5, color: '#E1306C' }} />
+          <ReelsIcon sx={{ mr: 1.5, color: '#E91E63' }} />
           <Typography variant="h5" sx={{ fontWeight: 'medium' }}>
-            Nova Postagem
+            Novo Reel
           </Typography>
           
           {selectedClient && (
@@ -647,50 +621,116 @@ const CreatePost: React.FC = () => {
           )}
         </Box>
 
-        <ImageUploader 
-          images={images} 
-          onChange={handleImagesChange} 
-          caption={caption}
-          clientName={selectedClient?.name || 'Cliente'}
-          clientUsername={selectedClient?.instagram || 'cliente'}
+        {/* Upload de Vídeo */}
+        <VideoUploader 
+          video={video} 
+          onChange={handleVideoChange}
+          maxFileSize={2048} // ✅ 2GB para Reels
+          maxDuration={90} // 90 segundos para Reels
+          acceptedFormats={['video/mp4', 'video/mov', 'video/quicktime', 'video/webm', 'video/avi']}
+          showPreview={true}
         />
         
-        {/* Indicador do tipo de post */}
-        {images.length > 0 && (
+        {/* Indicador do tipo de conteúdo */}
+        {video && (
           <Box sx={{ mt: 2, mb: 2 }}>
             <Alert 
               severity="info" 
               variant="outlined"
               sx={{ 
                 borderRadius: 2,
-                backgroundColor: images.length > 1 ? 'rgba(25, 118, 210, 0.04)' : 'rgba(76, 175, 80, 0.04)'
+                backgroundColor: 'rgba(233, 30, 99, 0.04)'
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {images.length > 1 ? (
-                  <>
-                    <InstagramIcon sx={{ color: '#1976d2' }} />
-                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                      <strong>Carrossel:</strong> Será criado um carrossel com {images.length} imagens
-                    </Typography>
-                  </>
-                ) : (
-                  <>
-                    <InstagramIcon sx={{ color: '#4caf50' }} />
-                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                      <strong>Post simples:</strong> Será criado um post com 1 imagem
-                    </Typography>
-                  </>
-                )}
+                <ReelsIcon sx={{ color: '#E91E63' }} />
+                <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                  <strong>Reel:</strong> Será criado um Reel com duração de {Math.round(video.duration)}s
+                  {video.publicUrl && (
+                    <Chip 
+                      size="small" 
+                      label="✓ Vídeo armazenado (2GB suportado)" 
+                      color="success" 
+                      sx={{ ml: 1 }}
+                    />
+                  )}
+                </Typography>
               </Box>
             </Alert>
           </Box>
         )}
 
         <Divider sx={{ my: 4 }} />
+
+        {/* Upload de Capa Personalizada */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+            <ImageIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+            Capa Personalizada (Opcional)
+          </Typography>
+          
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Adicione uma imagem personalizada como capa para seu Reel. Se não for adicionada, será usado o primeiro frame do vídeo automaticamente.
+          </Typography>
+
+          <ImageUploader
+            images={coverImage}
+            onChange={handleCoverImageChange}
+            maxImages={1} // ✅ Apenas 1 imagem para capa
+            aspectRatio="9:16" // ✅ Proporção vertical ideal para Reels
+            helperText="Recomendado: 1080x1920 pixels (9:16) para melhor qualidade no Instagram"
+            clientName={selectedClient?.name || 'Cliente'}
+            clientUsername={selectedClient?.instagram || 'username'}
+            caption="" // Não mostrar caption no preview da capa
+          />
+
+          {/* Status da capa */}
+          {coverImage.length > 0 ? (
+            <Alert severity="success" sx={{ mt: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <CheckCircleIcon sx={{ mr: 1 }} />
+                Capa personalizada será usada no Reel
+              </Box>
+            </Alert>
+          ) : video?.thumbnail ? (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <InfoIcon sx={{ mr: 1 }} />
+                Será usado o primeiro frame do vídeo como capa
+              </Box>
+            </Alert>
+          ) : null}
+        </Box>
+
+        <Divider sx={{ my: 4 }} />
         
         <CaptionEditor caption={caption} onChange={handleCaptionChange} />
         
+        <Divider sx={{ my: 4 }} />
+
+        {/* Configurações do Reel */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h6" sx={{ mb: 2, fontWeight: 'medium' }}>
+            Configurações do Reel
+          </Typography>
+          
+          <FormControlLabel
+            control={
+              <Switch
+                checked={shareToFeed}
+                onChange={(e) => setShareToFeed(e.target.checked)}
+                color="primary"
+              />
+            }
+            label="Compartilhar no feed principal"
+            sx={{ mb: 1 }}
+          />
+          
+          <Typography variant="body2" color="text.secondary" sx={{ ml: 4 }}>
+            Quando ativado, o Reel também aparecerá no feed principal da conta
+          </Typography>
+        </Box>
+
         <Divider sx={{ my: 4 }} />
         
         <DateTimePicker scheduledDate={scheduledDate} onChange={handleDateChange} />
@@ -702,47 +742,46 @@ const CreatePost: React.FC = () => {
             size="large"
             startIcon={<SendIcon />}
             onClick={handlePostNow}
-            disabled={postNowLoading || loading || !selectedClientId || images.length === 0 || !hasInstagramAuth}
+            disabled={postNowLoading || loading || !selectedClientId || !video || !hasInstagramAuth}
             sx={{ 
               px: 4, 
               py: 1.5, 
               borderRadius: 2,
-              borderColor: '#121212',
-              color: '#121212',
+              borderColor: '#E91E63',
+              color: '#E91E63',
               '&:hover': {
-                backgroundColor: 'rgba(18,18,18,0.04)',
-                borderColor: '#000'
+                backgroundColor: 'rgba(233, 30, 99, 0.04)',
+                borderColor: '#C2185B'
               },
               '&.Mui-disabled': {
                 color: 'rgba(0, 0, 0, 0.26)'
               }
             }}
           >
-            {postNowLoading ? 'Enviando...' : 'Postar Agora'}
+            {postNowLoading ? 'Enviando...' : 'Publicar Agora'}
           </Button>
 
           <Button
             variant="contained"
-            color="primary"
             size="large"
             startIcon={<ScheduleIcon />}
             onClick={handleSubmit}
-            disabled={loading || postNowLoading || !selectedClientId || images.length === 0 || !scheduledDate || !hasInstagramAuth}
+            disabled={loading || postNowLoading || !selectedClientId || !video || !scheduledDate || !hasInstagramAuth}
             sx={{ 
               px: 4, 
               py: 1.5, 
               borderRadius: 2,
-              backgroundColor: '#121212',
+              backgroundColor: '#E91E63',
               color: '#ffffff',
               '&:hover': {
-                backgroundColor: '#333'
+                backgroundColor: '#C2185B'
               },
               '&.Mui-disabled': {
                 color: 'rgba(255, 255, 255, 0.3)'
               }
             }}
           >
-            {loading ? 'Agendando...' : 'Agendar Postagem'}
+            {loading ? 'Agendando...' : 'Agendar Reel'}
           </Button>
         </Box>
         
@@ -753,54 +792,11 @@ const CreatePost: React.FC = () => {
             sx={{ mt: 3 }}
             icon={<InfoIcon />}
           >
-            Esta conta não está conectada ao Instagram. Não é possível agendar ou publicar posts.
+            Esta conta não está conectada ao Instagram. Não é possível agendar ou publicar Reels.
             Por favor, conecte a conta nas configurações do cliente.
           </Alert>
         )}
       </Paper>
-
-      {/* Footer */}
-      <Box 
-        component="footer" 
-        sx={{ 
-          py: 3, 
-          px: 2, 
-          mt: 'auto', 
-          backgroundColor: '#f9f9f9',
-          color: 'text.secondary',
-          textAlign: 'center',
-          borderTop: '1px solid rgba(0,0,0,0.08)'
-        }}
-      >
-        <Container maxWidth="lg">
-          <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            flexDirection: { xs: 'column', sm: 'row' },
-            gap: { xs: 2, sm: 0 }
-          }}>
-            <Typography variant="body2">
-              © {new Date().getFullYear()} AUPE - Todos os direitos reservados
-            </Typography>
-            <Box sx={{ 
-              display: 'flex', 
-              gap: 3,
-              color: 'text.secondary'
-            }}>
-              <Typography variant="body2" sx={{ cursor: 'pointer', '&:hover': { color: 'text.primary' } }}>
-                Termos de Uso
-              </Typography>
-              <Typography variant="body2" sx={{ cursor: 'pointer', '&:hover': { color: 'text.primary' } }}>
-                Privacidade
-              </Typography>
-              <Typography variant="body2" sx={{ cursor: 'pointer', '&:hover': { color: 'text.primary' } }}>
-                Suporte
-              </Typography>
-            </Box>
-          </Box>
-        </Container>
-      </Box>
 
       {/* Dialog para adicionar cliente */}
       <Dialog 
@@ -826,26 +822,6 @@ const CreatePost: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {isMobile && (
-        <Fab 
-          color="primary" 
-          aria-label="add-client" 
-          sx={{ 
-            position: 'fixed', 
-            bottom: 16, 
-            right: 16,
-            backgroundColor: '#121212',
-            color: '#ffffff',
-            '&:hover': {
-              backgroundColor: '#333'
-            }
-          }}
-          onClick={() => setClientDialogOpen(true)}
-        >
-          <AddIcon />
-        </Fab>
-      )}
-
       <Snackbar
         open={notification.open}
         autoHideDuration={6000}
@@ -865,4 +841,4 @@ const CreatePost: React.FC = () => {
   );
 };
 
-export default CreatePost;
+export default CreateReels;

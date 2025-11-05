@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Client } from '../types';
+import { Client, ScheduledPost, PostStatus } from '../types';
 import { InstagramAuthData } from '../services/instagramAuthService';
 import { fixInstagramConnection } from 'services/instagramFixService';
 
@@ -41,7 +41,17 @@ const columnMapping: Record<string, string> = {
   'fullName': 'full_name',
   'avatarUrl': 'avatar_url',
   'createdAt': 'created_at',
-  'updatedAt': 'updated_at'
+  'updatedAt': 'updated_at',
+  'postType': 'post_type',
+  'n8nJobId': 'n8n_job_id',
+  'instagramPostId': 'instagram_post_id',
+  'errorMessage': 'error_message',
+  'postedAt': 'posted_at',
+  'retryCount': 'retry_count',
+  'lastRetryAt': 'last_retry_at',
+  'n8nResponse': 'n8n_response',
+  'shareToFeed': 'share_to_feed',
+  'coverImage': 'cover_image'
 };
 
 // Função para converter camelCase para snake_case com mapeamento específico
@@ -81,7 +91,7 @@ const convertFromDbFormat = (obj: Record<string, any>) => {
       const jsKey = reverseMapping[key] || key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
       
       // Converter strings de data para objetos Date
-      if ((key === 'token_expiry' || key === 'created_at' || key === 'updated_at') && obj[key]) {
+      if ((key === 'token_expiry' || key === 'created_at' || key === 'updated_at' || key === 'posted_at' || key === 'last_retry_at') && obj[key]) {
         try {
           result[jsKey] = new Date(obj[key]);
         } catch (e) {
@@ -555,8 +565,10 @@ export const clientService = {
 
 // Serviços para gerenciar posts
 export const postService = {
-  // Salvar um post agendado
-  async saveScheduledPost(post: any): Promise<any> {
+  // ===== MÉTODOS EXISTENTES (MANTER) =====
+  
+  // Salvar um post agendado (método antigo - manter para compatibilidade)
+  async saveScheduledPost_OLD(post: any): Promise<any> {
     try {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
@@ -585,7 +597,7 @@ export const postService = {
       throw error;
     }
   },
-  
+
   // Buscar posts agendados por cliente
   async getScheduledPostsByClient(clientId: string): Promise<any[]> {
     try {
@@ -694,6 +706,214 @@ export const postService = {
       }
     } catch (error) {
       console.error('Erro ao excluir post agendado:', error);
+      throw error;
+    }
+  },
+
+  // ===== NOVOS MÉTODOS PARA O SISTEMA DE AGENDAMENTO =====
+  
+  // Método atualizado para salvar post com novos campos
+    // Método atualizado para salvar post com campos de Reels
+  async saveScheduledPost(post: Partial<ScheduledPost>): Promise<ScheduledPost> {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      // ✅ CORRIGIDO: Incluir todos os campos necessários para Reels
+      const postData = {
+        clientId: post.clientId,
+        userId: user.id,
+        caption: post.caption,
+        images: post.images,
+        scheduledDate: post.scheduledDate,
+        postType: post.postType || 'post',
+        immediate: post.immediate || false,
+        status: post.status || 'pending',
+        retryCount: post.retryCount || 0,
+        // ✅ NOVOS CAMPOS para Reels
+        video: post.video,
+        shareToFeed: post.shareToFeed,
+        coverImage: post.coverImage
+      };
+
+      // Remover campos undefined/null
+      const filteredPostData = Object.fromEntries(
+        Object.entries(postData).filter(([_, value]) => value !== undefined && value !== null)
+      );
+
+      // Converter camelCase para snake_case
+      const dbData = convertToDbFormat(filteredPostData);
+
+      console.log('Salvando post no Supabase (com campos de Reels):', dbData);
+
+      const { data, error } = await supabase
+        .from('scheduled_posts')
+        .insert([dbData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erro ao salvar post agendado:', error);
+        throw new Error(`Não foi possível salvar o post: ${error.message}`);
+      }
+
+      console.log('Post salvo com sucesso:', data);
+
+      // Converter de volta para camelCase
+      return convertFromDbFormat(data) as ScheduledPost;
+    } catch (error) {
+      console.error('Erro ao salvar post agendado:', error);
+      throw error;
+    }
+  },
+
+  // Método para atualizar status do post
+  async updatePostStatus(
+    postId: string, 
+    status: PostStatus, 
+    additionalData?: Partial<ScheduledPost>
+  ): Promise<ScheduledPost> {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      // ✅ CORRIGIDO: Remover updatedAt
+      const updateData = {
+        status,
+        ...additionalData
+      };
+
+      // Se o status é 'posted', definir postedAt
+      if (status === 'posted' && !updateData.postedAt) {
+        updateData.postedAt = new Date().toISOString();
+      }
+
+      // Se é uma tentativa de retry, incrementar contador
+      if (status === 'sent_to_n8n' && additionalData?.retryCount) {
+        updateData.lastRetryAt = new Date().toISOString();
+      }
+
+      const dbData = convertToDbFormat(updateData);
+
+      console.log(`Atualizando post ${postId} para status ${status}:`, dbData);
+
+      const { data, error } = await supabase
+        .from('scheduled_posts')
+        .update(dbData)
+        .eq('id', postId)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erro ao atualizar status do post:', error);
+        throw new Error(`Não foi possível atualizar o post: ${error.message}`);
+      }
+
+      console.log('Status do post atualizado:', data);
+      return convertFromDbFormat(data) as ScheduledPost;
+    } catch (error) {
+      console.error('Erro ao atualizar status do post:', error);
+      throw error;
+    }
+  },
+
+  // Método para buscar posts por status
+  async getPostsByStatus(status: PostStatus): Promise<ScheduledPost[]> {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { data, error } = await supabase
+        .from('scheduled_posts')
+        .select(`
+          *,
+          clients (*)
+        `)
+        .eq('user_id', user.id)
+        .eq('status', status)
+        .order('scheduled_date', { ascending: true });
+
+      if (error) {
+        console.error('Erro ao buscar posts por status:', error);
+        throw new Error('Não foi possível buscar os posts');
+      }
+
+      return (data || []).map(post => {
+        const result = convertFromDbFormat(post) as ScheduledPost;
+        if (post.clients) {
+          result.clients = convertFromDbFormat(post.clients) as Client;
+        }
+        return result;
+      });
+    } catch (error) {
+      console.error('Erro ao buscar posts por status:', error);
+      throw error;
+    }
+  },
+
+  // Método para reprocessar posts falhados
+  async retryFailedPost(postId: string): Promise<ScheduledPost> {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      // Buscar o post atual
+      const { data: currentPost, error: fetchError } = await supabase
+        .from('scheduled_posts')
+        .select('*')
+        .eq('id', postId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (fetchError || !currentPost) {
+        throw new Error('Post não encontrado');
+      }
+
+      // Incrementar contador de retry
+      const retryCount = (currentPost.retry_count || 0) + 1;
+
+      // Atualizar para pending novamente
+      return await this.updatePostStatus(postId, 'pending', {
+        retryCount,
+        errorMessage: null, // Limpar erro anterior
+        lastRetryAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Erro ao reprocessar post:', error);
+      throw error;
+    }
+  },
+
+  // Método para buscar posts com relacionamento de cliente
+  async getScheduledPostsWithClient(): Promise<ScheduledPost[]> {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { data, error } = await supabase
+        .from('scheduled_posts')
+        .select(`
+          *,
+          clients (*)
+        `)
+        .eq('user_id', user.id)
+        .order('scheduled_date', { ascending: true });
+
+      if (error) {
+        console.error('Erro ao buscar posts com cliente:', error);
+        throw new Error('Não foi possível buscar os posts');
+      }
+
+      return (data || []).map(post => {
+        const result = convertFromDbFormat(post) as ScheduledPost;
+        if (post.clients) {
+          result.clients = convertFromDbFormat(post.clients) as Client;
+        }
+        return result;
+      });
+    } catch (error) {
+      console.error('Erro ao buscar posts com cliente:', error);
       throw error;
     }
   }

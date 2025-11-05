@@ -26,11 +26,13 @@ import {
   AccountCircle as AccountIcon,
   Dashboard as DashboardIcon,
   ExitToApp as LogoutIcon,
-  AdminPanelSettings as AdminIcon
+  AdminPanelSettings as AdminIcon,
+  VideoLibrary as ReelsIcon, // ✅ Nova importação
+  AddPhotoAlternate as PostIcon // ✅ Nova importação
 } from '@mui/icons-material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { roleService } from '../services/roleService'; // Nova importação
+import { roleService } from '../services/roleService';
 
 // URL da logo da agência
 const AGENCY_LOGO_URL = "/LOGO-AUPE.jpg";
@@ -59,6 +61,7 @@ const Header: React.FC = () => {
   
   const [menuAnchorEl, setMenuAnchorEl] = React.useState<null | HTMLElement>(null);
   const [userMenuAnchorEl, setUserMenuAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [createMenuAnchorEl, setCreateMenuAnchorEl] = React.useState<null | HTMLElement>(null); // ✅ Novo estado
   
   // Estados para verificação de admin
   const [isAdmin, setIsAdmin] = React.useState(false);
@@ -72,11 +75,6 @@ const Header: React.FC = () => {
         try {
           const adminStatus = await roleService.isCurrentUserAdmin();
           setIsAdmin(adminStatus);
-          
-          // Removido: Debug teste que não existe mais
-          // if (process.env.NODE_ENV === 'development') {
-          //   await roleService.testRoleSystem();
-          // }
         } catch (error) {
           console.error('❌ Erro ao verificar status de admin:', error);
           setIsAdmin(false);
@@ -106,6 +104,15 @@ const Header: React.FC = () => {
 
   const handleUserMenuClose = () => {
     setUserMenuAnchorEl(null);
+  };
+
+  // ✅ Novos handlers para menu de criação
+  const handleCreateMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setCreateMenuAnchorEl(event.currentTarget);
+  };
+
+  const handleCreateMenuClose = () => {
+    setCreateMenuAnchorEl(null);
   };
 
   const handleLogout = async () => {
@@ -315,11 +322,11 @@ const Header: React.FC = () => {
               Calendário
             </Button>
 
+            {/* ✅ Botão de criar com dropdown */}
             <Button 
-              component={Link} 
-              to="/create-post" 
               variant="contained"
               startIcon={<AddIcon />}
+              onClick={handleCreateMenuOpen}
               sx={{ 
                 ml: 2,
                 bgcolor: COLORS.offWhite,
@@ -333,7 +340,7 @@ const Header: React.FC = () => {
                 }
               }}
             >
-              Criar Post
+              Criar
             </Button>
           </Box>
         )}
@@ -364,6 +371,97 @@ const Header: React.FC = () => {
           </Avatar>
         </IconButton>
       </Toolbar>
+
+      {/* ✅ Menu de criação (desktop) */}
+      <Menu
+        anchorEl={createMenuAnchorEl}
+        open={Boolean(createMenuAnchorEl)}
+        onClose={handleCreateMenuClose}
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
+            bgcolor: COLORS.offWhite,
+            minWidth: 200
+          }
+        }}
+      >
+        <MenuItem 
+          component={Link} 
+          to="/create-post"
+          onClick={handleCreateMenuClose}
+          sx={{ 
+            borderRadius: '8px', 
+            m: 0.5,
+            fontFamily: '"Poppins", sans-serif'
+          }}
+        >
+          <ListItemIcon>
+            <PostIcon fontSize="small" sx={{ color: COLORS.primary }} />
+          </ListItemIcon>
+          <ListItemText 
+            primary="Criar Post" 
+            primaryTypographyProps={{ 
+              fontFamily: '"Poppins", sans-serif',
+              fontWeight: 400
+            }} 
+          />
+        </MenuItem>
+
+        <MenuItem 
+          component={Link} 
+          to="/create-reels"
+          onClick={handleCreateMenuClose}
+          sx={{ 
+            borderRadius: '8px', 
+            m: 0.5,
+            fontFamily: '"Poppins", sans-serif'
+          }}
+        >
+          <ListItemIcon>
+            <ReelsIcon fontSize="small" sx={{ color: '#E91E63' }} />
+          </ListItemIcon>
+          <ListItemText 
+            primary="Criar Reels" 
+            primaryTypographyProps={{ 
+              fontFamily: '"Poppins", sans-serif',
+              fontWeight: 400
+            }} 
+          />
+          <Chip
+            label="Novo"
+            size="small"
+            sx={{
+              backgroundColor: '#E91E63',
+              color: 'white',
+              fontSize: '0.7rem',
+              height: '18px'
+            }}
+          />
+        </MenuItem>
+
+        <MenuItem 
+          component={Link} 
+          to="/create-story"
+          onClick={handleCreateMenuClose}
+          sx={{ 
+            borderRadius: '8px', 
+            m: 0.5,
+            fontFamily: '"Poppins", sans-serif'
+          }}
+        >
+          <ListItemIcon>
+            <AddIcon fontSize="small" sx={{ color: COLORS.primary }} />
+          </ListItemIcon>
+          <ListItemText 
+            primary="Criar Story" 
+            primaryTypographyProps={{ 
+              fontFamily: '"Poppins", sans-serif',
+              fontWeight: 400
+            }} 
+          />
+        </MenuItem>
+      </Menu>
 
       {/* Menu mobile */}
       <Menu
@@ -435,7 +533,7 @@ const Header: React.FC = () => {
           }}
         >
           <ListItemIcon>
-            <AddIcon fontSize="small" sx={{ color: COLORS.primary }} />
+            <PostIcon fontSize="small" sx={{ color: COLORS.primary }} />
           </ListItemIcon>
           <ListItemText 
             primary="Criar Post" 
@@ -443,6 +541,39 @@ const Header: React.FC = () => {
               fontFamily: '"Poppins", sans-serif',
               fontWeight: 400
             }} 
+          />
+        </MenuItem>
+
+        {/* ✅ Nova opção para Reels no menu mobile */}
+        <MenuItem 
+          component={Link} 
+          to="/create-reels"
+          onClick={handleMenuClose}
+          sx={{ 
+            borderRadius: '8px', 
+            m: 0.5,
+            fontFamily: '"Poppins", sans-serif'
+          }}
+        >
+          <ListItemIcon>
+            <ReelsIcon fontSize="small" sx={{ color: '#E91E63' }} />
+          </ListItemIcon>
+          <ListItemText 
+            primary="Criar Reels" 
+            primaryTypographyProps={{ 
+              fontFamily: '"Poppins", sans-serif',
+              fontWeight: 400
+            }} 
+          />
+          <Chip
+            label="Novo"
+            size="small"
+            sx={{
+              backgroundColor: '#E91E63',
+              color: 'white',
+              fontSize: '0.7rem',
+              height: '18px'
+            }}
           />
         </MenuItem>
 
