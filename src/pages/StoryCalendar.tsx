@@ -1,708 +1,831 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Container, 
-  Typography, 
-  Paper, 
-  Button, 
-  IconButton, 
-  Tabs, 
-  Tab, 
-  Menu, 
-  MenuItem, 
-  List, 
-  ListItem, 
-  ListItemText, 
-  ListItemAvatar, 
-  Avatar, 
-  Divider, 
-  Chip, 
-  useTheme,
-  useMediaQuery,
-  Breadcrumbs,
-  FormControl,
-  InputLabel,
-  Select,
-  SelectChangeEvent,
+import {
+  Container,
+  Typography,
+  Paper,
+  Box,
+  Grid,
+  Button,
+  IconButton,
+  Menu,
+  MenuItem,
   ListItemIcon,
-  CircularProgress,
+  ListItemText,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  Chip,
+  Avatar,
   Tooltip,
+  CircularProgress,
+  Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  ToggleButton,
+  ToggleButtonGroup,
+  List,
+  ListItem,
+  ListItemAvatar,
+  Divider,
   Badge,
-  Grid
+  Card,
+  CardContent,
+  SelectChangeEvent
 } from '@mui/material';
-import { Link } from 'react-router-dom';
-import { useNavigate } from 'react-router-dom';
-import { 
+import {
   Add as AddIcon,
-  ArrowBack as ArrowBackIcon,
-  ArrowForward as ArrowForwardIcon,
-  CalendarMonth as CalendarIcon,
-  Instagram as InstagramIcon,
-  Home as HomeIcon,
-  NavigateNext as NavigateNextIcon,
-  FilterList as FilterIcon,
   MoreVert as MoreVertIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
   Visibility as VisibilityIcon,
-  CheckCircle as CheckCircleIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
   Schedule as ScheduleIcon,
-  People as PeopleIcon,
-  Photo as PhotoIcon,
-  VideoLibrary as VideoIcon,
-  Collections as CarouselIcon,
+  CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
-  Refresh as RefreshIcon,
-  PersonAdd as PersonAddIcon
+  CalendarMonth as CalendarIcon,
+  ViewList as ViewListIcon,
+  ViewModule as ViewModuleIcon,
+  PersonAdd as PersonAddIcon,
+  Instagram as InstagramIcon,
+  VideoLibrary as VideoLibraryIcon,
+  Collections as CollectionsIcon,
+  Image as ImageIcon,
+  AccessTime as AccessTimeIcon,
+  Person as PersonIcon
 } from '@mui/icons-material';
-import { 
-  format, 
-  startOfMonth, 
-  endOfMonth, 
-  isSameMonth, 
-  isSameDay, 
-  addMonths, 
-  subMonths,
-  startOfDay,
-  endOfDay,
-  startOfWeek,
-  endOfWeek,
-  getDay,
-  addDays,
-  parseISO,
-  isWithinInterval
-} from 'date-fns';
+import { useNavigate } from 'react-router-dom';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { clientService, postService } from '../services/supabaseClient';
-import { Client, Post, Story } from '../types';
+import { useTheme } from '@mui/material/styles';
+import { postService, clientService, userProfileService, UserProfile } from '../services/supabaseClient';
+import { Client, ScheduledPost, Story, PostStatus } from '../types';
 import StoryPreview from '../components/StoryPreview';
 import ClientManager from '../components/ClientManager';
+import SmartImage from '../components/SmartImage';
+import { imageUrlService } from '../services/imageUrlService';
 
-// Implementação personalizada da função eachDayOfInterval para evitar problemas
-function eachDayOfInterval({ start, end }: { start: Date; end: Date }): Date[] {
-  const days = [];
-  let currentDate = startOfDay(new Date(start));
-  const endDate = startOfDay(new Date(end));
-
-  while (currentDate <= endDate) {
-    days.push(new Date(currentDate));
-    currentDate = addDays(currentDate, 1);
-  }
-
-  return days;
-}
-
-// Tipo para representar qualquer conteúdo agendado (post, carrossel, reels ou story)
-interface ScheduledContent {
-  id: string;
-  clientId: string;
-  type: 'post' | 'carousel' | 'reels' | 'story';
-  images: { url: string }[] | { url: string };
-  scheduledDate: string;
-  status: 'draft' | 'scheduled' | 'posted' | 'failed';
-  createdAt: string;
-  caption?: string;
-  client?: Client;
-}
-
-const ContentCalendar: React.FC = () => {
-  const theme = useTheme();
+const StoryCalendar: React.FC = () => {
   const navigate = useNavigate();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+  const theme = useTheme();
   
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedClient, setSelectedClient] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
-  const [contentItems, setContentItems] = useState<ScheduledContent[]>([]);
+  // Estados principais
+  const [content, setContent] = useState<ScheduledPost[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedContent, setSelectedContent] = useState<ScheduledContent | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [previewOpen, setPreviewOpen] = useState<boolean>(false);
-  const [contentTypeFilter, setContentTypeFilter] = useState<string>('all');
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
-  const [clientDialogOpen, setClientDialogOpen] = useState<boolean>(false);
   
-  // Gerar dias do mês atual
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(currentDate);
-  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  // Estados de filtros e visualização
+  const [selectedClient, setSelectedClient] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
   
-  // Adicionar dias do início da semana (se o mês não começar no domingo)
-  const startWeek = startOfWeek(monthStart);
-  const daysBeforeMonth = eachDayOfInterval({ 
-    start: startWeek, 
-    end: new Date(monthStart.getTime() - 24 * 60 * 60 * 1000) 
-  });
-  
-  // Adicionar dias do fim da semana (se o mês não terminar no sábado)
-  const endWeek = endOfWeek(monthEnd);
-  const daysAfterMonth = eachDayOfInterval({ 
-    start: new Date(monthEnd.getTime() + 24 * 60 * 60 * 1000), 
-    end: endWeek 
-  });
-  
-  // Todos os dias que serão exibidos no calendário
-  const calendarDays = [...daysBeforeMonth, ...monthDays, ...daysAfterMonth];
-  
-  // Função para buscar clientes e conteúdos agendados
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
-    
+  // Estados para menus e diálogos
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedContent, setSelectedContent] = useState<ScheduledPost | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [clientDialogOpen, setClientDialogOpen] = useState(false);
+
+  // Carregar dados iniciais
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
     try {
-      // Buscar clientes
-      const clientsData = await clientService.getClients();
-      setClients(clientsData);
+      setLoading(true);
+      setError(null);
       
-      // Buscar todos os posts agendados
-      const postsData = await postService.getAllScheduledPosts();
+      console.log('🔄 Carregando dados do calendário...');
       
-      // Converter posts para o formato ScheduledContent
-      const formattedContent: ScheduledContent[] = postsData.map(post => {
-        // Determinar o tipo de conteúdo com base no número de imagens
-        let contentType: 'post' | 'carousel' | 'reels' | 'story' = 'post';
-        
-        if (post.type) {
-          contentType = post.type;
-        } else if (post.images && Array.isArray(post.images)) {
-          contentType = post.images.length > 1 ? 'carousel' : 'post';
-        }
-        
-        // Se for um vídeo, marcar como reels
-        if (post.isVideo) {
-          contentType = 'reels';
-        }
-        
-        return {
-          id: post.id,
-          clientId: post.clientId,
-          type: contentType,
-          images: post.images || [],
-          scheduledDate: post.scheduledDate,
-          status: post.status || 'scheduled',
-          createdAt: post.createdAt || new Date().toISOString(),
-          caption: post.caption,
-          client: post.clients
-        };
+      // Carregar dados em paralelo
+      const [postsData, clientsData, profileData] = await Promise.all([
+        postService.getScheduledPostsWithClient(),
+        clientService.getClients(),
+        userProfileService.getCurrentUserProfile()
+      ]);
+      
+      console.log('📊 Dados carregados:', {
+        content: postsData?.length || 0,
+        clients: clientsData?.length || 0,
+        profile: !!profileData
       });
       
-      setContentItems(formattedContent);
+      // Log detalhado dos dados para debug
+      if (postsData && postsData.length > 0) {
+        console.log('📝 Primeiro item de conteúdo:', postsData[0]);
+      }
+      
+      if (clientsData && clientsData.length > 0) {
+        console.log('👥 Primeiro cliente:', clientsData[0]);
+      }
+      
+      setContent(postsData || []);
+      setClients(clientsData || []);
+      setUserProfile(profileData);
     } catch (err) {
-      console.error('Erro ao carregar dados:', err);
-      setError('Não foi possível carregar os dados. Por favor, tente novamente.');
+      console.error('❌ Erro ao carregar dados:', err);
+      setError('Erro ao carregar dados do calendário');
     } finally {
       setLoading(false);
     }
   };
-  
-  // Carregar dados ao montar o componente
-  useEffect(() => {
-    fetchData();
-  }, []);
-  
-  // Filtrar conteúdo com base no cliente e tipo selecionados
-  const filteredContent = contentItems.filter(item => {
-    const clientMatch = selectedClient === 'all' || item.clientId === selectedClient;
-    const typeMatch = contentTypeFilter === 'all' || item.type === contentTypeFilter;
-    return clientMatch && typeMatch;
+
+  // Função para fazer parse seguro de datas
+  const safeParseDateISO = (dateString: string | Date | null | undefined): Date | null => {
+    if (!dateString) return null;
+    
+    try {
+      if (dateString instanceof Date) {
+        return isValid(dateString) ? dateString : null;
+      }
+      
+      if (typeof dateString === 'string') {
+        const parsed = parseISO(dateString);
+        return isValid(parsed) ? parsed : null;
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn('Erro ao fazer parse da data:', dateString, error);
+      return null;
+    }
+  };
+
+  // Função para formatar data de forma segura
+  const safeFormatDate = (
+    dateString: string | Date | null | undefined, 
+    formatStr: string, 
+    options?: { locale?: any }
+  ): string => {
+    const date = safeParseDateISO(dateString);
+    if (!date) return 'Data inválida';
+    
+    try {
+      return format(date, formatStr, options);
+    } catch (error) {
+      console.warn('Erro ao formatar data:', dateString, error);
+      return 'Data inválida';
+    }
+  };
+
+  // Função para obter cliente por ID
+  const getClientById = (clientId: string): Client | undefined => {
+    return clients.find(client => client.id === clientId);
+  };
+
+  // Função para obter logo do cliente de forma segura
+  const getClientLogo = (client: Client | null | undefined): string | undefined => {
+    if (!client) return undefined;
+    
+    // Priorizar profilePicture (foto do Instagram)
+    if (client.profilePicture && client.profilePicture.trim() !== '') {
+      return client.profilePicture;
+    }
+    
+    // Fallback para logoUrl
+    if (client.logoUrl && client.logoUrl.trim() !== '') {
+      return client.logoUrl;
+    }
+    
+    return undefined;
+  };
+
+// Função para obter a primeira URL de imagem de forma segura
+const getFirstImageUrl = (content: ScheduledPost): string => {
+  try {
+    // Para Reels, verificar se tem coverImage primeiro
+    if (content.postType === 'reels' && content.coverImage) {
+      // Verificação mais segura para string
+      if (typeof content.coverImage === 'string') {
+        const coverStr = content.coverImage as string;
+        if (coverStr.trim()) {
+          return imageUrlService.getPublicUrl(coverStr);
+        }
+      }
+      
+      // Verificação mais segura para array
+      if (Array.isArray(content.coverImage)) {
+        const coverArray = content.coverImage as string[];
+        if (coverArray.length > 0) {
+          const firstCover = coverArray[0];
+          if (typeof firstCover === 'string' && firstCover.trim()) {
+            return imageUrlService.getPublicUrl(firstCover);
+          }
+        }
+      }
+      
+      // Verificação para objeto com url
+      if (typeof content.coverImage === 'object' && content.coverImage !== null) {
+        const coverObj = content.coverImage as { url?: string };
+        if (coverObj.url && typeof coverObj.url === 'string' && coverObj.url.trim()) {
+          return imageUrlService.getPublicUrl(coverObj.url);
+        }
+      }
+    }
+    
+    // Para outros tipos ou se não tem coverImage, usar images
+    if (content.images) {
+      // Verificação mais segura para string
+      if (typeof content.images === 'string') {
+        const imagesStr = content.images as string;
+        if (imagesStr.trim()) {
+          return imageUrlService.getPublicUrl(imagesStr);
+        }
+      }
+      
+      // Verificação mais segura para array
+      if (Array.isArray(content.images)) {
+        const imagesArray = content.images as string[];
+        if (imagesArray.length > 0) {
+          const firstImage = imagesArray[0];
+          if (typeof firstImage === 'string' && firstImage.trim()) {
+            return imageUrlService.getPublicUrl(firstImage);
+          }
+        }
+      }
+      
+      // Verificação para objeto com url
+      if (typeof content.images === 'object' && content.images !== null) {
+        const imagesObj = content.images as { url?: string };
+        if (imagesObj.url && typeof imagesObj.url === 'string' && imagesObj.url.trim()) {
+          return imageUrlService.getPublicUrl(imagesObj.url);
+        }
+      }
+    }
+    
+    // Fallback baseado no tipo de conteúdo
+    const fallbackText = content.postType === 'stories' ? 'Story' : 
+                        content.postType === 'reels' ? 'Reel' : 
+                        content.postType === 'carousel' ? 'Carrossel' : 'Post';
+    
+    return imageUrlService.getPlaceholder(400, 400, fallbackText);
+    
+  } catch (error) {
+    console.warn('Erro ao obter URL da imagem:', error);
+    return imageUrlService.getPlaceholder(400, 400, 'Erro na imagem');
+  }
+};
+
+  // Função para obter cor por tipo de conteúdo (usando brand colors)
+  const getContentTypeColor = (type: string): string => {
+    switch (type) {
+      case 'post': return '#E1306C'; // Instagram pink
+      case 'carousel': return '#833AB4'; // Instagram purple
+      case 'reels': return '#F56040'; // Instagram orange
+      case 'stories': return '#FCAF45'; // Instagram yellow
+      default: return theme.palette.primary.main;
+    }
+  };
+
+  // Função para obter ícone por tipo de conteúdo
+  const getContentTypeIcon = (type: string) => {
+    const iconProps = { fontSize: 'small' as const };
+    switch (type) {
+      case 'post': return <ImageIcon {...iconProps} />;
+      case 'carousel': return <CollectionsIcon {...iconProps} />;
+      case 'reels': return <VideoLibraryIcon {...iconProps} />;
+      case 'stories': return <InstagramIcon {...iconProps} />;
+      default: return <ImageIcon {...iconProps} />;
+    }
+  };
+
+  // Função para obter label do status
+  const getStatusLabel = (status: PostStatus): string => {
+    switch (status) {
+      case 'pending': return 'Pendente';
+      case 'sent_to_n8n': return 'Enviado';
+      case 'processing': return 'Processando';
+      case 'posted': return 'Publicado';
+      case 'failed': return 'Falhou';
+      case 'cancelled': return 'Cancelado';
+      default: return status;
+    }
+  };
+
+  // Função para obter cor do status
+  const getStatusColor = (status: PostStatus): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
+    switch (status) {
+      case 'pending': return 'warning';
+      case 'sent_to_n8n': return 'info';
+      case 'processing': return 'primary';
+      case 'posted': return 'success';
+      case 'failed': return 'error';
+      case 'cancelled': return 'default';
+      default: return 'default';
+    }
+  };
+
+  // Filtrar conteúdo
+  const filteredContent = content.filter(item => {
+    const matchesClient = selectedClient === 'all' || item.clientId === selectedClient;
+    const itemDate = safeParseDateISO(item.scheduledDate);
+    if (!itemDate) return false;
+    const matchesMonth = isSameMonth(itemDate, selectedMonth);
+    return matchesClient && matchesMonth;
   });
-  
-  const handleClientChange = (event: SelectChangeEvent) => {
-    setSelectedClient(event.target.value);
+
+  // Agrupar conteúdo por dia para visualização de calendário
+  const getContentForDay = (day: Date) => {
+    return filteredContent.filter(item => {
+      const itemDate = safeParseDateISO(item.scheduledDate);
+      if (!itemDate) return false;
+      return format(itemDate, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd');
+    });
   };
-  
-  const handleContentTypeChange = (event: SelectChangeEvent) => {
-    setContentTypeFilter(event.target.value);
-  };
-  
-  const handlePrevMonth = () => {
-    setCurrentDate(subMonths(currentDate, 1));
-  };
-  
-  const handleNextMonth = () => {
-    setCurrentDate(addMonths(currentDate, 1));
-  };
-  
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, content: ScheduledContent) => {
+
+  // Handlers para menu
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, content: ScheduledPost) => {
     setMenuAnchorEl(event.currentTarget);
     setSelectedContent(content);
   };
-  
+
   const handleMenuClose = () => {
     setMenuAnchorEl(null);
+    setSelectedContent(null);
   };
-  
+
+  // Handlers para ações
   const handlePreview = () => {
-    setMenuAnchorEl(null);
     setPreviewOpen(true);
+    handleMenuClose();
   };
-  
+
   const handleEdit = () => {
-    setMenuAnchorEl(null);
-    
-    if (!selectedContent) return;
-    
-    // Redirecionar para a página de edição apropriada com base no tipo de conteúdo
-    switch (selectedContent.type) {
-      case 'story':
-        navigate(`/edit-story/${selectedContent.id}`);
-        break;
-      case 'post':
-      case 'carousel':
-      case 'reels':
-        navigate(`/edit-post/${selectedContent.id}`);
-        break;
+    if (selectedContent) {
+      // Navegar para página de edição baseada no tipo
+      switch (selectedContent.postType) {
+        case 'stories':
+          navigate(`/edit-story/${selectedContent.id}`);
+          break;
+        case 'reels':
+          navigate(`/edit-reel/${selectedContent.id}`);
+          break;
+        default:
+          navigate(`/edit-post/${selectedContent.id}`);
+      }
     }
+    handleMenuClose();
   };
-  
+
   const handleDeleteConfirm = () => {
-    setMenuAnchorEl(null);
     setDeleteConfirmOpen(true);
+    handleMenuClose();
   };
-  
+
   const handleDelete = async () => {
-    if (!selectedContent) {
-      setDeleteConfirmOpen(false);
-      return;
+    if (selectedContent) {
+      try {
+        await postService.deleteScheduledPost(selectedContent.id);
+        await loadData(); // Recarregar dados
+        setDeleteConfirmOpen(false);
+        setSelectedContent(null);
+      } catch (error) {
+        console.error('Erro ao excluir conteúdo:', error);
+        setError('Erro ao excluir conteúdo');
+      }
     }
-    
+  };
+
+  // Handler para mudança de cliente
+  const handleClientChange = (event: SelectChangeEvent<string>) => {
+    setSelectedClient(event.target.value);
+  };
+
+  // Handler para mudança de modo de visualização
+  const handleViewModeChange = (_: React.MouseEvent<HTMLElement>, newMode: 'calendar' | 'list' | null) => {
+    if (newMode) {
+      setViewMode(newMode);
+    }
+  };
+
+  // Handler para adicionar cliente
+  const handleAddClient = async (newClient: Omit<Client, 'id'>) => {
     try {
-      // Implementar a lógica de exclusão quando estiver disponível na API
-      // await postService.deleteScheduledPost(selectedContent.id);
-      
-      // Por enquanto, apenas remover do estado local
-      setContentItems(prev => prev.filter(item => item.id !== selectedContent.id));
-      
-      setDeleteConfirmOpen(false);
-      setSelectedContent(null);
-    } catch (err) {
-      console.error('Erro ao excluir conteúdo:', err);
-      // Mostrar mensagem de erro
+      const addedClient = await clientService.addClient(newClient);
+      setClients([...clients, addedClient]);
+    } catch (error) {
+      console.error('Erro ao adicionar cliente:', error);
+      setError('Erro ao adicionar cliente');
+      throw error;
     }
   };
-  
-  // Função para lidar com a adição de um novo cliente
-  const handleAddClient = (client: Client) => {
-    setClients(prevClients => [...prevClients, client]);
-    setClientDialogOpen(false);
+
+  // Handler para atualizar cliente
+  const handleUpdateClient = (updatedClient: Client) => {
+    setClients(clients.map(c => c.id === updatedClient.id ? updatedClient : c));
   };
-  
-  // Função para obter conteúdo de um dia específico
-  const getContentForDay = (day: Date) => {
-    return filteredContent.filter(item => {
-      const itemDate = parseISO(item.scheduledDate);
-      return isWithinInterval(itemDate, {
-        start: startOfDay(day),
-        end: endOfDay(day)
-      });
-    });
+
+  // Handler para deletar cliente
+  const handleDeleteClient = (clientId: string) => {
+    setClients(clients.filter(c => c.id !== clientId));
   };
-  
-  // Função para obter o cliente pelo ID
-  const getClientById = (clientId: string) => {
-    return clients.find(client => client.id === clientId) || null;
-  };
-  
-  // Função para obter o ícone com base no tipo de conteúdo
-  const getContentTypeIcon = (type: string) => {
-    switch (type) {
-      case 'post':
-        return <PhotoIcon fontSize="small" />;
-      case 'carousel':
-        return <CarouselIcon fontSize="small" />;
-      case 'reels':
-        return <VideoIcon fontSize="small" />;
-      case 'story':
-        return <InstagramIcon fontSize="small" />;
-      default:
-        return <PhotoIcon fontSize="small" />;
-    }
-  };
-  
-  // Função para obter a cor com base no tipo de conteúdo
-  const getContentTypeColor = (type: string) => {
-    switch (type) {
-      case 'post':
-        return theme.palette.primary.main;
-      case 'carousel':
-        return theme.palette.secondary.main;
-      case 'reels':
-        return '#E1306C'; // Rosa do Instagram
-      case 'story':
-        return '#FCAF45'; // Laranja do Instagram
-      default:
-        return theme.palette.primary.main;
-    }
-  };
-  
-  // Função para obter o rótulo com base no status
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return 'Rascunho';
-      case 'scheduled':
-        return 'Agendado';
-      case 'posted':
-        return 'Publicado';
-      case 'failed':
-        return 'Falhou';
-      default:
-        return 'Desconhecido';
-    }
-  };
-  
-  // Função para obter a cor com base no status
-  const getStatusColor = (status: string): "default" | "primary" | "secondary" | "error" | "info" | "success" | "warning" => {
-    switch (status) {
-      case 'draft':
-        return 'default';
-      case 'scheduled':
-        return 'primary';
-      case 'posted':
-        return 'success';
-      case 'failed':
-        return 'error';
-      default:
-        return 'default';
-    }
-  };
-  
+
   // Função para renderizar o conteúdo do preview
   const renderPreviewContent = () => {
     if (!selectedContent) return null;
     
-    // Determinar o que renderizar com base no tipo de conteúdo
-    switch (selectedContent.type) {
-      case 'story':
-        // Converter para o formato esperado pelo StoryPreview
-        const storyData: Story = {
-          id: selectedContent.id,
-          clientId: selectedContent.clientId,
-          image: {
-            id: 'preview',
-            url: Array.isArray(selectedContent.images) 
-              ? selectedContent.images[0]?.url 
-              : selectedContent.images.url,
-            width: 1080,
-            height: 1920,
-            aspectRatio: 9/16
-          },
-          elements: [],
-          scheduledDate: selectedContent.scheduledDate,
-          status: selectedContent.status,
-          createdAt: selectedContent.createdAt,
-          duration: 15
-        };
-        return <StoryPreview story={storyData} />;
-        
-      case 'post':
-      case 'carousel':
-      case 'reels':
-        return (
-          <Box sx={{ textAlign: 'center' }}>
-            {Array.isArray(selectedContent.images) ? (
-              // Carrossel ou post único
-              selectedContent.images.map((img, index) => (
-                <Box 
-                  key={index}
-                  component="img"
-                  src={img.url}
-                  alt={`Imagem ${index + 1}`}
-                  sx={{ 
-                    maxWidth: '100%', 
-                    maxHeight: 500,
-                    mb: 2,
-                    borderRadius: 2
-                  }}
-                />
-              ))
-            ) : (
-              // Imagem única
-              <Box 
-                component="img"
-                src={selectedContent.images.url}
-                alt="Prévia"
-                sx={{ 
-                  maxWidth: '100%', 
-                  maxHeight: 500,
-                  borderRadius: 2
-                }}
+    const client = selectedContent.clients || getClientById(selectedContent.clientId);
+    const contentDate = safeParseDateISO(selectedContent.scheduledDate);
+    const createdDate = safeParseDateISO(selectedContent.createdAt);
+    
+    return (
+      <Box>
+        {/* Cabeçalho com informações do usuário e cliente */}
+        <Card sx={{ mb: 3, bgcolor: 'background.default' }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <SmartImage
+                src={getClientLogo(client)}
+                alt={client?.name || 'Cliente'}
+                width={48}
+                height={48}
+                borderRadius="50%"
+                fallbackText={client?.name?.charAt(0) || 'C'}
+                sx={{ mr: 2 }}
               />
-            )}
+              <Box sx={{ flex: 1 }}>
+                <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
+                  {client?.name || 'Cliente não encontrado'}
+                  <Chip 
+                    icon={getContentTypeIcon(selectedContent.postType)}
+                    label={selectedContent.postType.toUpperCase()}
+                    size="small"
+                    sx={{ 
+                      ml: 1,
+                      bgcolor: getContentTypeColor(selectedContent.postType),
+                      color: 'white'
+                    }}
+                  />
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                  <AccessTimeIcon fontSize="small" sx={{ mr: 0.5 }} />
+                  {contentDate ? safeFormatDate(selectedContent.scheduledDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : 'Data inválida'}
+                </Typography>
+              </Box>
+              <Chip 
+                icon={selectedContent.status === 'failed' ? <ErrorIcon /> : <CheckCircleIcon />} 
+                label={getStatusLabel(selectedContent.status)}
+                size="small"
+                color={getStatusColor(selectedContent.status)}
+              />
+            </Box>
             
-            {selectedContent.caption && (
-              <Paper sx={{ p: 2, mt: 2, bgcolor: 'background.default' }}>
-                <Typography variant="body2">{selectedContent.caption}</Typography>
-              </Paper>
+            {/* Informações do usuário que criou */}
+            {userProfile && (
+              <Box sx={{ display: 'flex', alignItems: 'center', pt: 2, borderTop: 1, borderColor: 'divider' }}>
+                <PersonIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                <Typography variant="body2" color="text.secondary">
+                  Criado por: {userProfile.full_name || userProfile.email}
+                </Typography>
+                {createdDate && (
+                  <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                    em {safeFormatDate(selectedContent.createdAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                  </Typography>
+                )}
+              </Box>
             )}
-          </Box>
-        );
-        
-      default:
-        return (
-          <Typography>
-            Prévia não disponível para este tipo de conteúdo.
-          </Typography>
-        );
+          </CardContent>
+        </Card>
+
+        {/* Conteúdo visual */}
+        <Box sx={{ mb: 3 }}>
+          {selectedContent.postType === 'stories' ? (
+            // Renderizar story
+            (() => {
+              const storyData: Story = {
+                id: selectedContent.id,
+                clientId: selectedContent.clientId,
+                image: {
+                  id: 'preview',
+                  url: getFirstImageUrl(selectedContent),
+                  width: 1080,
+                  height: 1920,
+                  aspectRatio: 9/16
+                },
+                elements: [],
+                scheduledDate: selectedContent.scheduledDate,
+                status: selectedContent.status as 'draft' | 'scheduled' | 'posted' | 'failed',
+                createdAt: selectedContent.createdAt,
+                duration: 15
+              };
+              return (
+                <Box sx={{ maxWidth: 300, mx: 'auto' }}>
+                  <StoryPreview story={storyData} />
+                </Box>
+              );
+            })()
+          ) : selectedContent.postType === 'reels' ? (
+            // Renderizar reel
+            <Box sx={{ textAlign: 'center' }}>
+              {selectedContent.video ? (
+                <Box sx={{ maxWidth: 400, mx: 'auto', mb: 2 }}>
+                  <video
+                    controls
+                    style={{
+                      width: '100%',
+                      maxHeight: 600,
+                      borderRadius: 8
+                    }}
+                  >
+                    <source src={imageUrlService.getPublicUrl(selectedContent.video)} type="video/mp4" />
+                    Seu navegador não suporta o elemento de vídeo.
+                  </video>
+                </Box>
+              ) : (
+                <SmartImage
+                  src={selectedContent.coverImage}
+                  alt="Capa do Reel"
+                  width="100%"
+                  height={400}
+                  borderRadius={2}
+                  fallbackText="Vídeo do Reel"
+                />
+              )}
+              
+              {selectedContent.shareToFeed && (
+                <Chip 
+                  label="Compartilhar no Feed" 
+                  size="small" 
+                  color="primary" 
+                  sx={{ mb: 2 }}
+                />
+              )}
+            </Box>
+          ) : (
+            // Renderizar post ou carrossel
+            <Box sx={{ textAlign: 'center' }}>
+{(() => {
+  // Processar as imagens de forma mais robusta
+  let imagesToRender: string[] = [];
+  
+  if (selectedContent.images) {
+    if (Array.isArray(selectedContent.images)) {
+      imagesToRender = selectedContent.images
+        .map(img => {
+          if (typeof img === 'string') {
+            const trimmedImg = (img as string).trim();
+            return trimmedImg || null;
+          }
+          if (typeof img === 'object' && img !== null && 'url' in img) {
+            const imgObj = img as { url?: string };
+            const trimmedUrl = imgObj.url?.trim();
+            return trimmedUrl || null;
+          }
+          return null;
+        })
+        .filter((img): img is string => img !== null && img !== '');
+    } else if (typeof selectedContent.images === 'string') {
+      const trimmedImages = (selectedContent.images as string).trim();
+      if (trimmedImages) {
+        imagesToRender = [trimmedImages];
+      }
     }
-  };
+  }
+  
+  if (imagesToRender.length === 0) {
+    return (
+      <SmartImage
+        src=""
+        alt="Sem imagem"
+        width="100%"
+        height={400}
+        borderRadius={2}
+        fallbackText="Sem imagem disponível"
+      />
+    );
+  }
   
   return (
-    <>
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        {/* Breadcrumbs de navegação */}
-        <Breadcrumbs 
-          separator={<NavigateNextIcon fontSize="small" />} 
-          aria-label="breadcrumb"
-          sx={{ mb: 3 }}
-        >
-          <Box 
-            component={Link} 
-            to="/" 
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              color: theme.palette.text.secondary, 
-              textDecoration: 'none' 
-            }}
-          >
-            <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Início
+    <Grid container spacing={1}>
+      {imagesToRender.map((img, index) => (
+        <Grid item xs={imagesToRender.length === 1 ? 12 : 6} key={index}>
+          <SmartImage
+            src={img}
+            alt={`Imagem ${index + 1}`}
+            width="100%"
+            height={300}
+            borderRadius={2}
+            fallbackText={`Imagem ${index + 1}`}
+          />
+        </Grid>
+      ))}
+    </Grid>
+  );
+})()}
+            </Box>
+          )}
+        </Box>
+
+        {/* Legenda */}
+        {selectedContent.caption && (
+          <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+              Legenda:
+            </Typography>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word'
+              }}
+            >
+              {selectedContent.caption}
+            </Typography>
+          </Paper>
+        )}
+
+        {/* Informações adicionais */}
+        {(selectedContent.errorMessage || selectedContent.instagramPostId) && (
+          <Box sx={{ mt: 2 }}>
+            {selectedContent.instagramPostId && (
+              <Alert severity="success" sx={{ mb: 1 }}>
+                <Typography variant="body2">
+                  <strong>ID do Post no Instagram:</strong> {selectedContent.instagramPostId}
+                </Typography>
+              </Alert>
+            )}
+            
+            {selectedContent.errorMessage && (
+              <Alert severity="error">
+                <Typography variant="body2">
+                  <strong>Erro:</strong> {selectedContent.errorMessage}
+                </Typography>
+              </Alert>
+            )}
           </Box>
-          <Typography
-            sx={{ display: 'flex', alignItems: 'center' }}
-            color="text.primary"
-          >
-            <CalendarIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            Calendário de Conteúdo
-          </Typography>
-        </Breadcrumbs>
-        
-        {/* Cabeçalho da página */}
+        )}
+      </Box>
+    );
+  };
+
+  // Gerar dias do mês para o calendário
+  const monthStart = startOfMonth(selectedMonth);
+  const monthEnd = endOfMonth(selectedMonth);
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+  if (loading) {
+    return (
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+          <Box sx={{ textAlign: 'center' }}>
+            <CircularProgress size={48} />
+            <Typography variant="h6" sx={{ mt: 2 }}>
+              Carregando calendário...
+            </Typography>
+          </Box>
+        </Box>
+      </Container>
+    );
+  }
+
+  return (
+    <>
+      <Container maxWidth="xl" sx={{ py: 4 }}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
+        {/* Cabeçalho */}
         <Box sx={{ 
           display: 'flex', 
+          justifyContent: 'space-between', 
           alignItems: 'center', 
-          justifyContent: 'space-between',
-          flexDirection: isTablet ? 'column' : 'row',
-          gap: 2,
-          mb: 4 
+          mb: 4,
+          flexWrap: 'wrap',
+          gap: 2
         }}>
-          <Typography variant="h4" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
-            <CalendarIcon sx={{ mr: 2, color: theme.palette.primary.main }} />
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
             Calendário de Conteúdo
           </Typography>
-          
-          <Box sx={{ 
-            display: 'flex', 
-            gap: 2, 
-            width: isTablet ? '100%' : 'auto',
-            flexDirection: isMobile ? 'column' : 'row'
-          }}>
-            <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
-              <FormControl fullWidth sx={{ minWidth: isMobile ? '100%' : 150 }}>
-                <InputLabel id="client-select-label">Cliente</InputLabel>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Button
+              variant="outlined"
+              startIcon={<PersonAddIcon />}
+              onClick={() => setClientDialogOpen(true)}
+            >
+              Gerenciar Clientes
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => navigate('/create-story')}
+            >
+              Criar Conteúdo
+            </Button>
+          </Box>
+        </Box>
+
+        {/* Filtros e controles */}
+        <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+          <Grid container spacing={3} alignItems="center">
+            <Grid item xs={12} md={4}>
+              <FormControl fullWidth>
+                <InputLabel>Cliente</InputLabel>
                 <Select
-                  labelId="client-select-label"
-                  id="client-select"
                   value={selectedClient}
-                  label="Cliente"
                   onChange={handleClientChange}
-                  startAdornment={<PeopleIcon sx={{ mr: 1, color: 'action.active' }} />}
+                  label="Cliente"
                 >
                   <MenuItem value="all">Todos os Clientes</MenuItem>
                   {clients.map((client) => (
                     <MenuItem key={client.id} value={client.id}>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar 
-                          src={client.profilePicture || client.logoUrl}
-                          sx={{ width: 24, height: 24, mr: 1 }}
-                        >
-                          {client.name.charAt(0)}
-                        </Avatar>
+                        <SmartImage
+                          src={getClientLogo(client)}
+                          alt={client.name}
+                          width={24}
+                          height={24}
+                          borderRadius="50%"
+                          fallbackText={client.name.charAt(0)}
+                          sx={{ mr: 1 }}
+                        />
                         {client.name}
                       </Box>
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
-              
-              <FormControl fullWidth sx={{ minWidth: isMobile ? '100%' : 150 }}>
-                <InputLabel id="type-select-label">Tipo</InputLabel>
-                <Select
-                  labelId="type-select-label"
-                  id="type-select"
-                  value={contentTypeFilter}
-                  label="Tipo"
-                  onChange={handleContentTypeChange}
-                >
-                  <MenuItem value="all">Todos os Tipos</MenuItem>
-                  <MenuItem value="post">
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <PhotoIcon sx={{ mr: 1 }} />
-                      Posts
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="carousel">
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <CarouselIcon sx={{ mr: 1 }} />
-                      Carrosséis
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="reels">
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <VideoIcon sx={{ mr: 1 }} />
-                      Reels
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="story">
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <InstagramIcon sx={{ mr: 1 }} />
-                      Stories
-                    </Box>
-                  </MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
+            </Grid>
             
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              {/* Botão para adicionar novo cliente */}
-              <Button 
-                variant="outlined"
-                startIcon={<PersonAddIcon />}
-                onClick={() => setClientDialogOpen(true)}
-                sx={{ whiteSpace: 'nowrap' }}
+            <Grid item xs={12} md={4}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <IconButton onClick={() => setSelectedMonth(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1))}>
+                  ←
+                </IconButton>
+                <Typography variant="h6" sx={{ minWidth: 200, textAlign: 'center' }}>
+                  {format(selectedMonth, 'MMMM yyyy', { locale: ptBR })}
+                </Typography>
+                <IconButton onClick={() => setSelectedMonth(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1))}>
+                  →
+                </IconButton>
+              </Box>
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={handleViewModeChange}
+                size="small"
               >
-                Novo Cliente
-              </Button>
-              
-              <Button 
-                variant="outlined"
-                startIcon={<RefreshIcon />}
-                onClick={fetchData}
-                sx={{ whiteSpace: 'nowrap' }}
-              >
-                Atualizar
-              </Button>
-              
-              <Button 
-                variant="contained" 
-                startIcon={<AddIcon />}
-                onClick={() => navigate('/create-story')}
-                sx={{ whiteSpace: 'nowrap' }}
-              >
-                Novo Conteúdo
-              </Button>
-            </Box>
-          </Box>
-        </Box>
-        
-        {/* Seletor de visualização */}
-        <Paper sx={{ mb: 4, borderRadius: 2, overflow: 'hidden' }}>
-          <Tabs
-            value={viewMode}
-            onChange={(_, newValue) => setViewMode(newValue)}
-            indicatorColor="primary"
-            textColor="primary"
-            variant="fullWidth"
-          >
-            <Tab 
-              icon={<CalendarIcon />} 
-              label="Calendário" 
-              value="calendar" 
-            />
-            <Tab 
-              icon={<List />} 
-              label="Lista" 
-              value="list" 
-            />
-          </Tabs>
+                <ToggleButton value="calendar">
+                  <ViewModuleIcon sx={{ mr: 1 }} />
+                  Calendário
+                </ToggleButton>
+                <ToggleButton value="list">
+                  <ViewListIcon sx={{ mr: 1 }} />
+                  Lista
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Grid>
+          </Grid>
         </Paper>
-        
-        {/* Estado de carregamento */}
-        {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-            <CircularProgress />
-          </Box>
-        )}
-        
-        {/* Estado de erro */}
-        {error && (
-          <Paper sx={{ p: 3, mb: 4, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 2 }}>
-            <Typography variant="body1">{error}</Typography>
-            <Button 
-              variant="contained" 
-              color="error"
-              startIcon={<RefreshIcon />}
-              onClick={fetchData}
-              sx={{ mt: 2 }}
-            >
-              Tentar Novamente
-            </Button>
-          </Paper>
-        )}
-        
+
         {/* Visualização de Calendário */}
-        {!loading && !error && viewMode === 'calendar' && (
+        {viewMode === 'calendar' && (
           <Paper sx={{ p: 3, borderRadius: 2 }}>
-            {/* Navegação do mês */}
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-              <IconButton onClick={handlePrevMonth}>
-                <ArrowBackIcon />
-              </IconButton>
-              
-              <Typography variant="h5" sx={{ fontWeight: 'medium', textTransform: 'capitalize' }}>
-                {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
-              </Typography>
-              
-              <IconButton onClick={handleNextMonth}>
-                <ArrowForwardIcon />
-              </IconButton>
-            </Box>
+            <Typography variant="h6" sx={{ mb: 3 }}>
+              {format(selectedMonth, 'MMMM yyyy', { locale: ptBR })}
+            </Typography>
             
-            {/* Calendário - usando Box com display grid em vez de Grid para evitar problemas */}
-            <Box sx={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(7, 1fr)', 
-              gap: 1 
-            }}>
-              {/* Cabeçalho dos dias da semana */}
+            {/* Cabeçalho dos dias da semana */}
+            <Grid container spacing={1} sx={{ mb: 2 }}>
               {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
-                <Box 
-                  key={day} 
-                  sx={{ 
-                    textAlign: 'center', 
-                    fontWeight: 'bold',
-                    p: 1
-                  }}
-                >
-                  {day}
-                </Box>
+                <Grid item xs key={day}>
+                  <Typography 
+                    variant="subtitle2" 
+                    align="center" 
+                    sx={{ fontWeight: 'bold', color: 'text.secondary' }}
+                  >
+                    {day}
+                  </Typography>
+                </Grid>
               ))}
-              
-              {/* Dias do calendário */}
-              {calendarDays.map((day, index) => {
+            </Grid>
+            
+            {/* Dias do calendário */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1 }}>
+              {daysInMonth.map((day, index) => {
                 const dayContent = getContentForDay(day);
-                const isToday = isSameDay(day, new Date());
-                const isCurrentMonth = isSameMonth(day, currentDate);
+                const isCurrentMonth = isSameMonth(day, selectedMonth);
+                const isDayToday = isToday(day);
                 
                 return (
-                  <Paper 
+                  <Paper
                     key={index}
                     elevation={0} 
                     sx={{ 
                       p: 1, 
                       height: '100%', 
                       minHeight: 120,
-                      bgcolor: isToday ? 'rgba(25, 118, 210, 0.08)' : 
+                      bgcolor: isDayToday ? 'rgba(25, 118, 210, 0.08)' : 
                                !isCurrentMonth ? 'rgba(0, 0, 0, 0.03)' : 'background.paper',
-                      border: isToday ? `1px solid ${theme.palette.primary.main}` : '1px solid #eee',
+                      border: isDayToday ? `1px solid ${theme.palette.primary.main}` : '1px solid #eee',
                       borderRadius: 1,
                       display: 'flex',
                       flexDirection: 'column',
@@ -712,69 +835,81 @@ const ContentCalendar: React.FC = () => {
                     <Typography 
                       variant="body2" 
                       sx={{ 
-                        fontWeight: isToday ? 'bold' : 'normal',
-                        color: isToday ? 'primary.main' : 'text.primary',
+                        fontWeight: isDayToday ? 'bold' : 'normal',
+                        color: isDayToday ? 'primary.main' : 'text.primary',
                         mb: 1
                       }}
                     >
                       {format(day, 'd')}
                     </Typography>
-                    
-                    {dayContent.length > 0 ? (
-                      <Box sx={{ overflowY: 'auto', flex: 1 }}>
-                        {dayContent.map((content) => {
-                          const client = content.client || getClientById(content.clientId);
-                          const contentDate = parseISO(content.scheduledDate);
-                          
-                          return (
-                            <Box 
-                              key={content.id} 
-                              sx={{ 
-                                p: 0.5, 
-                                mb: 0.5, 
-                                bgcolor: getContentTypeColor(content.type),
-                                color: '#fff',
-                                borderRadius: 1,
-                                fontSize: '0.75rem',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between'
-                              }}
-                            >
-                              <Box sx={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
-                                <Tooltip title={client?.name || 'Cliente'}>
-                                  <Avatar 
-                                    src={client?.logoUrl} 
-                                    sx={{ width: 16, height: 16, mr: 0.5 }}
-                                  >
-                                    {client?.name?.charAt(0)}
-                                  </Avatar>
-                                </Tooltip>
-                                <Tooltip title={format(contentDate, "HH:mm")}>
-                                  <Box component="span" sx={{ fontWeight: 'medium', mr: 0.5 }}>
-                                    {format(contentDate, "HH:mm")}
-                                  </Box>
-                                </Tooltip>
-                                <Tooltip title={content.type}>
-                                  <Box component="span">
-                                    {getContentTypeIcon(content.type)}
-                                  </Box>
-                                </Tooltip>
-                              </Box>
-                              <IconButton 
-                                size="small" 
-                                sx={{ color: 'inherit', p: 0.25 }}
-                                onClick={(e) => handleMenuOpen(e, content)}
-                              >
-                                <MoreVertIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          );
-                        })}
-                      </Box>
-                    ) : (
-                      <Box sx={{ flex: 1 }} />
-                    )}
+              {dayContent.length > 0 ? (
+  <Box sx={{ overflowY: 'auto', flex: 1 }}>
+    {dayContent.map((content) => {
+      const client = content.clients || getClientById(content.clientId);
+      const contentDate = safeParseDateISO(content.scheduledDate);
+      
+      if (!contentDate) return null; // Pular conteúdo com data inválida
+      
+      return (
+        <Box 
+          key={content.id} 
+          sx={{ 
+            p: 0.5, 
+            mb: 0.5, 
+            bgcolor: getContentTypeColor(content.postType),
+            color: '#fff',
+            borderRadius: 1,
+            fontSize: '0.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+            <Tooltip title={client?.name || 'Cliente'}>
+              <SmartImage
+                src={getClientLogo(client)}
+                alt={client?.name || 'Cliente'}
+                width={16}
+                height={16}
+                borderRadius="50%"
+                fallbackText={client?.name?.charAt(0) || 'C'}
+                sx={{ mr: 0.5 }}
+              />
+            </Tooltip>
+            <Typography 
+              variant="caption" 
+              sx={{ 
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                flex: 1
+              }}
+            >
+              {safeFormatDate(content.scheduledDate, 'HH:mm')}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', ml: 0.5 }}>
+            <Tooltip title={content.postType}>
+              <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+                {getContentTypeIcon(content.postType)}
+              </Box>
+            </Tooltip>
+          </Box>
+          <IconButton 
+            size="small" 
+            sx={{ color: 'inherit', p: 0.25 }}
+            onClick={(e) => handleMenuOpen(e, content)}
+          >
+            <MoreVertIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      );
+    })}
+  </Box>
+) : (
+  <Box sx={{ flex: 1 }} />
+)}
                   </Paper>
                 );
               })}
@@ -795,15 +930,15 @@ const ContentCalendar: React.FC = () => {
                 <Typography variant="caption">Reels</Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Box sx={{ width: 16, height: 16, bgcolor: getContentTypeColor('story'), borderRadius: 1, mr: 1 }} />
-                <Typography variant="caption">Story</Typography>
+                <Box sx={{ width: 16, height: 16, bgcolor: getContentTypeColor('stories'), borderRadius: 1, mr: 1 }} />
+                <Typography variant="caption">Stories</Typography>
               </Box>
             </Box>
           </Paper>
         )}
         
         {/* Visualização de Lista */}
-        {!loading && !error && viewMode === 'list' && (
+        {viewMode === 'list' && (
           <Paper sx={{ p: 3, borderRadius: 2 }}>
             <Typography variant="h6" sx={{ mb: 3 }}>
               Conteúdo Agendado
@@ -836,10 +971,17 @@ const ContentCalendar: React.FC = () => {
             ) : (
               <List>
                 {filteredContent
-                  .sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime())
+                  .sort((a, b) => {
+                    const dateA = safeParseDateISO(a.scheduledDate);
+                    const dateB = safeParseDateISO(b.scheduledDate);
+                    if (!dateA || !dateB) return 0;
+                    return dateA.getTime() - dateB.getTime();
+                  })
                   .map((content, index) => {
-                    const client = content.client || getClientById(content.clientId);
-                    const contentDate = parseISO(content.scheduledDate);
+                    const client = content.clients || getClientById(content.clientId);
+                    const contentDate = safeParseDateISO(content.scheduledDate);
+                    
+                    if (!contentDate) return null; // Pular conteúdo com data inválida
                     
                     return (
                       <React.Fragment key={content.id}>
@@ -856,63 +998,80 @@ const ContentCalendar: React.FC = () => {
                               overlap="circular"
                               anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                               badgeContent={
-                                <Tooltip title={content.type}>
+                                <Tooltip title={content.postType}>
                                   <Avatar 
                                     sx={{ 
                                       width: 20, 
                                       height: 20, 
-                                      bgcolor: getContentTypeColor(content.type) 
+                                      bgcolor: getContentTypeColor(content.postType) 
                                     }}
                                   >
-                                    {getContentTypeIcon(content.type)}
+                                    {getContentTypeIcon(content.postType)}
                                   </Avatar>
                                 </Tooltip>
                               }
                             >
-                              <Avatar 
-                                variant="rounded"
-                                src={Array.isArray(content.images) 
-                                  ? content.images[0]?.url 
-                                  : content.images?.url
-                                }
-                                sx={{ width: 56, height: 56 }}
+                              <SmartImage
+                                src={getFirstImageUrl(content)}
+                                alt={`Prévia do ${content.postType}`}
+                                width={56}
+                                height={56}
+                                borderRadius={1}
+                                fallbackText="Sem imagem"
+                                sx={{ 
+                                  border: '1px solid',
+                                  borderColor: 'grey.300'
+                                }}
                               />
                             </Badge>
                           </ListItemAvatar>
                           <ListItemText
                             primary={
                               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <Avatar 
-                                  src={client?.logoUrl} 
-                                  sx={{ width: 24, height: 24, mr: 1 }}
-                                >
-                                  {client?.name?.charAt(0)}
-                                </Avatar>
-                                <Typography variant="subtitle1">
+                                <SmartImage
+                                  src={getClientLogo(client)}
+                                  alt={client?.name || 'Cliente'}
+                                  width={24}
+                                  height={24}
+                                  borderRadius="50%"
+                                  fallbackText={client?.name?.charAt(0) || 'C'}
+                                  sx={{ mr: 1 }}
+                                />
+                                <Typography variant="subtitle1" component="span">
                                   {client?.name || 'Cliente não encontrado'}
                                 </Typography>
                               </Box>
                             }
                             secondary={
-                              <Box sx={{ mt: 1 }}>
-                                <Chip 
-                                  icon={<ScheduleIcon />} 
-                                  label={format(contentDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                                  size="small"
-                                  variant="outlined"
-                                  sx={{ mr: 1, mb: 1 }}
-                                />
-                                <Chip 
-                                  icon={content.status === 'failed' ? <ErrorIcon /> : <CheckCircleIcon />} 
-                                  label={getStatusLabel(content.status)}
-                                  size="small"
-                                  color={getStatusColor(content.status)}
-                                  sx={{ mr: 1, mb: 1 }}
-                                />
+                              <Box component="div" sx={{ mt: 1 }}>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                                  <Chip 
+                                    icon={<ScheduleIcon />} 
+                                    label={safeFormatDate(content.scheduledDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                    size="small"
+                                    variant="outlined"
+                                  />
+                                  <Chip 
+                                    icon={content.status === 'failed' ? <ErrorIcon /> : <CheckCircleIcon />} 
+                                    label={getStatusLabel(content.status)}
+                                    size="small"
+                                    color={getStatusColor(content.status)}
+                                  />
+                                  {/* Mostrar quem criou o conteúdo */}
+                                  {userProfile && (
+                                    <Chip 
+                                      icon={<PersonIcon />} 
+                                      label={`Por: ${userProfile.full_name || userProfile.email}`}
+                                      size="small"
+                                      variant="outlined"
+                                    />
+                                  )}
+                                </Box>
                                 {content.caption && (
                                   <Typography 
                                     variant="body2" 
                                     color="text.secondary" 
+                                    component="div"
                                     sx={{ 
                                       mt: 0.5, 
                                       overflow: 'hidden',
@@ -937,8 +1096,8 @@ const ContentCalendar: React.FC = () => {
           </Paper>
         )}
       </Container>
-      
-      {/* Menu de ações para conteúdo */}
+
+      {/* Menu de contexto */}
       <Menu
         anchorEl={menuAnchorEl}
         open={Boolean(menuAnchorEl)}
@@ -956,85 +1115,129 @@ const ContentCalendar: React.FC = () => {
           </ListItemIcon>
           <ListItemText>Editar</ListItemText>
         </MenuItem>
-        <Divider />
-        <MenuItem onClick={handleDeleteConfirm}>
+        <MenuItem onClick={handleDeleteConfirm} sx={{ color: 'error.main' }}>
           <ListItemIcon>
             <DeleteIcon fontSize="small" color="error" />
           </ListItemIcon>
-          <ListItemText sx={{ color: 'error.main' }}>Excluir</ListItemText>
+          <ListItemText>Excluir</ListItemText>
         </MenuItem>
       </Menu>
-      
-      {/* Diálogo de prévia */}
-      <Dialog
-        open={previewOpen}
+
+      {/* Diálogo de visualização */}
+      <Dialog 
+        open={previewOpen} 
         onClose={() => setPreviewOpen(false)}
         maxWidth="md"
         fullWidth
+        PaperProps={{
+          sx: { borderRadius: 2 }
+        }}
       >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          pb: 1
+        }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            {selectedContent && getContentTypeIcon(selectedContent.type)}
-            <Typography sx={{ ml: 1 }}>
-              Prévia do {selectedContent?.type === 'post' ? 'Post' : 
-                         selectedContent?.type === 'carousel' ? 'Carrossel' :
-                         selectedContent?.type === 'reels' ? 'Reels' : 'Story'}
-            </Typography>
+            <VisibilityIcon sx={{ mr: 1 }} />
+            Visualizar Conteúdo
           </Box>
-          <Chip 
-            label={selectedContent?.client?.name || getClientById(selectedContent?.clientId || '')?.name || 'Cliente'}
-            size="small"
-            variant="outlined"
-          />
+          {selectedContent && (
+            <Chip 
+              label={selectedContent.postType.toUpperCase()}
+              size="small"
+              sx={{ 
+                bgcolor: getContentTypeColor(selectedContent.postType),
+                color: 'white'
+              }}
+            />
+          )}
         </DialogTitle>
-        <DialogContent dividers>
+        <DialogContent sx={{ pt: 2 }}>
           {renderPreviewContent()}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPreviewOpen(false)}>
             Fechar
           </Button>
+          {selectedContent && (
+            <Button 
+              variant="contained" 
+              onClick={handleEdit}
+              startIcon={<EditIcon />}
+            >
+              Editar
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
-      
+
       {/* Diálogo de confirmação de exclusão */}
-      <Dialog
-        open={deleteConfirmOpen}
+      <Dialog 
+        open={deleteConfirmOpen} 
         onClose={() => setDeleteConfirmOpen(false)}
+        maxWidth="sm"
+        PaperProps={{
+          sx: { borderRadius: 2 }
+        }}
       >
-        <DialogTitle>Confirmar exclusão</DialogTitle>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center' }}>
+          <DeleteIcon sx={{ mr: 1, color: 'error.main' }} />
+          Confirmar Exclusão
+        </DialogTitle>
         <DialogContent>
           <Typography>
             Tem certeza que deseja excluir este conteúdo? Esta ação não pode ser desfeita.
           </Typography>
+          {selectedContent && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Cliente:</strong> {getClientById(selectedContent.clientId)?.name || 'Cliente não encontrado'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Tipo:</strong> {selectedContent.postType}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Data:</strong> {safeFormatDate(selectedContent.scheduledDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+              </Typography>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancelar</Button>
-          <Button onClick={handleDelete} color="error" variant="contained">
+          <Button onClick={() => setDeleteConfirmOpen(false)}>
+            Cancelar
+          </Button>
+          <Button 
+            variant="contained" 
+            color="error" 
+            onClick={handleDelete}
+            startIcon={<DeleteIcon />}
+          >
             Excluir
           </Button>
         </DialogActions>
       </Dialog>
-      
-      {/* Novo diálogo para adicionar cliente */}
-      <Dialog
-        open={clientDialogOpen}
+
+      {/* Diálogo de gerenciamento de clientes */}
+      <Dialog 
+        open={clientDialogOpen} 
         onClose={() => setClientDialogOpen(false)}
         maxWidth="md"
         fullWidth
+        PaperProps={{
+          sx: { borderRadius: 2 }
+        }}
       >
         <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <PersonAddIcon sx={{ mr: 1 }} />
-            Gerenciar Clientes
-          </Box>
+          Gerenciar Clientes
         </DialogTitle>
-        <DialogContent dividers>
-          <ClientManager 
-            clients={clients} 
-            onAddClient={handleAddClient} 
-            onSelectClient={() => {}} 
-            selectedClientId=""
+        <DialogContent>
+          <ClientManager
+            clients={clients}
+            onClientAdded={handleAddClient}
+            onClientUpdated={handleUpdateClient}
+            onClientDeleted={handleDeleteClient}
           />
         </DialogContent>
         <DialogActions>
@@ -1044,7 +1247,7 @@ const ContentCalendar: React.FC = () => {
         </DialogActions>
       </Dialog>
     </>
-  );
+  ); 
 };
 
-export default ContentCalendar;
+export default StoryCalendar;

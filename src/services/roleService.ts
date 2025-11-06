@@ -1,147 +1,143 @@
 import { supabase } from './supabaseClient';
 
-export type UserRole = 'user' | 'admin' | 'moderator';
+export type UserRole = 'admin' | 'moderator' | 'user';
 
 export interface UserProfile {
   id: string;
   email: string;
-  full_name?: string;
-  avatar_url?: string;
+  full_name: string | null;
   role: UserRole;
   created_at: string;
   updated_at: string;
 }
 
-interface CreateUserData {
+export interface CreateUserData {
   email: string;
   password: string;
   full_name: string;
   role: UserRole;
 }
 
-interface UpdateUserData {
-  full_name?: string;
-  role?: UserRole;
-  email?: string;
-}
-
 class RoleService {
-  // Cache para evitar múltiplas consultas
-  private roleCache = new Map<string, { role: UserRole; timestamp: number }>();
-  private cacheTimeout = 30000; // 30 segundos
-
-  // Verificar se o usuário atual é admin
+  /**
+   * Verificar se o usuário atual é admin usando RPC
+   */
   async isCurrentUserAdmin(): Promise<boolean> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
 
-      // Verificar cache primeiro
-      const cached = this.roleCache.get(user.id);
-      if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
-        return cached.role === 'admin';
-      }
-
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
+      // Usar RPC para evitar recursão
+      const { data, error } = await supabase.rpc('is_admin', { user_id: user.id });
+      
       if (error) {
-        console.error('❌ Erro ao verificar role:', error);
-        return false;
+        console.error('❌ Erro ao verificar admin via RPC:', error);
+        // Fallback: tentar buscar diretamente
+        const profile = await this.getUserProfileDirect(user.id);
+        return profile?.role === 'admin';
       }
 
-      const role = (profile?.role as UserRole) || 'user';
-      
-      // Atualizar cache
-      this.roleCache.set(user.id, { role, timestamp: Date.now() });
-      
-      return role === 'admin';
+      return data === true;
     } catch (error) {
-      console.error('❌ Erro ao verificar admin:', error);
+      console.error('❌ Erro ao verificar se usuário é admin:', error);
       return false;
     }
   }
 
-  // Obter role do usuário atual
-  async getCurrentUserRole(): Promise<UserRole> {
+  /**
+   * Buscar perfil diretamente (fallback)
+   */
+  private async getUserProfileDirect(userId: string): Promise<UserProfile | null> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return 'user';
-
-      // Verificar cache primeiro
-      const cached = this.roleCache.get(user.id);
-      if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
-        return cached.role;
-      }
-
+      // Tentar profiles primeiro
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('role')
-        .eq('id', user.id)
+        .select('*')
+        .eq('id', userId)
         .single();
 
-      if (error) {
-        console.error('❌ Erro ao obter role:', error);
-        return 'user';
+      if (error && error.message.includes('does not exist')) {
+        // Tentar user_profiles
+        const { data: userProfile, error: userError } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+        
+        return userError ? null : userProfile;
       }
 
-      const role = (profile?.role as UserRole) || 'user';
-      
-      // Atualizar cache
-      this.roleCache.set(user.id, { role, timestamp: Date.now() });
-      
-      return role;
+      return error ? null : profile;
     } catch (error) {
-      console.error('❌ Erro ao obter role:', error);
-      return 'user';
+      return null;
     }
   }
 
-  // Limpar cache (útil após mudanças de role)
-  clearCache(userId?: string): void {
-    if (userId) {
-      this.roleCache.delete(userId);
-    } else {
-      this.roleCache.clear();
-    }
+  /**
+   * Obter perfil do usuário (sem recursão)
+   */
+  async getUserProfile(userId: string): Promise<UserProfile | null> {
+    return await this.getUserProfileDirect(userId);
   }
 
-  // Obter perfil completo do usuário atual
+  /**
+   * Obter perfil do usuário atual
+   */
   async getCurrentUserProfile(): Promise<UserProfile | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        console.error('❌ Erro ao obter perfil:', error);
-        return null;
-      }
-
-      return profile as UserProfile;
+      return await this.getUserProfile(user.id);
     } catch (error) {
-      console.error('❌ Erro ao obter perfil:', error);
+      console.error('❌ Erro ao obter perfil do usuário atual:', error);
       return null;
     }
   }
 
-  // Atualizar role de um usuário (apenas admins)
-  async updateUserRole(userId: string, newRole: UserRole): Promise<boolean> {
+  /**
+   * Listar todos os usuários com seus roles
+   */
+  async getAllUsersWithRoles(): Promise<UserProfile[]> {
     try {
-      const isAdmin = await this.isCurrentUserAdmin();
-      if (!isAdmin) {
-        throw new Error('Apenas administradores podem alterar roles');
+      // Tentar profiles primeiro
+      let { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      // Se profiles não existir, tentar user_profiles
+      if (error && error.message.includes('does not exist')) {
+        const result = await supabase
+          .from('user_profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        profiles = result.data;
+        error = result.error;
       }
 
-      const { error } = await supabase
+      if (error) {
+        console.error('❌ Erro ao buscar usuários:', error);
+        return [];
+      }
+
+      return profiles || [];
+    } catch (error) {
+      console.error('❌ Erro ao listar usuários:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Atualizar role do usuário
+   */
+  async updateUserRole(userId: string, newRole: UserRole): Promise<boolean> {
+    try {
+      console.log(`🔄 Atualizando role do usuário ${userId} para ${newRole}`);
+
+      // Tentar profiles primeiro
+      let { error } = await supabase
         .from('profiles')
         .update({ 
           role: newRole,
@@ -149,162 +145,288 @@ class RoleService {
         })
         .eq('id', userId);
 
+      // Se profiles não existir, tentar user_profiles
+      if (error && error.message.includes('does not exist')) {
+        const result = await supabase
+          .from('user_profiles')
+          .update({ 
+            role: newRole,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+        
+        error = result.error;
+      }
+
       if (error) {
         console.error('❌ Erro ao atualizar role:', error);
         return false;
       }
 
-      // Limpar cache do usuário alterado
-      this.clearCache(userId);
-      
+      console.log('✅ Role atualizada com sucesso');
       return true;
     } catch (error) {
-      console.error('❌ Erro ao atualizar role:', error);
-      return false;
-    }
-  }
-
-  // Listar todos os usuários com suas roles (apenas admins)
-  async getAllUsersWithRoles(): Promise<UserProfile[]> {
-    try {
-      const isAdmin = await this.isCurrentUserAdmin();
-      if (!isAdmin) {
-        throw new Error('Apenas administradores podem listar usuários');
-      }
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('❌ Erro ao listar usuários:', error);
-        return [];
-      }
-
-      return data as UserProfile[];
-    } catch (error) {
-      console.error('❌ Erro ao listar usuários:', error);
-      return [];
-    }
-  }
-
-  // Verificar se um usuário específico é admin
-  async isUserAdmin(userId: string): Promise<boolean> {
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('❌ Erro ao verificar role do usuário:', error);
-        return false;
-      }
-
-      return profile?.role === 'admin';
-    } catch (error) {
-      console.error('❌ Erro ao verificar role do usuário:', error);
+      console.error('❌ Erro ao atualizar role do usuário:', error);
       return false;
     }
   }
 
   /**
-   * Cria um novo usuário com role específica - USANDO RPC
+   * Atualizar perfil do usuário
    */
-  async createUserWithRole(userData: CreateUserData): Promise<boolean> {
+  async updateUserProfile(userId: string, updates: {
+    full_name?: string;
+    role?: UserRole;
+    email?: string;
+  }): Promise<boolean> {
     try {
-      // Verificar se o usuário atual é admin
-      const isAdmin = await this.isCurrentUserAdmin();
-      if (!isAdmin) {
-        throw new Error('Apenas administradores podem criar usuários');
+      console.log(`🔄 Atualizando perfil do usuário ${userId}:`, updates);
+
+      const updateData = {
+        ...updates,
+        updated_at: new Date().toISOString()
+      };
+
+      // Tentar profiles primeiro
+      let { error } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('id', userId);
+
+      // Se profiles não existir, tentar user_profiles
+      if (error && error.message.includes('does not exist')) {
+        const result = await supabase
+          .from('user_profiles')
+          .update(updateData)
+          .eq('id', userId);
+        
+        error = result.error;
       }
 
-      // 1. Criar usuário no Auth
+      if (error) {
+        console.error('❌ Erro ao atualizar perfil:', error);
+        return false;
+      }
+
+      console.log('✅ Perfil atualizado com sucesso');
+      return true;
+    } catch (error) {
+      console.error('❌ Erro ao atualizar perfil do usuário:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Salvar sessão atual antes de criar usuário - CORRIGIDO
+   */
+  private async saveCurrentSession(): Promise<{ session: any; user: any } | null> {
+    try {
+      // Buscar sessão e usuário separadamente
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      return { session, user };
+    } catch (error) {
+      console.error('❌ Erro ao salvar sessão:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Restaurar sessão salva
+   */
+  private async restoreSession(savedSession: { session: any; user: any }): Promise<void> {
+    try {
+      if (savedSession.session) {
+        await supabase.auth.setSession(savedSession.session);
+        console.log('✅ Sessão restaurada com sucesso');
+      }
+    } catch (error) {
+      console.error('❌ Erro ao restaurar sessão:', error);
+    }
+  }
+
+  /**
+   * Criar usuário com role específica - VERSÃO COM RESTAURAÇÃO DE SESSÃO
+   */
+  async createUserWithRole(userData: CreateUserData): Promise<boolean> {
+    let savedSession: { session: any; user: any } | null = null;
+    
+    try {
+      console.log('🔄 Criando usuário (com restauração de sessão):', userData.email);
+
+      // 1. Salvar sessão atual
+      savedSession = await this.saveCurrentSession();
+      console.log('💾 Sessão atual salva');
+
+      // 2. Criar usuário usando signUp (vai fazer login automático temporariamente)
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: userData.email,
         password: userData.password,
         options: {
-          data: {
-            full_name: userData.full_name,
-            role: userData.role
-          }
+          emailRedirectTo: undefined // Não enviar email de confirmação
         }
       });
 
       if (authError) {
-        console.error('❌ Erro no Auth:', authError);
-        throw authError;
+        console.error('❌ Erro no Auth SignUp:', authError);
+        throw new Error(`Erro ao criar usuário: ${authError.message}`);
       }
 
       if (!authData.user) {
-        throw new Error('Usuário não foi criado no Auth');
+        throw new Error('Usuário não foi criado no auth');
       }
 
-      // 2. Usar função RPC para criar perfil (evita problemas de RLS)
-      const { data: rpcResult, error: rpcError } = await supabase
-        .rpc('admin_create_profile', {
-          user_id: authData.user.id,
-          user_email: userData.email,
-          user_full_name: userData.full_name,
-          user_role: userData.role
-        });
+      console.log('✅ Usuário criado no auth:', authData.user.id);
 
-      if (rpcError) {
-        console.error('❌ Erro ao criar perfil via RPC:', rpcError);
-        throw rpcError;
+      // 3. Aguardar um pouco
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // 4. Criar perfil via RPC
+      const { data, error } = await supabase.rpc('create_user_profile', {
+        user_id: authData.user.id,
+        user_email: userData.email,
+        user_full_name: userData.full_name,
+        user_role: userData.role
+      });
+
+      if (error) {
+        console.error('❌ Erro ao criar perfil via RPC:', error);
+        // Se RPC falhar, tentar criação manual
+        const success = await this.createProfileManually(authData.user.id, userData);
+        if (!success) {
+          throw new Error('Falha ao criar perfil do usuário');
+        }
       }
 
-      if (!rpcResult) {
-        throw new Error('Falha ao criar perfil via RPC');
+      console.log('✅ Perfil criado com sucesso');
+
+      // 5. IMPORTANTE: Restaurar sessão original ANTES de retornar
+      if (savedSession) {
+        await this.restoreSession(savedSession);
+        console.log('🔄 Sessão original restaurada');
       }
 
+      console.log('✅ Usuário criado com sucesso (sessão restaurada):', userData.email);
       return true;
+
     } catch (error) {
       console.error('❌ Erro ao criar usuário:', error);
+      
+      // Tentar restaurar sessão mesmo em caso de erro
+      if (savedSession) {
+        try {
+          await this.restoreSession(savedSession);
+          console.log('🔄 Sessão restaurada após erro');
+        } catch (restoreError) {
+          console.error('❌ Erro ao restaurar sessão após erro:', restoreError);
+        }
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Criar perfil manualmente (fallback)
+   */
+  private async createProfileManually(userId: string, userData: CreateUserData): Promise<boolean> {
+    try {
+      console.log('🔄 Criando perfil manualmente para:', userData.email);
+
+      const profileData = {
+        id: userId,
+        email: userData.email,
+        full_name: userData.full_name,
+        role: userData.role,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Tentar profiles primeiro
+      let { error } = await supabase
+        .from('profiles')
+        .insert([profileData]);
+
+      // Se profiles não existir, tentar user_profiles
+      if (error && error.message.includes('does not exist')) {
+        const result = await supabase
+          .from('user_profiles')
+          .insert([profileData]);
+        
+        error = result.error;
+      }
+
+      if (error) {
+        console.error('❌ Erro ao criar perfil manualmente:', error);
+        return false;
+      }
+
+      console.log('✅ Perfil criado manualmente com sucesso');
+      return true;
+    } catch (error) {
+      console.error('❌ Erro ao criar perfil manualmente:', error);
       return false;
     }
   }
 
   /**
-   * Atualiza dados do perfil de um usuário
+   * Deletar usuário completamente
    */
-  async updateUserProfile(userId: string, updateData: UpdateUserData): Promise<boolean> {
+  async deleteUser(userId: string): Promise<boolean> {
     try {
-      // Verificar se o usuário atual é admin ou está editando seu próprio perfil
-      const { data: { user } } = await supabase.auth.getUser();
-      const isAdmin = await this.isCurrentUserAdmin();
-      const isOwnProfile = user?.id === userId;
+      console.log('🔄 Deletando usuário:', userId);
 
-      if (!isAdmin && !isOwnProfile) {
-        throw new Error('Você não tem permissão para editar este perfil');
-      }
-
-      // Se não é admin, não pode alterar role
-      if (!isAdmin && updateData.role) {
-        delete updateData.role;
-      }
-      
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          ...updateData,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
+      // Usar a função RPC para deletar
+      const { data, error } = await supabase.rpc('delete_user_simple', {
+        user_id: userId
+      });
 
       if (error) {
-        console.error('❌ Erro ao atualizar perfil:', error);
-        throw error;
+        console.error('❌ Erro ao deletar usuário:', error);
+        throw new Error(`Erro ao deletar usuário: ${error.message}`);
       }
 
-      // Limpar cache do usuário alterado
-      this.clearCache(userId);
-
+      console.log('✅ Usuário deletado com sucesso');
       return true;
     } catch (error) {
-      console.error('❌ Erro ao atualizar perfil:', error);
+      console.error('❌ Erro ao deletar usuário:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verificar se usuário tem permissão para uma ação
+   */
+  async hasPermission(userId: string, requiredRole: UserRole): Promise<boolean> {
+    try {
+      const profile = await this.getUserProfile(userId);
+      if (!profile) return false;
+
+      const roleHierarchy: Record<UserRole, number> = {
+        'user': 1,
+        'moderator': 2,
+        'admin': 3
+      };
+
+      return roleHierarchy[profile.role] >= roleHierarchy[requiredRole];
+    } catch (error) {
+      console.error('❌ Erro ao verificar permissão:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Verificar se usuário atual tem permissão
+   */
+  async currentUserHasPermission(requiredRole: UserRole): Promise<boolean> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      return await this.hasPermission(user.id, requiredRole);
+    } catch (error) {
+      console.error('❌ Erro ao verificar permissão do usuário atual:', error);
       return false;
     }
   }

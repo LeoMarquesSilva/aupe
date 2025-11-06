@@ -15,11 +15,12 @@ import Header from './components/Header';
 // Pages - Public
 import Login from './pages/Login';
 import ResetPassword from './pages/ResetPassword';
+import EmailConfirmation from './pages/EmailConfirmation'; // ✅ Nova importação
 
 // Pages - Protected
 import CreatePost from './pages/CreatePost';
 import CreateStory from './pages/CreateStory';
-import CreateReels from './pages/CreateReels'; // ✅ Nova importação
+import CreateReels from './pages/CreateReels';
 import InstagramCallback from './pages/InstagramCallback';
 import StoryCalendar from './pages/StoryCalendar';
 import EditStory from './pages/EditStory';
@@ -120,7 +121,11 @@ const router = createBrowserRouter([
     path: "/reset-password",
     element: <PublicLayout><ResetPassword /></PublicLayout>,
   },
-  
+  {
+    path: "/email-confirmation", // ✅ Nova rota para confirmação de email
+    element: <PublicLayout><EmailConfirmation /></PublicLayout>,
+  },
+
   // Rotas protegidas - Dashboard
   {
     path: "/",
@@ -155,7 +160,7 @@ const router = createBrowserRouter([
     element: <ProtectedPageLayout><CreateStory /></ProtectedPageLayout>,
   },
   {
-    path: "/create-reels", // ✅ Nova rota para Reels
+    path: "/create-reels",
     element: <ProtectedPageLayout><CreateReels /></ProtectedPageLayout>,
   },
   {

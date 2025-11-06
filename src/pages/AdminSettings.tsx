@@ -197,23 +197,22 @@ const AdminSettings: React.FC = () => {
   const [selectedItem, setSelectedItem] = useState<any>(null);
 
   // Carregar dados automaticamente quando o componente monta
-  // (já sabemos que o usuário é admin por causa do ProtectedRoute)
-useEffect(() => {
-  let mounted = true;
-  
-  const loadData = async () => {
-    if (!mounted) return;
+  useEffect(() => {
+    let mounted = true;
     
-    console.log('✅ Carregando dados do admin...');
-    await loadAllData();
-  };
-  
-  loadData();
-  
-  return () => {
-    mounted = false;
-  };
-}, []);
+    const loadData = async () => {
+      if (!mounted) return;
+      
+      console.log('✅ Carregando dados do admin...');
+      await loadAllData();
+    };
+    
+    loadData();
+    
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const loadAllData = async () => {
     await Promise.all([
@@ -646,8 +645,12 @@ useEffect(() => {
       
       switch (deleteDialog.type) {
         case 'user':
-          // Para deletar usuário, seria necessário Admin API
-          console.log('⚠️ Exclusão de usuário requer Admin API do Supabase');
+          // USAR NOSSA FUNÇÃO DE DELETAR USUÁRIO
+          console.log('🔄 Deletando usuário:', deleteDialog.item.email);
+          await roleService.deleteUser(deleteDialog.item.id);
+          await loadUsersData();
+          await loadSystemStats();
+          console.log('✅ Usuário deletado com sucesso');
           break;
           
         case 'client':
@@ -678,6 +681,7 @@ useEffect(() => {
       await loadSystemStats();
     } catch (error) {
       console.error('❌ Erro ao excluir item:', error);
+      alert(`Erro ao excluir: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setLoading(false);
       setDeleteDialog({ open: false, type: null, item: null });
@@ -923,7 +927,7 @@ useEffect(() => {
           </TableContainer>
         </TabPanel>
 
-                {/* Painel de Clientes */}
+        {/* Painel de Clientes */}
         <TabPanel value={currentTab} index={1}>
           <Alert severity="info" icon={<BusinessIcon />} sx={{ mb: 3 }}>
             <Typography variant="subtitle1" fontWeight="bold">

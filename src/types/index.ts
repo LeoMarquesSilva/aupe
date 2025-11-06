@@ -222,7 +222,7 @@ export interface ScheduledPost {
   id: string;
   clientId: string;
   caption: string;
-  images: string[];
+  images: (string | { url: string })[];  // Tipo mais específico
   scheduledDate: string;
   postType: 'post' | 'carousel' | 'reels' | 'stories';
   status: 'pending' | 'sent_to_n8n' | 'processing' | 'posted' | 'failed' | 'cancelled';

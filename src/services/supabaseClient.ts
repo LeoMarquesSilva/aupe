@@ -171,7 +171,7 @@ export const userProfileService = {
 
 // Serviços para gerenciar clientes
 export const clientService = {
-  // Buscar todos os clientes do usuário atual
+  // Buscar todos os clientes (AGORA TODOS OS USUÁRIOS VEEM TODOS OS CLIENTES)
   async getClients(): Promise<Client[]> {
     try {
       const user = await getCurrentUser();
@@ -180,7 +180,7 @@ export const clientService = {
       const { data, error } = await supabase
         .from('clients')
         .select('*')
-        .eq('user_id', user.id)
+        // ✅ REMOVIDO: .eq('user_id', user.id) - AGORA TODOS VEEM TODOS
         .order('name');
       
       if (error) {
@@ -280,7 +280,7 @@ export const clientService = {
     }
   },
   
-  // Atualizar um cliente existente
+  // Atualizar um cliente existente (MANTER PROTEÇÃO PARA UPDATES)
   async updateClient(client: Partial<Client> & { id: string }): Promise<Client> {
     try {
       const user = await getCurrentUser();
@@ -311,7 +311,7 @@ export const clientService = {
         .from('clients')
         .update(clientData)
         .eq('id', client.id)
-        .eq('user_id', user.id) // Garantir que só atualiza clientes do usuário atual
+        .eq('user_id', user.id) // ✅ MANTER PROTEÇÃO PARA UPDATES - só o dono pode editar
         .select()
         .single();
       
@@ -344,7 +344,7 @@ export const clientService = {
     }
   },
   
-  // Excluir um cliente
+  // Excluir um cliente (MANTER PROTEÇÃO PARA DELETES)
   async deleteClient(clientId: string): Promise<void> {
     try {
       const user = await getCurrentUser();
@@ -354,7 +354,7 @@ export const clientService = {
         .from('clients')
         .delete()
         .eq('id', clientId)
-        .eq('user_id', user.id); // Garantir que só exclui clientes do usuário atual
+        .eq('user_id', user.id); // ✅ MANTER PROTEÇÃO PARA DELETES - só o dono pode excluir
       
       if (error) {
         console.error('Erro ao excluir cliente:', error);
@@ -366,7 +366,7 @@ export const clientService = {
     }
   },
   
-  // Salvar dados de autenticação do Instagram para um cliente
+  // Salvar dados de autenticação do Instagram para um cliente (MANTER PROTEÇÃO)
   async saveInstagramAuth(clientId: string, authData: InstagramAuthData): Promise<Client> {
     try {
       const user = await getCurrentUser();
@@ -394,7 +394,7 @@ export const clientService = {
         .from('clients')
         .update(updateData)
         .eq('id', clientId)
-        .eq('user_id', user.id) // Garantir que só atualiza clientes do usuário atual
+        .eq('user_id', user.id) // ✅ MANTER PROTEÇÃO - só o dono pode conectar Instagram
         .select('*')
         .single();
       
@@ -457,7 +457,7 @@ export const clientService = {
     }
   },
   
-  // Remover dados de autenticação do Instagram para um cliente
+  // Remover dados de autenticação do Instagram para um cliente (MANTER PROTEÇÃO)
   async removeInstagramAuth(clientId: string): Promise<Client> {
     try {
       const user = await getCurrentUser();
@@ -482,7 +482,7 @@ export const clientService = {
         .from('clients')
         .update(updateData)
         .eq('id', clientId)
-        .eq('user_id', user.id) // Garantir que só atualiza clientes do usuário atual
+        .eq('user_id', user.id) // ✅ MANTER PROTEÇÃO - só o dono pode desconectar
         .select()
         .single();
       
@@ -565,7 +565,7 @@ export const clientService = {
 
 // Serviços para gerenciar posts
 export const postService = {
-  // ===== MÉTODOS EXISTENTES (MANTER) =====
+  // ===== MÉTODOS EXISTENTES (CORRIGIDOS) =====
   
   // Salvar um post agendado (método antigo - manter para compatibilidade)
   async saveScheduledPost_OLD(post: any): Promise<any> {
@@ -598,7 +598,7 @@ export const postService = {
     }
   },
 
-  // Buscar posts agendados por cliente
+  // Buscar posts agendados por cliente (AGORA TODOS VEEM TODOS)
   async getScheduledPostsByClient(clientId: string): Promise<any[]> {
     try {
       const user = await getCurrentUser();
@@ -608,7 +608,7 @@ export const postService = {
         .from('scheduled_posts')
         .select('*')
         .eq('client_id', clientId)
-        .eq('user_id', user.id) // Garantir que só busca posts do usuário atual
+        // ✅ REMOVIDO: .eq('user_id', user.id) - AGORA TODOS VEEM TODOS
         .order('scheduled_date', { ascending: true });
       
       if (error) {
@@ -624,7 +624,7 @@ export const postService = {
     }
   },
   
-  // Buscar todos os posts agendados do usuário atual
+  // Buscar todos os posts agendados (AGORA TODOS VEEM TODOS)
   async getAllScheduledPosts(): Promise<any[]> {
     try {
       const user = await getCurrentUser();
@@ -636,7 +636,7 @@ export const postService = {
           *,
           clients (*)
         `)
-        .eq('user_id', user.id) // Garantir que só busca posts do usuário atual
+        // ✅ REMOVIDO: .eq('user_id', user.id) - AGORA TODOS VEEM TODOS
         .order('scheduled_date', { ascending: true });
       
       if (error) {
@@ -658,7 +658,7 @@ export const postService = {
     }
   },
 
-  // Atualizar um post agendado
+  // Atualizar um post agendado (MANTER PROTEÇÃO PARA UPDATES)
   async updateScheduledPost(postId: string, updates: any): Promise<any> {
     try {
       const user = await getCurrentUser();
@@ -671,7 +671,7 @@ export const postService = {
         .from('scheduled_posts')
         .update(postData)
         .eq('id', postId)
-        .eq('user_id', user.id) // Garantir que só atualiza posts do usuário atual
+        .eq('user_id', user.id) // ✅ MANTER PROTEÇÃO - só o dono pode editar
         .select()
         .single();
       
@@ -688,7 +688,7 @@ export const postService = {
     }
   },
 
-  // Excluir um post agendado
+  // Excluir um post agendado (MANTER PROTEÇÃO PARA DELETES)
   async deleteScheduledPost(postId: string): Promise<void> {
     try {
       const user = await getCurrentUser();
@@ -698,7 +698,7 @@ export const postService = {
         .from('scheduled_posts')
         .delete()
         .eq('id', postId)
-        .eq('user_id', user.id); // Garantir que só exclui posts do usuário atual
+        .eq('user_id', user.id); // ✅ MANTER PROTEÇÃO - só o dono pode excluir
       
       if (error) {
         console.error('Erro ao excluir post agendado:', error);
@@ -710,10 +710,9 @@ export const postService = {
     }
   },
 
-  // ===== NOVOS MÉTODOS PARA O SISTEMA DE AGENDAMENTO =====
+  // ===== NOVOS MÉTODOS PARA O SISTEMA DE AGENDAMENTO (CORRIGIDOS) =====
   
   // Método atualizado para salvar post com novos campos
-    // Método atualizado para salvar post com campos de Reels
   async saveScheduledPost(post: Partial<ScheduledPost>): Promise<ScheduledPost> {
     try {
       const user = await getCurrentUser();
@@ -767,7 +766,7 @@ export const postService = {
     }
   },
 
-  // Método para atualizar status do post
+  // Método para atualizar status do post (MANTER PROTEÇÃO)
   async updatePostStatus(
     postId: string, 
     status: PostStatus, 
@@ -801,7 +800,7 @@ export const postService = {
         .from('scheduled_posts')
         .update(dbData)
         .eq('id', postId)
-        .eq('user_id', user.id)
+        .eq('user_id', user.id) // ✅ MANTER PROTEÇÃO - só o dono pode atualizar status
         .select()
         .single();
 
@@ -818,7 +817,7 @@ export const postService = {
     }
   },
 
-  // Método para buscar posts por status
+  // Método para buscar posts por status (AGORA TODOS VEEM TODOS)
   async getPostsByStatus(status: PostStatus): Promise<ScheduledPost[]> {
     try {
       const user = await getCurrentUser();
@@ -830,7 +829,7 @@ export const postService = {
           *,
           clients (*)
         `)
-        .eq('user_id', user.id)
+        // ✅ REMOVIDO: .eq('user_id', user.id) - AGORA TODOS VEEM TODOS
         .eq('status', status)
         .order('scheduled_date', { ascending: true });
 
@@ -852,7 +851,7 @@ export const postService = {
     }
   },
 
-  // Método para reprocessar posts falhados
+  // Método para reprocessar posts falhados (MANTER PROTEÇÃO)
   async retryFailedPost(postId: string): Promise<ScheduledPost> {
     try {
       const user = await getCurrentUser();
@@ -863,7 +862,7 @@ export const postService = {
         .from('scheduled_posts')
         .select('*')
         .eq('id', postId)
-        .eq('user_id', user.id)
+        .eq('user_id', user.id) // ✅ MANTER PROTEÇÃO - só o dono pode reprocessar
         .single();
 
       if (fetchError || !currentPost) {
@@ -885,7 +884,7 @@ export const postService = {
     }
   },
 
-  // Método para buscar posts com relacionamento de cliente
+  // Método para buscar posts com relacionamento de cliente (AGORA TODOS VEEM TODOS)
   async getScheduledPostsWithClient(): Promise<ScheduledPost[]> {
     try {
       const user = await getCurrentUser();
@@ -897,7 +896,7 @@ export const postService = {
           *,
           clients (*)
         `)
-        .eq('user_id', user.id)
+        // ✅ REMOVIDO: .eq('user_id', user.id) - AGORA TODOS VEEM TODOS
         .order('scheduled_date', { ascending: true });
 
       if (error) {

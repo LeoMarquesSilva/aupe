@@ -39,16 +39,24 @@ import { InstagramAuthData } from '../services/instagramAuthService';
 
 interface ClientManagerProps {
   clients: Client[];
-  onAddClient: (client: Client) => void;
-  onSelectClient: (clientId: string) => void;
-  selectedClientId: string;
+  // Props opcionais para compatibilidade com diferentes usos
+  onAddClient?: (client: Client) => void;
+  onSelectClient?: (clientId: string) => void;
+  selectedClientId?: string;
+  // Novas props para o StoryCalendar
+  onClientAdded?: (newClient: Omit<Client, 'id'>) => Promise<void>;
+  onClientUpdated?: (updatedClient: Client) => void;
+  onClientDeleted?: (clientId: string) => void;
 }
 
 const ClientManager: React.FC<ClientManagerProps> = ({ 
   clients, 
-  onAddClient, 
+  onAddClient,
   onSelectClient,
-  selectedClientId
+  selectedClientId,
+  onClientAdded,
+  onClientUpdated,
+  onClientDeleted
 }) => {
   const [name, setName] = useState<string>('');
   const [instagram, setInstagram] = useState<string>('');
@@ -74,14 +82,25 @@ const ClientManager: React.FC<ClientManagerProps> = ({
     setError(null);
 
     try {
-      const newClient = await clientService.addClient({
+      const clientData = {
         name,
         instagram,
         logoUrl,
         appId,
         accessToken,
         userId
-      });
+      };
+
+      // Se temos onClientAdded (usado no StoryCalendar), usar ela
+      if (onClientAdded) {
+        await onClientAdded(clientData);
+      } else {
+        // Caso contrário, criar o cliente e notificar via onAddClient
+        const newClient = await clientService.addClient(clientData);
+        if (onAddClient) {
+          onAddClient(newClient);
+        }
+      }
 
       // Limpar formulário
       setName('');
@@ -91,8 +110,6 @@ const ClientManager: React.FC<ClientManagerProps> = ({
       setAccessToken('');
       setUserId('');
 
-      // Notificar componente pai
-      onAddClient(newClient);
     } catch (error) {
       console.error('Erro ao adicionar cliente:', error);
       setError('Erro ao adicionar cliente');
@@ -112,6 +129,12 @@ const ClientManager: React.FC<ClientManagerProps> = ({
 
     try {
       const updatedClient = await clientService.updateClient(editingClient);
+      
+      // Notificar o componente pai sobre a atualização
+      if (onClientUpdated) {
+        onClientUpdated(updatedClient);
+      }
+      
       setEditingClient(null);
     } catch (error) {
       console.error('Erro ao atualizar cliente:', error);
@@ -129,6 +152,12 @@ const ClientManager: React.FC<ClientManagerProps> = ({
 
     try {
       await clientService.deleteClient(clientToDelete.id);
+      
+      // Notificar o componente pai sobre a exclusão
+      if (onClientDeleted) {
+        onClientDeleted(clientToDelete.id);
+      }
+      
       setDeleteDialogOpen(false);
       setClientToDelete(null);
     } catch (error) {
@@ -140,7 +169,9 @@ const ClientManager: React.FC<ClientManagerProps> = ({
   };
 
   const handleSelectClient = (client: Client) => {
-    onSelectClient(client.id);
+    if (onSelectClient) {
+      onSelectClient(client.id);
+    }
   };
 
   const handleEditClient = (client: Client) => {
@@ -173,8 +204,12 @@ const ClientManager: React.FC<ClientManagerProps> = ({
         };
         
         clientService.updateClient(updatedClient)
-          .then(() => {
+          .then((updated) => {
             console.log('Cliente atualizado com dados do Instagram');
+            // Notificar o componente pai sobre a atualização
+            if (onClientUpdated) {
+              onClientUpdated(updated);
+            }
           })
           .catch(err => {
             console.error('Erro ao atualizar cliente com dados do Instagram:', err);
@@ -344,10 +379,10 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                           sx={{ 
                             display: 'flex', 
                             alignItems: 'center', 
-                            cursor: 'pointer',
+                            cursor: onSelectClient ? 'pointer' : 'default',
                             flexGrow: 1
                           }}
-                          onClick={() => handleSelectClient(client)}
+                          onClick={() => onSelectClient && handleSelectClient(client)}
                         >
                           <ListItemAvatar>
                             <Avatar 

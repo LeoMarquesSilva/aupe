@@ -274,6 +274,17 @@ export const getPostsByStatus = async (status: PostStatus): Promise<ScheduledPos
   }
 };
 
+// Função auxiliar para extrair URL de string ou objeto
+const extractUrlFromImageData = (imageData: string | { url: string }): string => {
+  if (typeof imageData === 'string') {
+    return imageData;
+  }
+  if (typeof imageData === 'object' && imageData.url) {
+    return imageData.url;
+  }
+  throw new Error('Formato de imagem inválido');
+};
+
 // 🧹 FUNÇÃO: Limpar posts antigos
 export const cleanupOldPosts = async (daysOld: number = 30): Promise<number> => {
   try {
@@ -293,17 +304,24 @@ export const cleanupOldPosts = async (daysOld: number = 30): Promise<number> => 
         if (post.images && post.images.length > 0) {
           try {
             const mediaPaths = post.images
-              .filter(url => url.includes('supabase.co/storage'))
-              .map(url => {
-                // Extrair o caminho da URL do Supabase Storage
-                if (url.includes('/post-images/')) {
-                  const match = url.match(/\/storage\/v1\/object\/public\/post-images\/(.+)$/);
-                  return { type: 'image', path: match ? match[1] : null };
-                } else if (url.includes('/reels-videos/')) {
-                  const match = url.match(/\/storage\/v1\/object\/public\/reels-videos\/(.+)$/);
-                  return { type: 'video', path: match ? match[1] : null };
+              .map(imageData => {
+                try {
+                  const url = extractUrlFromImageData(imageData);
+                  if (url.includes('supabase.co/storage')) {
+                    // Extrair o caminho da URL do Supabase Storage
+                    if (url.includes('/post-images/')) {
+                      const match = url.match(/\/storage\/v1\/object\/public\/post-images\/(.+)$/);
+                      return { type: 'image', path: match ? match[1] : null };
+                    } else if (url.includes('/reels-videos/')) {
+                      const match = url.match(/\/storage\/v1\/object\/public\/reels-videos\/(.+)$/);
+                      return { type: 'video', path: match ? match[1] : null };
+                    }
+                  }
+                  return null;
+                } catch (error) {
+                  console.warn('Erro ao processar URL da imagem:', error);
+                  return null;
                 }
-                return null;
               })
               .filter(Boolean) as { type: string; path: string }[];
             
@@ -374,9 +392,14 @@ export const migrateImagesFromImgBBToSupabase = async (): Promise<void> => {
     // Buscar todos os posts que têm imagens do ImgBB
     const posts = await postService.getScheduledPostsWithClient();
     const postsWithImgBB = posts.filter(post => 
-      post.images && post.images.some(url => 
-        url.includes('i.ibb.co') || url.includes('image.ibb.co')
-      )
+      post.images && post.images.some(imageData => {
+        try {
+          const url = extractUrlFromImageData(imageData);
+          return url.includes('i.ibb.co') || url.includes('image.ibb.co');
+        } catch (error) {
+          return false;
+        }
+      })
     );
     
     console.log(`📊 Encontrados ${postsWithImgBB.length} posts com imagens do ImgBB`);
@@ -387,19 +410,32 @@ export const migrateImagesFromImgBBToSupabase = async (): Promise<void> => {
         
         const newImageUrls: string[] = [];
         
-        for (const imageUrl of post.images) {
-          if (imageUrl.includes('i.ibb.co') || imageUrl.includes('image.ibb.co')) {
-            // Migrar esta imagem
-            const uploadResult = await supabaseStorageService.uploadImageFromUrl(
-              imageUrl, 
-              user.id, 
-              `migrated-${Date.now()}.jpg`
-            );
-            newImageUrls.push(uploadResult.url);
-            console.log(`✅ Imagem migrada: ${imageUrl} -> ${uploadResult.url}`);
-          } else {
-            // Manter URL existente
-            newImageUrls.push(imageUrl);
+        for (const imageData of post.images) {
+          try {
+            const imageUrl = extractUrlFromImageData(imageData);
+            
+            if (imageUrl.includes('i.ibb.co') || imageUrl.includes('image.ibb.co')) {
+              // Migrar esta imagem
+              const uploadResult = await supabaseStorageService.uploadImageFromUrl(
+                imageUrl, 
+                user.id, 
+                `migrated-${Date.now()}.jpg`
+              );
+              newImageUrls.push(uploadResult.url);
+              console.log(`✅ Imagem migrada: ${imageUrl} -> ${uploadResult.url}`);
+            } else {
+              // Manter URL existente
+              newImageUrls.push(imageUrl);
+            }
+          } catch (error) {
+            console.warn('Erro ao processar imagem individual:', error);
+            // Em caso de erro, manter a imagem original
+            try {
+              const originalUrl = extractUrlFromImageData(imageData);
+              newImageUrls.push(originalUrl);
+            } catch (e) {
+              console.error('Erro ao extrair URL original:', e);
+            }
           }
         }
         

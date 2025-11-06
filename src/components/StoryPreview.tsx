@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography, IconButton } from '@mui/material';
 import Stories from 'react-insta-stories';
 import { Story, StoryElement, Position, Size } from '../types';
+import { imageUrlService } from '../services/imageUrlService';
 
 interface StoryPreviewProps {
   story: Story;
@@ -75,6 +76,9 @@ const StoryPreview: React.FC<StoryPreviewProps> = ({
     startWidth: 0,
     startHeight: 0
   });
+
+  // Processar a URL da imagem do story
+  const storyImageUrl = imageUrlService.getPublicUrl(story.image.url);
   
   // Efeito para calcular o tamanho do container
   useEffect(() => {
@@ -497,13 +501,17 @@ const StoryPreview: React.FC<StoryPreviewProps> = ({
         {/* Imagem de fundo */}
         <Box
           component="img"
-          src={story.image.url}
+          src={storyImageUrl}
           alt="Story Background"
           sx={{
             width: '100%',
             height: '100%',
             objectFit: 'contain',
             objectPosition: 'center'
+          }}
+          onError={(e) => {
+            // Fallback para imagem de placeholder em caso de erro
+            (e.target as HTMLImageElement).src = '/placeholder-image.jpg';
           }}
         />
         
@@ -516,7 +524,7 @@ const StoryPreview: React.FC<StoryPreviewProps> = ({
   // Se estamos no modo de visualização, usamos a biblioteca react-insta-stories
   const storyContent = [
     {
-      url: story.image.url,
+      url: storyImageUrl,
       duration: story.duration || 15,
       header: {
         heading: 'username',
@@ -530,14 +538,17 @@ const StoryPreview: React.FC<StoryPreviewProps> = ({
         return (
           <div style={{ position: 'relative', width: '100%', height: '100%' }}>
             <img 
-              src={story.image.url} 
+              src={storyImageUrl} 
               alt="Story" 
               style={{ 
                 width: '100%', 
                 height: '100%', 
                 objectFit: 'contain' 
-              }} 
-            />
+              }}
+              onError={(e) => {
+                // Fallback para imagem de placeholder em caso de erro
+                (e.target as HTMLImageElement).src = '/placeholder-image.jpg';
+              }}            />
             {story.elements.map(renderElement)}
           </div>
         );
