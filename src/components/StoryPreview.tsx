@@ -77,8 +77,17 @@ const StoryPreview: React.FC<StoryPreviewProps> = ({
     startHeight: 0
   });
 
-  // Processar a URL da imagem do story
-  const storyImageUrl = imageUrlService.getPublicUrl(story.image.url);
+  // CORRIGIDO: Processar a URL da imagem do story corretamente
+  const getStoryImageUrl = () => {
+    // Se a URL já é uma data URL (base64), usar diretamente
+    if (story.image.url.startsWith('data:')) {
+      return story.image.url;
+    }
+    // Caso contrário, usar o imageUrlService
+    return imageUrlService.getPublicUrl(story.image.url);
+  };
+  
+  const storyImageUrl = getStoryImageUrl();
   
   // Efeito para calcular o tamanho do container
   useEffect(() => {
@@ -498,7 +507,7 @@ const StoryPreview: React.FC<StoryPreviewProps> = ({
           alignItems: 'center'
         }}
       >
-        {/* Imagem de fundo */}
+        {/* Imagem de fundo - CORRIGIDO: Melhor tratamento de erro */}
         <Box
           component="img"
           src={storyImageUrl}
@@ -510,8 +519,13 @@ const StoryPreview: React.FC<StoryPreviewProps> = ({
             objectPosition: 'center'
           }}
           onError={(e) => {
+            console.error('Erro ao carregar imagem do story:', storyImageUrl);
             // Fallback para imagem de placeholder em caso de erro
-            (e.target as HTMLImageElement).src = '/placeholder-image.jpg';
+            const target = e.target as HTMLImageElement;
+            target.src = imageUrlService.getPlaceholder(400, 600, 'Erro na imagem');
+          }}
+          onLoad={() => {
+            console.log('Imagem carregada com sucesso:', storyImageUrl);
           }}
         />
         
@@ -546,9 +560,11 @@ const StoryPreview: React.FC<StoryPreviewProps> = ({
                 objectFit: 'contain' 
               }}
               onError={(e) => {
-                // Fallback para imagem de placeholder em caso de erro
-                (e.target as HTMLImageElement).src = '/placeholder-image.jpg';
-              }}            />
+                console.error('Erro ao carregar imagem do story:', storyImageUrl);
+                const target = e.target as HTMLImageElement;
+                target.src = imageUrlService.getPlaceholder(400, 600, 'Erro na imagem');
+              }}
+            />
             {story.elements.map(renderElement)}
           </div>
         );

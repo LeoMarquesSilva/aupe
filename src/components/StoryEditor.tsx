@@ -343,24 +343,28 @@ const StoryEditor: React.FC<StoryEditorProps> = ({ clientId, onSave, initialStor
           
           <Divider sx={{ my: 2 }} />
           
-          {/* Botões de ação */}
+          {/* Botões de ação - CORRIGIDO: Envolvendo botões desabilitados com Box */}
           <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-            <Tooltip title="Desfazer">
-              <IconButton 
-                onClick={handleUndo}
-                disabled={history.currentIndex === 0}
-              >
-                <UndoIcon />
-              </IconButton>
+            <Tooltip title={history.currentIndex === 0 ? "Nada para desfazer" : "Desfazer"}>
+              <Box>
+                <IconButton 
+                  onClick={handleUndo}
+                  disabled={history.currentIndex === 0}
+                >
+                  <UndoIcon />
+                </IconButton>
+              </Box>
             </Tooltip>
             
-            <Tooltip title="Refazer">
-              <IconButton 
-                onClick={handleRedo}
-                disabled={history.currentIndex === history.elements.length - 1}
-              >
-                <RedoIcon />
-              </IconButton>
+            <Tooltip title={history.currentIndex === history.elements.length - 1 ? "Nada para refazer" : "Refazer"}>
+              <Box>
+                <IconButton 
+                  onClick={handleRedo}
+                  disabled={history.currentIndex === history.elements.length - 1}
+                >
+                  <RedoIcon />
+                </IconButton>
+              </Box>
             </Tooltip>
             
             <Tooltip title="Trocar Imagem">
