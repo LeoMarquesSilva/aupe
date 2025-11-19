@@ -44,8 +44,6 @@ import { clientService, postService } from '../services/supabaseClient';
 import { Client } from '../types';
 import ClientManager from '../components/ClientManager';
 
-// ... resto do arquivo permanece igual
-
 const ClientDashboard: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -80,15 +78,23 @@ const ClientDashboard: React.FC = () => {
         try {
           const posts = await postService.getScheduledPostsByClient(client.id);
           
+          // ✅ MAPEAMENTO CORRETO DOS STATUS
           const stats = {
-            scheduled: posts.filter(p => p.status === 'scheduled').length,
-            posted: posts.filter(p => p.status === 'posted').length,
-            draft: posts.filter(p => p.status === 'draft').length
+            // Agendados = apenas pending (posts que ainda não foram enviados)
+            scheduled: posts.filter(p => p.status === 'pending').length,
+            
+            // Publicados = published (posts publicados com sucesso pelo N8N)
+            posted: posts.filter(p => p.status === 'published').length,
+            
+            // Falhados = failed + cancelled
+            draft: posts.filter(p => 
+              p.status === 'failed' || 
+              p.status === 'cancelled'
+            ).length
           };
           
           return { clientId: client.id, stats };
         } catch (err) {
-          console.error(`Erro ao buscar posts do cliente ${client.id}:`, err);
           return { 
             clientId: client.id, 
             stats: { scheduled: 0, posted: 0, draft: 0 } 
@@ -105,7 +111,6 @@ const ClientDashboard: React.FC = () => {
       
       setClientStats(statsMap);
     } catch (err) {
-      console.error('Erro ao carregar clientes:', err);
       setError('Não foi possível carregar os clientes. Por favor, tente novamente.');
     } finally {
       setLoading(false);
@@ -156,7 +161,6 @@ const ClientDashboard: React.FC = () => {
       setDeleteConfirmOpen(false);
       setSelectedClient(null);
     } catch (err) {
-      console.error('Erro ao excluir cliente:', err);
       setError('Erro ao excluir cliente. Por favor, tente novamente.');
     } finally {
       setLoading(false);
@@ -371,7 +375,7 @@ const ClientDashboard: React.FC = () => {
                     
                     <Divider sx={{ my: 2 }} />
                     
-                    {/* Cards de estatísticas com melhor espaçamento */}
+                    {/* Cards de estatísticas */}
                     <Box sx={{ 
                       display: 'grid', 
                       gridTemplateColumns: 'repeat(3, 1fr)', 
@@ -479,7 +483,7 @@ const ClientDashboard: React.FC = () => {
                             letterSpacing: 0.5
                           }}
                         >
-                          Rascunhos
+                          Falhados
                         </Typography>
                       </Paper>
                     </Box>

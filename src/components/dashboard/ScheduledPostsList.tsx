@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Grid,
-  Paper,
   Typography,
   Box,
   Card,
@@ -18,7 +17,12 @@ import {
   Schedule as ScheduleIcon,
   Image as ImageIcon,
   VideoLibrary as VideoIcon,
-  ViewCarousel as ViewCarouselIcon
+  ViewCarousel as ViewCarouselIcon,
+  Send as SendIcon,
+  Sync as SyncIcon,
+  CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon,
+  Cancel as CancelIcon
 } from '@mui/icons-material';
 
 interface ScheduledPost {
@@ -26,8 +30,10 @@ interface ScheduledPost {
   caption: string;
   images: string[];
   scheduled_date: string;
-  status: 'draft' | 'scheduled' | 'posted' | 'failed';
+  status: 'pending' | 'sent_to_n8n' | 'processing' | 'published' | 'failed' | 'cancelled';
   created_at: string;
+  post_type?: 'post' | 'carousel' | 'reels' | 'stories';
+  video?: string;
 }
 
 interface ScheduledPostsListProps {
@@ -43,14 +49,18 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
 }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'draft':
-        return 'default';
-      case 'scheduled':
+      case 'pending':
+        return 'warning';
+      case 'sent_to_n8n':
+        return 'info';
+      case 'processing':
         return 'primary';
-      case 'posted':
+      case 'published':
         return 'success';
       case 'failed':
         return 'error';
+      case 'cancelled':
+        return 'default';
       default:
         return 'default';
     }
@@ -58,16 +68,63 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'draft':
-        return 'Rascunho';
-      case 'scheduled':
+      case 'pending':
         return 'Agendado';
-      case 'posted':
+      case 'sent_to_n8n':
+        return 'Enviado';
+      case 'processing':
+        return 'Processando';
+      case 'published':
         return 'Publicado';
       case 'failed':
         return 'Falhou';
+      case 'cancelled':
+        return 'Cancelado';
       default:
         return status;
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <ScheduleIcon fontSize="small" />;
+      case 'sent_to_n8n':
+        return <SendIcon fontSize="small" />;
+      case 'processing':
+        return <SyncIcon fontSize="small" />;
+      case 'published':
+        return <CheckCircleIcon fontSize="small" />;
+      case 'failed':
+        return <ErrorIcon fontSize="small" />;
+      case 'cancelled':
+        return <CancelIcon fontSize="small" />;
+      default:
+        return <ScheduleIcon fontSize="small" />;
+    }
+  };
+
+  const getMediaTypeIcon = (post: ScheduledPost) => {
+    if (post.video) {
+      return <VideoIcon fontSize="small" color="action" />;
+    } else if (post.images && post.images.length > 1) {
+      return <ViewCarouselIcon fontSize="small" color="action" />;
+    } else {
+      return <ImageIcon fontSize="small" color="action" />;
+    }
+  };
+
+  const getMediaTypeLabel = (post: ScheduledPost) => {
+    if (post.post_type === 'reels') {
+      return 'Reels';
+    } else if (post.post_type === 'stories') {
+      return 'Stories';
+    } else if (post.images && post.images.length > 1) {
+      return `Carrossel (${post.images.length} imagens)`;
+    } else if (post.video) {
+      return 'Vídeo';
+    } else {
+      return 'Imagem';
     }
   };
 
@@ -103,12 +160,14 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
                 sx={{ objectFit: 'cover' }}
               />
             )}
+            
             <CardContent sx={{ flexGrow: 1 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                 <Chip 
                   label={getStatusLabel(post.status)}
                   color={getStatusColor(post.status) as any}
                   size="small"
+                  icon={getStatusIcon(post.status)}
                 />
                 <Box>
                   <Tooltip title="Editar">
@@ -127,24 +186,22 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
               <Typography variant="body2" sx={{ mb: 2, height: 60, overflow: 'hidden' }}>
                 {post.caption && post.caption.length > 100 
                   ? `${post.caption.substring(0, 100)}...` 
-                  : post.caption}
+                  : post.caption || 'Sem legenda'}
               </Typography>
               
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 'auto' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <ScheduleIcon fontSize="small" color="action" />
                 <Typography variant="caption" color="text.secondary">
                   {formatScheduledDate(post.scheduled_date)}
                 </Typography>
               </Box>
               
-              {post.images && post.images.length > 1 && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
-                  <ViewCarouselIcon fontSize="small" color="action" />
-                  <Typography variant="caption" color="text.secondary">
-                    {post.images.length} imagens
-                  </Typography>
-                </Box>
-              )}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                {getMediaTypeIcon(post)}
+                <Typography variant="caption" color="text.secondary">
+                  {getMediaTypeLabel(post)}
+                </Typography>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
