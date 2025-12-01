@@ -4,7 +4,7 @@ import axios from 'axios';
 // Constantes para autenticação - mantidas no servidor para segurança
 const META_APP_ID = '1087259016929287';
 const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873';
-const META_REDIRECT_URI = 'https://aupe.vercel.app/callback';
+const META_REDIRECT_URI = 'https://aupedigital.com.br/callback';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Permitir apenas solicitações POST

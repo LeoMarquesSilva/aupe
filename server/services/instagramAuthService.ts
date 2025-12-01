@@ -56,7 +56,7 @@ interface FacebookPagesResponse {
 
 // Constantes para autenticação
 const META_APP_ID = '1087259016929287';
-const META_REDIRECT_URI = 'https://aupe.vercel.app/callback';
+const META_REDIRECT_URI = 'https://aupedigital.com.br/callback';
 
 // Configuração da URL base da API
 // Como estamos rodando no cliente, usamos a URL atual ou uma URL fixa
