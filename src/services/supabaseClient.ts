@@ -221,6 +221,52 @@ export const clientService = {
       throw error;
     }
   },
+
+   async getClientById(clientId: string): Promise<Client | null> {
+    try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', clientId)
+        // ✅ TODOS PODEM VER TODOS OS CLIENTES (sem filtro por user_id)
+        .single();
+      
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // Cliente não encontrado
+          console.warn('Cliente não encontrado:', clientId);
+          return null;
+        }
+        console.error('Erro ao buscar cliente por ID:', error);
+        throw new Error('Não foi possível buscar o cliente');
+      }
+      
+      // CONVERSÃO MANUAL IGUAL À getClients
+      const convertedClient: Client = {
+        id: data.id,
+        name: data.name,
+        instagram: data.instagram,
+        logoUrl: data.logo_url,
+        accessToken: data.access_token,
+        userId: data.user_id,
+        appId: data.app_id,
+        instagramAccountId: data.instagram_account_id,
+        username: data.instagram_username,
+        profilePicture: data.profile_picture,
+        tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
+        pageId: data.page_id,
+        pageName: data.page_name
+      };
+      
+      return convertedClient;
+    } catch (error) {
+      console.error('Erro ao buscar cliente por ID:', error);
+      throw error;
+    }
+  },
   
   // Adicionar um novo cliente
   async addClient(client: Omit<Client, 'id'>): Promise<Client> {
@@ -276,6 +322,39 @@ export const clientService = {
       return convertedClient;
     } catch (err) {
       console.error('Erro ao adicionar cliente:', err);
+      throw err;
+    }
+  },
+
+    // ✅ NOVA FUNÇÃO: Atualizar apenas foto de perfil (SEM restrição de user_id)
+  async updateClientProfilePicture(clientId: string, profilePicture: string, username?: string): Promise<void> {
+    try {
+      console.log(`🔄 Atualizando foto de perfil do cliente ${clientId}`);
+      
+      const updateData: any = {
+        profile_picture: profilePicture,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Incluir username se fornecido
+      if (username) {
+        updateData.instagram_username = username;
+      }
+      
+      const { error } = await supabase
+        .from('clients')
+        .update(updateData)
+        .eq('id', clientId);
+        // ✅ SEM .eq('user_id', user.id) - permite atualizar qualquer cliente
+      
+      if (error) {
+        console.error('❌ Erro ao atualizar foto de perfil:', error);
+        throw new Error(`Não foi possível atualizar a foto de perfil: ${error.message}`);
+      }
+      
+      console.log(`✅ Foto de perfil do cliente ${clientId} atualizada com sucesso`);
+    } catch (err) {
+      console.error('❌ Erro ao atualizar foto de perfil:', err);
       throw err;
     }
   },

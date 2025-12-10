@@ -52,6 +52,7 @@ import {
   Collections as CollectionsIcon,
   Image as ImageIcon,
   AccessTime as AccessTimeIcon,
+  PlayArrow as PlayArrowIcon,
   Person as PersonIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -64,6 +65,8 @@ import StoryPreview from '../components/StoryPreview';
 import ClientManager from '../components/ClientManager';
 import SmartImage from '../components/SmartImage';
 import { imageUrlService } from '../services/imageUrlService';
+import { urlRefreshService } from '../services/urlRefreshService';
+import UrlCacheMonitor from '../components/UrlCacheMonitor';
 
 const StoryCalendar: React.FC = () => {
   const navigate = useNavigate();
@@ -88,7 +91,7 @@ const StoryCalendar: React.FC = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
 
-  // Carregar dados iniciais
+  // ✅ ADICIONAR useEffect para carregar dados
   useEffect(() => {
     loadData();
   }, []);
@@ -176,98 +179,81 @@ const StoryCalendar: React.FC = () => {
     return clients.find(client => client.id === clientId);
   };
 
-  // Função para obter logo do cliente de forma segura
-  const getClientLogo = (client: Client | null | undefined): string | undefined => {
+  // ✅ MOVER getClientLogo PARA ANTES de getFirstImageUrl
+  const getClientLogo = (client: Client | undefined): string | undefined => {
     if (!client) return undefined;
     
-    // Priorizar profilePicture (foto do Instagram)
-    if (client.profilePicture && client.profilePicture.trim() !== '') {
-      return client.profilePicture;
+    // Verificar se tem logoUrl
+    if (client.logoUrl) {
+      return imageUrlService.getPublicUrl(client.logoUrl);
     }
     
-    // Fallback para logoUrl
-    if (client.logoUrl && client.logoUrl.trim() !== '') {
-      return client.logoUrl;
+    // Verificar se tem profilePicture
+    if (client.profilePicture) {
+      return imageUrlService.getPublicUrl(client.profilePicture);
     }
     
     return undefined;
   };
 
-// Função para obter a primeira URL de imagem de forma segura
-const getFirstImageUrl = (content: ScheduledPost): string => {
-  try {
-    // Para Reels, verificar se tem coverImage primeiro
-    if (content.postType === 'reels' && content.coverImage) {
-      // Verificação mais segura para string
-      if (typeof content.coverImage === 'string') {
-        const coverStr = content.coverImage as string;
-        if (coverStr.trim()) {
-          return imageUrlService.getPublicUrl(coverStr);
-        }
+  const getFirstImageUrl = (content: ScheduledPost): string => {
+    const client = content.clients || getClientById(content.clientId);
+    
+    // 🔥 PRIORIZAR CONTEÚDO PRÓPRIO ANTES DA LOGO DO CLIENTE
+    
+    // Para stories - verificar se tem imagens próprias no array
+    if (content.postType === 'stories' && content.images && content.images.length > 0) {
+      const firstImage = content.images[0];
+      // Verificar se é string ou objeto com url
+      const imageUrl = typeof firstImage === 'string' ? firstImage : firstImage.url;
+      return imageUrlService.getPublicUrl(imageUrl);
+    }
+    
+    // Para reels - verificar se tem thumbnail ou usar vídeo
+    if (content.postType === 'reels') {
+      if (content.coverImage) {
+        return imageUrlService.getPublicUrl(content.coverImage);
       }
-      
-      // Verificação mais segura para array
-      if (Array.isArray(content.coverImage)) {
-        const coverArray = content.coverImage as string[];
-        if (coverArray.length > 0) {
-          const firstCover = coverArray[0];
-          if (typeof firstCover === 'string' && firstCover.trim()) {
-            return imageUrlService.getPublicUrl(firstCover);
-          }
-        }
-      }
-      
-      // Verificação para objeto com url
-      if (typeof content.coverImage === 'object' && content.coverImage !== null) {
-        const coverObj = content.coverImage as { url?: string };
-        if (coverObj.url && typeof coverObj.url === 'string' && coverObj.url.trim()) {
-          return imageUrlService.getPublicUrl(coverObj.url);
-        }
+      if (content.video) {
+        return imageUrlService.getPublicUrl(content.video);
       }
     }
     
-    // Para outros tipos ou se não tem coverImage, usar images
-    if (content.images) {
-      // Verificação mais segura para string
-      if (typeof content.images === 'string') {
-        const imagesStr = content.images as string;
-        if (imagesStr.trim()) {
-          return imageUrlService.getPublicUrl(imagesStr);
-        }
-      }
-      
-      // Verificação mais segura para array
-      if (Array.isArray(content.images)) {
-        const imagesArray = content.images as string[];
-        if (imagesArray.length > 0) {
-          const firstImage = imagesArray[0];
-          if (typeof firstImage === 'string' && firstImage.trim()) {
-            return imageUrlService.getPublicUrl(firstImage);
-          }
-        }
-      }
-      
-      // Verificação para objeto com url
-      if (typeof content.images === 'object' && content.images !== null) {
-        const imagesObj = content.images as { url?: string };
-        if (imagesObj.url && typeof imagesObj.url === 'string' && imagesObj.url.trim()) {
-          return imageUrlService.getPublicUrl(imagesObj.url);
-        }
-      }
+    // Para posts/carrossel - verificar se tem imagens próprias
+    if ((content.postType === 'post' || content.postType === 'carousel') && content.images && content.images.length > 0) {
+      const firstImage = content.images[0];
+      // Verificar se é string ou objeto com url
+      const imageUrl = typeof firstImage === 'string' ? firstImage : firstImage.url;
+      return imageUrlService.getPublicUrl(imageUrl);
     }
     
-    // Fallback baseado no tipo de conteúdo
-    const fallbackText = content.postType === 'stories' ? 'Story' : 
-                        content.postType === 'reels' ? 'Reel' : 
-                        content.postType === 'carousel' ? 'Carrossel' : 'Post';
+    // 🎯 APENAS COMO ÚLTIMO RECURSO, usar logo do cliente
+    const clientLogo = getClientLogo(client);
+    if (clientLogo) {
+      return clientLogo;
+    }
     
-    return imageUrlService.getPlaceholder(400, 400, fallbackText);
+    // Fallback final para placeholder
+    return imageUrlService.getPlaceholder(400, 400, client?.name || 'Conteúdo');
+  };
+
+  const getClientLogoForAvatar = (content: ScheduledPost): string => {
+    const client = content.clients || getClientById(content.clientId);
+    const clientLogo = getClientLogo(client);
     
-  } catch (error) {
-    console.warn('Erro ao obter URL da imagem:', error);
-    return imageUrlService.getPlaceholder(400, 400, 'Erro na imagem');
-  }
-};
+    if (clientLogo) {
+      return clientLogo;
+    }
+    
+    // Fallback para placeholder com inicial do cliente
+    return imageUrlService.getPlaceholder(40, 40, client?.name?.charAt(0) || 'C');
+  };
+
+  // Função otimizada para obter a primeira URL de imagem
+  const getClientImageForContent = (content: ScheduledPost): string | undefined => {
+    const client = content.clients || getClientById(content.clientId);
+    return getClientLogo(client);
+  };
 
   // Função para obter cor por tipo de conteúdo (usando brand colors)
   const getContentTypeColor = (type: string): string => {
@@ -334,6 +320,165 @@ const getFirstImageUrl = (content: ScheduledPost): string => {
       if (!itemDate) return false;
       return format(itemDate, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd');
     });
+  };
+
+  // Função para renderizar preview do conteúdo na lista
+  const renderContentPreview = (content: ScheduledPost) => {
+    const client = content.clients || getClientById(content.clientId);
+    
+    if (content.postType === 'stories') {
+      // Renderizar story preview
+      const storyData: Story = {
+        id: content.id,
+        clientId: content.clientId,
+        image: {
+          id: 'preview',
+          url: getFirstImageUrl(content),
+          width: 1080,
+          height: 1920,
+          aspectRatio: 9/16
+        },
+        elements: [],
+        scheduledDate: content.scheduledDate,
+        status: content.status as 'draft' | 'scheduled' | 'posted' | 'failed',
+        createdAt: content.createdAt,
+        duration: 15
+      };
+      
+      return (
+        <Box sx={{ 
+          width: 80, 
+          height: 140, 
+          position: 'relative',
+          borderRadius: 2,
+          overflow: 'hidden',
+          border: '2px solid',
+          borderColor: getContentTypeColor(content.postType)
+        }}>
+          <StoryPreview story={storyData} />
+          <Box sx={{ 
+            position: 'absolute', 
+            top: 4, 
+            right: 4, 
+            bgcolor: getContentTypeColor(content.postType),
+            borderRadius: '50%',
+            width: 20,
+            height: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            {getContentTypeIcon(content.postType)}
+          </Box>
+        </Box>
+      );
+    } else if (content.postType === 'reels') {
+      // Renderizar reel preview
+      return (
+        <Box sx={{ 
+          width: 80, 
+          height: 140, 
+          position: 'relative',
+          borderRadius: 2,
+          overflow: 'hidden',
+          border: '2px solid',
+          borderColor: getContentTypeColor(content.postType)
+        }}>
+          {content.video ? (
+            <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+              <video
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover'
+                }}
+                muted
+                preload="metadata"
+              >
+                <source src={imageUrlService.getPublicUrl(content.video)} type="video/mp4" />
+              </video>
+              <Box sx={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                bgcolor: 'rgba(0,0,0,0.6)',
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <PlayArrowIcon sx={{ color: 'white', fontSize: 20 }} />
+              </Box>
+            </Box>
+          ) : (
+            <SmartImage
+              src={getFirstImageUrl(content)}
+              alt="Capa do Reel"
+              width="100%"
+              height="100%"
+              borderRadius={0}
+              fallbackText="Reel"
+              sx={{ objectFit: 'cover' }}
+            />
+          )}
+          <Box sx={{ 
+            position: 'absolute', 
+            top: 4, 
+            right: 4, 
+            bgcolor: getContentTypeColor(content.postType),
+            borderRadius: '50%',
+            width: 20,
+            height: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            {getContentTypeIcon(content.postType)}
+          </Box>
+        </Box>
+      );
+    } else {
+      // Renderizar post ou carrossel
+      return (
+        <Box sx={{ 
+          width: 80, 
+          height: 80, 
+          position: 'relative',
+          borderRadius: 2,
+          overflow: 'hidden',
+          border: '2px solid',
+          borderColor: getContentTypeColor(content.postType)
+        }}>
+          <SmartImage
+            src={getFirstImageUrl(content)}
+            clientId={client?.id}
+            alt={`Preview do ${content.postType}`}
+            width="100%"
+            height="100%"
+            borderRadius={0}
+            fallbackText={content.postType.toUpperCase()}
+            sx={{ objectFit: 'cover' }}
+          />
+          <Box sx={{ 
+            position: 'absolute', 
+            top: 4, 
+            right: 4, 
+            bgcolor: getContentTypeColor(content.postType),
+            borderRadius: '50%',
+            width: 20,
+            height: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            {getContentTypeIcon(content.postType)}
+          </Box>
+        </Box>
+      );
+    }
   };
 
   // Handlers para menu
@@ -423,7 +568,7 @@ const getFirstImageUrl = (content: ScheduledPost): string => {
     setClients(clients.filter(c => c.id !== clientId));
   };
 
-  // Função para renderizar o conteúdo do preview
+  // Renderização otimizada do conteúdo de preview
   const renderPreviewContent = () => {
     if (!selectedContent) return null;
     
@@ -438,13 +583,14 @@ const getFirstImageUrl = (content: ScheduledPost): string => {
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <SmartImage
-                src={getClientLogo(client)}
-                alt={client?.name || 'Cliente'}
-                width={48}
-                height={48}
-                borderRadius="50%"
-                fallbackText={client?.name?.charAt(0) || 'C'}
-                sx={{ mr: 2 }}
+                      src={getClientLogo(client)}
+                      clientId={client?.id} // ✅ ADICIONAR clientId
+                      alt={client?.name || 'Cliente'}
+                      width={24}
+                      height={24}
+                      borderRadius="50%"
+                      fallbackText={client?.name?.charAt(0) || 'C'}
+                      sx={{ mr: 1 }}
               />
               <Box sx={{ flex: 1 }}>
                 <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
@@ -490,17 +636,18 @@ const getFirstImageUrl = (content: ScheduledPost): string => {
           </CardContent>
         </Card>
 
-        {/* Conteúdo visual */}
+        {/* Conteúdo visual otimizado */}
         <Box sx={{ mb: 3 }}>
           {selectedContent.postType === 'stories' ? (
             // Renderizar story
             (() => {
+              const client = selectedContent.clients || getClientById(selectedContent.clientId);
               const storyData: Story = {
                 id: selectedContent.id,
                 clientId: selectedContent.clientId,
                 image: {
                   id: 'preview',
-                  url: getFirstImageUrl(selectedContent),
+                  url: getFirstImageUrl(selectedContent), // ✅ Já usa logo do cliente
                   width: 1080,
                   height: 1920,
                   aspectRatio: 9/16
@@ -536,7 +683,7 @@ const getFirstImageUrl = (content: ScheduledPost): string => {
                 </Box>
               ) : (
                 <SmartImage
-                  src={selectedContent.coverImage}
+                  src={getFirstImageUrl(selectedContent)}
                   alt="Capa do Reel"
                   width="100%"
                   height={400}
@@ -555,66 +702,17 @@ const getFirstImageUrl = (content: ScheduledPost): string => {
               )}
             </Box>
           ) : (
-            // Renderizar post ou carrossel
+            // Renderizar post ou carrossel - USAR SEMPRE LOGO DO CLIENTE
             <Box sx={{ textAlign: 'center' }}>
-{(() => {
-  // Processar as imagens de forma mais robusta
-  let imagesToRender: string[] = [];
-  
-  if (selectedContent.images) {
-    if (Array.isArray(selectedContent.images)) {
-      imagesToRender = selectedContent.images
-        .map(img => {
-          if (typeof img === 'string') {
-            const trimmedImg = (img as string).trim();
-            return trimmedImg || null;
-          }
-          if (typeof img === 'object' && img !== null && 'url' in img) {
-            const imgObj = img as { url?: string };
-            const trimmedUrl = imgObj.url?.trim();
-            return trimmedUrl || null;
-          }
-          return null;
-        })
-        .filter((img): img is string => img !== null && img !== '');
-    } else if (typeof selectedContent.images === 'string') {
-      const trimmedImages = (selectedContent.images as string).trim();
-      if (trimmedImages) {
-        imagesToRender = [trimmedImages];
-      }
-    }
-  }
-  
-  if (imagesToRender.length === 0) {
-    return (
-      <SmartImage
-        src=""
-        alt="Sem imagem"
-        width="100%"
-        height={400}
-        borderRadius={2}
-        fallbackText="Sem imagem disponível"
-      />
-    );
-  }
-  
-  return (
-    <Grid container spacing={1}>
-      {imagesToRender.map((img, index) => (
-        <Grid item xs={imagesToRender.length === 1 ? 12 : 6} key={index}>
-          <SmartImage
-            src={img}
-            alt={`Imagem ${index + 1}`}
-            width="100%"
-            height={300}
-            borderRadius={2}
-            fallbackText={`Imagem ${index + 1}`}
-          />
-        </Grid>
-      ))}
-    </Grid>
-  );
-})()}
+              <SmartImage
+                src={getFirstImageUrl(selectedContent)} // ✅ Usa logo do cliente
+                alt={`Logo de ${client?.name || 'Cliente'}`}
+                width="100%"
+                height={400}
+                borderRadius={2}
+                fallbackText={client?.name || 'Logo do Cliente'}
+                sx={{ objectFit: 'contain' }}
+              />
             </Box>
           )}
         </Box>
@@ -735,14 +833,16 @@ const getFirstImageUrl = (content: ScheduledPost): string => {
                   {clients.map((client) => (
                     <MenuItem key={client.id} value={client.id}>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <SmartImage
-                          src={getClientLogo(client)}
-                          alt={client.name}
-                          width={24}
-                          height={24}
-                          borderRadius="50%"
-                          fallbackText={client.name.charAt(0)}
-                          sx={{ mr: 1 }}
+                                                <SmartImage
+                            src={getClientLogo(client)}
+                            clientId={client.id} // ✅ ADICIONAR clientId
+                            alt={client.name}
+                            width={24}
+                            height={24}
+                            borderRadius="50%"
+                            fallbackText={client.name.charAt(0)}
+                            sx={{ mr: 1 }}
+                            
                         />
                         {client.name}
                       </Box>
@@ -842,74 +942,77 @@ const getFirstImageUrl = (content: ScheduledPost): string => {
                     >
                       {format(day, 'd')}
                     </Typography>
-              {dayContent.length > 0 ? (
-  <Box sx={{ overflowY: 'auto', flex: 1 }}>
-    {dayContent.map((content) => {
-      const client = content.clients || getClientById(content.clientId);
-      const contentDate = safeParseDateISO(content.scheduledDate);
-      
-      if (!contentDate) return null; // Pular conteúdo com data inválida
-      
-      return (
-        <Box 
-          key={content.id} 
-          sx={{ 
-            p: 0.5, 
-            mb: 0.5, 
-            bgcolor: getContentTypeColor(content.postType),
-            color: '#fff',
-            borderRadius: 1,
-            fontSize: '0.75rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
-            <Tooltip title={client?.name || 'Cliente'}>
-              <SmartImage
-                src={getClientLogo(client)}
-                alt={client?.name || 'Cliente'}
-                width={16}
-                height={16}
-                borderRadius="50%"
-                fallbackText={client?.name?.charAt(0) || 'C'}
-                sx={{ mr: 0.5 }}
-              />
-            </Tooltip>
-            <Typography 
-              variant="caption" 
-              sx={{ 
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                flex: 1
-              }}
-            >
-              {safeFormatDate(content.scheduledDate, 'HH:mm')}
-            </Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', ml: 0.5 }}>
-            <Tooltip title={content.postType}>
-              <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
-                {getContentTypeIcon(content.postType)}
-              </Box>
-            </Tooltip>
-          </Box>
-          <IconButton 
-            size="small" 
-            sx={{ color: 'inherit', p: 0.25 }}
-            onClick={(e) => handleMenuOpen(e, content)}
-          >
-            <MoreVertIcon fontSize="small" />
-          </IconButton>
-        </Box>
-      );
-    })}
-  </Box>
-) : (
-  <Box sx={{ flex: 1 }} />
-)}
+                    
+                    {dayContent.length > 0 ? (
+                      <Box sx={{ overflowY: 'auto', flex: 1 }}>
+                        {dayContent.map((content) => {
+                          const client = content.clients || getClientById(content.clientId);
+                          const contentDate = safeParseDateISO(content.scheduledDate);
+                          
+                          if (!contentDate) return null;
+                          
+                          return (
+                            <Box 
+                              key={content.id} 
+                              sx={{ 
+                                p: 0.5, 
+                                mb: 0.5, 
+                                bgcolor: getContentTypeColor(content.postType),
+                                color: '#fff',
+                                borderRadius: 1,
+                                fontSize: '0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
+                              }}
+                            >
+                              <Box sx={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+                                <Tooltip title={client?.name || 'Cliente'}>
+                                  <SmartImage
+                                        src={getClientLogo(client)}
+                                        clientId={client?.id} // ✅ ADICIONAR clientId
+                                        alt={client?.name || 'Cliente'}
+                                        width={16}
+                                        height={16}
+                                        borderRadius="50%"
+                                        fallbackText={client?.name?.charAt(0) || 'C'}
+                                        sx={{ mr: 0.5 }}
+                                      
+                                  />
+                                </Tooltip>
+                                <Typography 
+                                  variant="caption" 
+                                  sx={{ 
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    flex: 1
+                                  }}
+                                >
+                                  {safeFormatDate(content.scheduledDate, 'HH:mm')}
+                                </Typography>
+                              </Box>
+                              <Box sx={{ display: 'flex', alignItems: 'center', ml: 0.5 }}>
+                                <Tooltip title={content.postType}>
+                                  <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+                                    {getContentTypeIcon(content.postType)}
+                                  </Box>
+                                </Tooltip>
+                              </Box>
+                              <IconButton 
+                                size="small" 
+                                sx={{ color: 'inherit', p: 0.25 }}
+                                onClick={(e) => handleMenuOpen(e, content)}
+                              >
+                                <MoreVertIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    ) : (
+                      <Box sx={{ flex: 1 }} />
+                    )}
                   </Paper>
                 );
               })}
@@ -981,7 +1084,7 @@ const getFirstImageUrl = (content: ScheduledPost): string => {
                     const client = content.clients || getClientById(content.clientId);
                     const contentDate = safeParseDateISO(content.scheduledDate);
                     
-                    if (!contentDate) return null; // Pular conteúdo com data inválida
+                    if (!contentDate) return null;
                     
                     return (
                       <React.Fragment key={content.id}>
@@ -994,49 +1097,23 @@ const getFirstImageUrl = (content: ScheduledPost): string => {
                           }
                         >
                           <ListItemAvatar>
-                            <Badge
-                              overlap="circular"
-                              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                              badgeContent={
-                                <Tooltip title={content.postType}>
-                                  <Avatar 
-                                    sx={{ 
-                                      width: 20, 
-                                      height: 20, 
-                                      bgcolor: getContentTypeColor(content.postType) 
-                                    }}
-                                  >
-                                    {getContentTypeIcon(content.postType)}
-                                  </Avatar>
-                                </Tooltip>
-                              }
-                            >
-                              <SmartImage
-                                src={getFirstImageUrl(content)}
-                                alt={`Prévia do ${content.postType}`}
-                                width={56}
-                                height={56}
-                                borderRadius={1}
-                                fallbackText="Sem imagem"
-                                sx={{ 
-                                  border: '1px solid',
-                                  borderColor: 'grey.300'
-                                }}
-                              />
-                            </Badge>
+                            <Box sx={{ mr: 2 }}>
+                              {renderContentPreview(content)}
+                            </Box>
                           </ListItemAvatar>
                           <ListItemText
                             primary={
                               <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <SmartImage
-                                  src={getClientLogo(client)}
-                                  alt={client?.name || 'Cliente'}
-                                  width={24}
-                                  height={24}
-                                  borderRadius="50%"
-                                  fallbackText={client?.name?.charAt(0) || 'C'}
-                                  sx={{ mr: 1 }}
-                                />
+                                      <SmartImage
+                                        src={getClientLogoForAvatar(content)}
+                                        clientId={client?.id}
+                                        alt={client?.name || 'Cliente'}
+                                        width={24}
+                                        height={24}
+                                        borderRadius="50%"
+                                        fallbackText={client?.name?.charAt(0) || 'C'}
+                                        sx={{ mr: 1 }}
+                                      />
                                 <Typography variant="subtitle1" component="span">
                                   {client?.name || 'Cliente não encontrado'}
                                 </Typography>
@@ -1057,7 +1134,6 @@ const getFirstImageUrl = (content: ScheduledPost): string => {
                                     size="small"
                                     color={getStatusColor(content.status)}
                                   />
-                                  {/* Mostrar quem criou o conteúdo */}
                                   {userProfile && (
                                     <Chip 
                                       icon={<PersonIcon />} 
@@ -1247,7 +1323,7 @@ const getFirstImageUrl = (content: ScheduledPost): string => {
         </DialogActions>
       </Dialog>
     </>
-  ); 
+  );
 };
 
 export default StoryCalendar;

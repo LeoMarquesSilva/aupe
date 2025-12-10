@@ -11,7 +11,6 @@ import {
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
   Schedule as ScheduleIcon,
-  Refresh as RefreshIcon,
   Clear as ClearIcon
 } from '@mui/icons-material';
 import { formatDistanceToNow } from 'date-fns';
@@ -22,7 +21,6 @@ interface CacheStatusDisplayProps {
   cacheStatus: CacheStatus;
   isStale: boolean;
   syncInProgress: boolean;
-  onForceRefresh: () => void;
   onClearCache: () => void;
 }
 
@@ -30,7 +28,6 @@ const CacheStatusDisplay: React.FC<CacheStatusDisplayProps> = ({
   cacheStatus,
   isStale,
   syncInProgress,
-  onForceRefresh,
   onClearCache
 }) => {
   const formatTimeAgo = (date: Date) => {
@@ -65,11 +62,11 @@ const CacheStatusDisplay: React.FC<CacheStatusDisplayProps> = ({
 
   const getStatusMessage = () => {
     if (syncInProgress) {
-      return 'Sincronizando dados do Instagram...';
+      return 'Sincronização automática em andamento...';
     }
     
     if (cacheStatus.syncStatus === 'failed') {
-      return `Erro na última sincronização: ${cacheStatus.errorMessage || 'Erro desconhecido'}`;
+      return `Erro na sincronização: ${cacheStatus.errorMessage || 'Erro desconhecido'}`;
     }
     
     if (isStale) {
@@ -84,15 +81,6 @@ const CacheStatusDisplay: React.FC<CacheStatusDisplayProps> = ({
       severity={getSeverity()}
       action={
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button 
-            color="inherit" 
-            size="small" 
-            startIcon={<RefreshIcon />}
-            onClick={onForceRefresh}
-            disabled={syncInProgress}
-          >
-            {syncInProgress ? 'Atualizando...' : 'Atualizar'}
-          </Button>
           <Button 
             color="inherit" 
             size="small" 

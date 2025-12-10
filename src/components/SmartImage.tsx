@@ -1,158 +1,185 @@
 import React from 'react';
-import { Box, CircularProgress, IconButton } from '@mui/material';
-import { Refresh as RefreshIcon, Image as ImageIcon } from '@mui/icons-material';
+import { Box, CircularProgress, Typography } from '@mui/material';
+import { Warning as WarningIcon } from '@mui/icons-material';
 import { useImageLoader } from '../hooks/useImageLoader';
+import { useRefreshableUrl } from '../hooks/useRefreshableUrl';
 
 interface SmartImageProps {
-  src: string | undefined | null;
+  src?: string;
   alt?: string;
   width?: number | string;
   height?: number | string;
   borderRadius?: number | string;
-  objectFit?: 'contain' | 'cover' | 'fill' | 'none' | 'scale-down';
-  showRefreshButton?: boolean;
-  validateUrl?: boolean;
   fallbackText?: string;
+  clientId?: string;
+  autoRefresh?: boolean;
+  onError?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
+  onLoad?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
   sx?: any;
-  onClick?: () => void;
-  onError?: (error: any) => void;
 }
 
 const SmartImage = React.forwardRef<HTMLDivElement, SmartImageProps & React.HTMLAttributes<HTMLDivElement>>(
-  function SmartImage(props, ref) {
+  (props, ref) => {
     const {
       src,
       alt = 'Imagem',
-      width = '100%',
-      height = 'auto',
-      borderRadius = 0,
-      objectFit = 'cover',
-      showRefreshButton = false,
-      validateUrl = false,
+      width = 40,
+      height = 40,
+      borderRadius = 1,
       fallbackText,
-      sx = {},
-      onClick,
+      clientId,
+      autoRefresh = true, // ✅ autoRefresh ativado por padrão
       onError,
+      onLoad,
+      sx,
       ...otherProps
     } = props;
 
-    const { src: imageSrc, isLoading, isError, reload } = useImageLoader(src, {
-      validateUrl,
-      fallbackUrl: fallbackText ? `/api/placeholder/400/400?text=${encodeURIComponent(fallbackText)}` : undefined
-    });
+    const [imageLoadError, setImageLoadError] = React.useState(false);
+    const [isImageLoaded, setIsImageLoaded] = React.useState(false);
+    const [isLoading, setIsLoading] = React.useState(false);
 
+    // ✅ Hook com autoRefresh ativo
+    const { 
+      url: refreshedUrl, 
+      notifyLoadError 
+    } = useRefreshableUrl({
+      clientId: clientId || '',
+      url: src,
+      autoRefresh
+    });
+    
+    const { isLoading: imageLoaderLoading } = useImageLoader(src || '');
+
+    // ✅ URL final (usar a refreshed se disponível, senão a original)
+    const finalSrc = refreshedUrl || src;
+
+    // ✅ HANDLER de erro MELHORADO com notificação automática
     const handleImageError = React.useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+      console.warn('❌ Erro ao carregar imagem:', finalSrc);
+      setImageLoadError(true);
+      setIsLoading(false);
+      
+      // ✅ Se for URL do Instagram, tentar refresh automático
+      if (finalSrc && clientId && autoRefresh && (
+        finalSrc.includes('fbcdn.net') || 
+        finalSrc.includes('instagram.com') || 
+        finalSrc.includes('facebook.com') ||
+        finalSrc.includes('scontent-')
+      )) {
+        console.log('⚠️ URL do Instagram expirada - tentando refresh automático');
+        notifyLoadError();
+      }
+      
       if (onError) {
         onError(e);
       }
-    }, [onError]);
+    }, [finalSrc, clientId, autoRefresh, notifyLoadError, onError]);
 
-    const handleRefresh = React.useCallback((e: React.MouseEvent) => {
-      e.stopPropagation();
-      reload();
-    }, [reload]);
-
-    const baseProps = {
-      ref,
-      onClick,
-      ...otherProps,
-      sx: {
-        width,
-        height,
-        borderRadius,
-        cursor: onClick ? 'pointer' : 'default',
-        ...sx
+    // ✅ HANDLER de sucesso no carregamento
+    const handleImageLoad = React.useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+      setIsImageLoaded(true);
+      setImageLoadError(false);
+      setIsLoading(false);
+      
+      if (onLoad) {
+        onLoad(e);
       }
-    };
+    }, [onLoad]);
 
-    if (isLoading) {
+    // ✅ HANDLER para início do carregamento
+    const handleImageLoadStart = React.useCallback(() => {
+      setIsLoading(true);
+      setImageLoadError(false);
+      setIsImageLoaded(false);
+    }, []);
+
+    // ✅ RESETAR estado quando URL muda
+    React.useEffect(() => {
+      setImageLoadError(false);
+      setIsImageLoaded(false);
+      setIsLoading(false);
+    }, [finalSrc]);
+
+    // ✅ MOSTRAR loading se estiver carregando
+    if (isLoading || imageLoaderLoading) {
       return (
         <Box
-          {...baseProps}
+          ref={ref}
           sx={{
-            ...baseProps.sx,
+            width: width,
+            height: height,
+            borderRadius: borderRadius,
+            bgcolor: 'grey.100',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: 'grey.100'
+            border: '1px solid',
+            borderColor: 'grey.200',
+            ...sx
           }}
+          {...otherProps}
         >
-          <CircularProgress size={24} />
+          <CircularProgress size={16} />
         </Box>
       );
     }
 
-    if (isError && !imageSrc) {
+    // ✅ MOSTRAR fallback se houver erro (SEM botão de refresh)
+    if (imageLoadError || !finalSrc) {
       return (
         <Box
-          {...baseProps}
+          ref={ref}
           sx={{
-            ...baseProps.sx,
+            width: width,
+            height: height,
+            borderRadius: borderRadius,
+            bgcolor: 'grey.100',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: 'grey.200',
-            color: 'grey.600',
             border: '1px dashed',
-            borderColor: 'grey.400'
+            borderColor: 'grey.300',
+            p: 1,
+            ...sx
           }}
+          {...otherProps}
         >
-          <ImageIcon sx={{ fontSize: 32, mb: 1 }} />
-          <Box sx={{ fontSize: 12, textAlign: 'center' }}>
-            {fallbackText || 'Imagem não disponível'}
-          </Box>
-          {showRefreshButton && (
-            <IconButton size="small" onClick={handleRefresh} sx={{ mt: 1 }}>
-              <RefreshIcon fontSize="small" />
-            </IconButton>
-          )}
+          <WarningIcon sx={{ fontSize: 16, color: 'grey.500', mb: 0.5 }} />
+          <Typography variant="caption" color="text.secondary" align="center" sx={{ fontSize: '0.65rem', lineHeight: 1.2 }}>
+            {fallbackText || 'Logo indisponível'}
+          </Typography>
         </Box>
       );
     }
 
+    // ✅ MOSTRAR imagem normal (SEM botão de refresh)
     return (
       <Box
-        {...baseProps}
+        ref={ref}
+        component="img"
+        src={finalSrc}
+        alt={alt}
+        onError={handleImageError}
+        onLoad={handleImageLoad}
+        onLoadStart={handleImageLoadStart}
         sx={{
-          ...baseProps.sx,
-          position: 'relative',
-          overflow: 'hidden'
+          width: width,
+          height: height,
+          borderRadius: borderRadius,
+          objectFit: 'cover',
+          border: '1px solid',
+          borderColor: 'grey.200',
+          bgcolor: 'grey.50',
+          ...sx
         }}
-      >
-        <Box
-          component="img"
-          src={imageSrc}
-          alt={alt}
-          sx={{
-            width: '100%',
-            height: '100%',
-            objectFit,
-            display: 'block'
-          }}
-          onError={handleImageError}
-        />
-        
-        {showRefreshButton && isError && (
-          <IconButton
-            size="small"
-            onClick={handleRefresh}
-            sx={{
-              position: 'absolute',
-              top: 4,
-              right: 4,
-              bgcolor: 'rgba(255, 255, 255, 0.8)',
-              '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.9)'
-              }
-            }}
-          >
-            <RefreshIcon fontSize="small" />
-          </IconButton>
-        )}
-      </Box>
+        {...otherProps}
+      />
     );
   }
 );
+
+SmartImage.displayName = 'SmartImage';
 
 export default SmartImage;
