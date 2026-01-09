@@ -737,7 +737,7 @@ export const postService = {
     }
   },
 
-  // Atualizar um post agendado (MANTER PROTEÇÃO PARA UPDATES)
+  // Atualizar um post agendado (AGORA TODOS PODEM EDITAR - CONSISTENTE COM LEITURA)
   async updateScheduledPost(postId: string, updates: any): Promise<any> {
     try {
       const user = await getCurrentUser();
@@ -750,13 +750,17 @@ export const postService = {
         .from('scheduled_posts')
         .update(postData)
         .eq('id', postId)
-        .eq('user_id', user.id) // ✅ MANTER PROTEÇÃO - só o dono pode editar
+        // ✅ REMOVIDO: .eq('user_id', user.id) - AGORA TODOS PODEM EDITAR (consistente com leitura)
         .select()
         .single();
       
       if (error) {
         console.error('Erro ao atualizar post agendado:', error);
         throw new Error('Não foi possível atualizar o post agendado');
+      }
+      
+      if (!data) {
+        throw new Error('Post não encontrado ou não foi possível atualizar');
       }
       
       // Converter snake_case para camelCase com mapeamento específico
@@ -767,7 +771,7 @@ export const postService = {
     }
   },
 
-  // Excluir um post agendado (MANTER PROTEÇÃO PARA DELETES)
+  // Excluir um post agendado (AGORA TODOS PODEM EXCLUIR - CONSISTENTE COM LEITURA)
   async deleteScheduledPost(postId: string): Promise<void> {
     try {
       const user = await getCurrentUser();
@@ -777,7 +781,7 @@ export const postService = {
         .from('scheduled_posts')
         .delete()
         .eq('id', postId)
-        .eq('user_id', user.id); // ✅ MANTER PROTEÇÃO - só o dono pode excluir
+        // ✅ REMOVIDO: .eq('user_id', user.id) - AGORA TODOS PODEM EXCLUIR (consistente com leitura)
       
       if (error) {
         console.error('Erro ao excluir post agendado:', error);
@@ -845,7 +849,7 @@ export const postService = {
     }
   },
 
-  // Método para atualizar status do post (MANTER PROTEÇÃO)
+  // Método para atualizar status do post (AGORA TODOS PODEM ATUALIZAR - CONSISTENTE COM LEITURA)
   async updatePostStatus(
     postId: string, 
     status: PostStatus, 
@@ -879,13 +883,17 @@ export const postService = {
         .from('scheduled_posts')
         .update(dbData)
         .eq('id', postId)
-        .eq('user_id', user.id) // ✅ MANTER PROTEÇÃO - só o dono pode atualizar status
+        // ✅ REMOVIDO: .eq('user_id', user.id) - AGORA TODOS PODEM ATUALIZAR (consistente com leitura)
         .select()
         .single();
 
       if (error) {
         console.error('Erro ao atualizar status do post:', error);
         throw new Error(`Não foi possível atualizar o post: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new Error('Post não encontrado ou não foi possível atualizar');
       }
 
       console.log('Status do post atualizado:', data);
@@ -930,7 +938,7 @@ export const postService = {
     }
   },
 
-  // Método para reprocessar posts falhados (MANTER PROTEÇÃO)
+  // Método para reprocessar posts falhados (AGORA TODOS PODEM REPROCESSAR - CONSISTENTE COM LEITURA)
   async retryFailedPost(postId: string): Promise<ScheduledPost> {
     try {
       const user = await getCurrentUser();
@@ -941,7 +949,7 @@ export const postService = {
         .from('scheduled_posts')
         .select('*')
         .eq('id', postId)
-        .eq('user_id', user.id) // ✅ MANTER PROTEÇÃO - só o dono pode reprocessar
+        // ✅ REMOVIDO: .eq('user_id', user.id) - AGORA TODOS PODEM REPROCESSAR (consistente com leitura)
         .single();
 
       if (fetchError || !currentPost) {

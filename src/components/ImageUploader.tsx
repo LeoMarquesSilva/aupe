@@ -20,6 +20,7 @@ interface ImageUploaderProps {
   maxImages?: number;
   aspectRatio?: string;
   helperText?: string;
+  disabled?: boolean;
 }
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({ 
@@ -30,7 +31,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   clientUsername = 'cliente',
   maxImages = 10,
   aspectRatio = '1:1',
-  helperText = ''
+  helperText = '',
+  disabled = false
 }) => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +54,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    if (disabled) return;
     if (acceptedFiles.length === 0) return;
     
     const remainingSlots = maxImages - images.length;
@@ -110,17 +113,18 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     } finally {
       setUploading(false);
     }
-  }, [images, onChange, maxImages]);
+  }, [images, onChange, maxImages, disabled]);
 
   const { getRootProps, getInputProps } = useDropzone({
     onDrop,
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png']
     },
-    disabled: uploading || images.length >= maxImages
+    disabled: disabled || uploading || images.length >= maxImages
   });
 
   const removeImage = (index: number) => {
+    if (disabled) return;
     const newImages = [...images];
     newImages.splice(index, 1);
     
@@ -137,6 +141,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
 
   const handleDragEnd = (result: any) => {
+    if (disabled) return;
     if (!result.destination) return;
     
     const fromIndex = result.source.index;

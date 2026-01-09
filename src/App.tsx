@@ -24,6 +24,7 @@ import CreateReels from './pages/CreateReels';
 import InstagramCallback from './pages/InstagramCallback';
 import StoryCalendar from './pages/StoryCalendar';
 import EditStory from './pages/EditStory';
+import EditPost from './pages/EditPost';
 import ClientDashboard from './pages/ClientDashboard';
 import SingleClientDashboard from './pages/SingleClientDashboard';
 import Settings from './pages/Settings';
@@ -166,6 +167,14 @@ const router = createBrowserRouter([
   {
     path: "/edit-story/:id",
     element: <ProtectedPageLayout><EditStory /></ProtectedPageLayout>,
+  },
+  {
+    path: "/edit-post/:postId",
+    element: <ProtectedPageLayout><EditPost /></ProtectedPageLayout>,
+  },
+  {
+    path: "/clients/:clientId/edit-post/:postId",
+    element: <ProtectedPageLayout><EditPost /></ProtectedPageLayout>,
   },
   
   // Rotas protegidas - Configurações

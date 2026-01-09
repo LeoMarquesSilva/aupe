@@ -20,9 +20,10 @@ import {
 interface DateTimePickerProps {
   scheduledDate: string;
   onChange: (date: string) => void;
+  disabled?: boolean;
 }
 
-const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange }) => {
+const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange, disabled = false }) => {
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [validationMessage, setValidationMessage] = useState<string>('');
@@ -257,15 +258,16 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange
                 <Chip
                   key={suggestion.label}
                   label={suggestion.label}
-                  onClick={() => handleDateChange(suggestion.value)}
+                  onClick={disabled ? undefined : () => handleDateChange(suggestion.value)}
                   variant={selectedDate === suggestion.value ? 'filled' : 'outlined'}
                   color={selectedDate === suggestion.value ? 'primary' : 'default'}
                   size="small"
+                  disabled={disabled}
                   sx={{ 
-                    cursor: 'pointer',
+                    cursor: disabled ? 'default' : 'pointer',
                     '&:hover': { 
-                      backgroundColor: selectedDate === suggestion.value ? 'primary.dark' : 'primary.light',
-                      color: 'white'
+                      backgroundColor: disabled ? undefined : (selectedDate === suggestion.value ? 'primary.dark' : 'primary.light'),
+                      color: disabled ? undefined : 'white'
                     }
                   }}
                 />
@@ -278,6 +280,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange
               variant="outlined"
               value={selectedDate}
               onChange={(e) => handleDateChange(e.target.value)}
+              disabled={disabled}
               inputProps={{
                 min: getMinDate()
               }}
@@ -323,15 +326,16 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange
                 <Chip
                   key={time}
                   label={time}
-                  onClick={() => handleTimeChange(time)}
+                  onClick={disabled ? undefined : () => handleTimeChange(time)}
                   variant={selectedTime === time ? 'filled' : 'outlined'}
                   color={selectedTime === time ? 'secondary' : 'default'}
                   size="small"
+                  disabled={disabled}
                   sx={{ 
-                    cursor: 'pointer',
+                    cursor: disabled ? 'default' : 'pointer',
                     '&:hover': { 
-                      backgroundColor: selectedTime === time ? 'secondary.dark' : 'secondary.light',
-                      color: 'white'
+                      backgroundColor: disabled ? undefined : (selectedTime === time ? 'secondary.dark' : 'secondary.light'),
+                      color: disabled ? undefined : 'white'
                     }
                   }}
                 />
@@ -344,6 +348,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange
               variant="outlined"
               value={selectedTime}
               onChange={(e) => handleTimeChange(e.target.value)}
+              disabled={disabled}
               inputProps={{
                 min: selectedDate === getMinDate() ? getMinTime() : '00:00',
                 step: 300 // 5 minutos

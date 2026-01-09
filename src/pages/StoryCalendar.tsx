@@ -32,7 +32,9 @@ import {
   Badge,
   Card,
   CardContent,
-  SelectChangeEvent
+  SelectChangeEvent,
+  TextField,
+  Collapse
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -53,13 +55,15 @@ import {
   Image as ImageIcon,
   AccessTime as AccessTimeIcon,
   PlayArrow as PlayArrowIcon,
-  Person as PersonIcon
+  Person as PersonIcon,
+  FilterList as FilterListIcon,
+  Clear as ClearIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useTheme } from '@mui/material/styles';
-import { postService, clientService, userProfileService, UserProfile } from '../services/supabaseClient';
+import { postService, clientService, userProfileService, UserProfile, supabase } from '../services/supabaseClient';
 import { Client, ScheduledPost, Story, PostStatus } from '../types';
 import StoryPreview from '../components/StoryPreview';
 import ClientManager from '../components/ClientManager';
@@ -83,6 +87,13 @@ const StoryCalendar: React.FC = () => {
   const [selectedClient, setSelectedClient] = useState<string>('all');
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+  
+  // Estados para filtros do modo lista
+  const [selectedUserId, setSelectedUserId] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [users, setUsers] = useState<Array<{ id: string; email: string; full_name?: string }>>([]);
   
   // Estados para menus e diálogos
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -128,11 +139,53 @@ const StoryCalendar: React.FC = () => {
       setContent(postsData || []);
       setClients(clientsData || []);
       setUserProfile(profileData);
+      
+      // Buscar lista de usuários únicos dos posts
+      await loadUsersFromPosts(postsData || []);
     } catch (err) {
       console.error('❌ Erro ao carregar dados:', err);
       setError('Erro ao carregar dados do calendário');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Função para carregar usuários únicos dos posts
+  const loadUsersFromPosts = async (posts: ScheduledPost[]) => {
+    try {
+      const userIds = [...new Set(posts.map(post => post.userId).filter(Boolean))];
+      
+      if (userIds.length === 0) {
+        setUsers([]);
+        return;
+      }
+
+      // Tentar buscar de profiles primeiro
+      let { data: profilesData, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .in('id', userIds);
+
+      // Se não encontrar, tentar user_profiles
+      if (error && error.message.includes('does not exist')) {
+        const result = await supabase
+          .from('user_profiles')
+          .select('id, email, full_name')
+          .in('id', userIds);
+        profilesData = result.data;
+        error = result.error;
+      }
+
+      if (error) {
+        console.error('Erro ao buscar usuários:', error);
+        // Se não conseguir buscar perfis, criar lista básica com IDs
+        setUsers(userIds.map(id => ({ id, email: id.substring(0, 8) + '...' })));
+      } else {
+        setUsers(profilesData || []);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar usuários:', err);
+      setUsers([]);
     }
   };
 
@@ -306,11 +359,44 @@ const StoryCalendar: React.FC = () => {
 
   // Filtrar conteúdo
   const filteredContent = content.filter(item => {
+    // Filtro de cliente (sempre aplicado)
     const matchesClient = selectedClient === 'all' || item.clientId === selectedClient;
-    const itemDate = safeParseDateISO(item.scheduledDate);
-    if (!itemDate) return false;
-    const matchesMonth = isSameMonth(itemDate, selectedMonth);
-    return matchesClient && matchesMonth;
+    
+    // Filtros específicos do modo lista
+    if (viewMode === 'list') {
+      // Filtro por usuário
+      const matchesUser = selectedUserId === 'all' || item.userId === selectedUserId;
+      
+      // Filtro por status
+      const matchesStatus = selectedStatus === 'all' || item.status === selectedStatus;
+      
+      // Filtro por data
+      const itemDate = safeParseDateISO(item.scheduledDate);
+      if (!itemDate) return false;
+      
+      let matchesDate = true;
+      if (startDate) {
+        const start = safeParseDateISO(startDate);
+        if (start && itemDate < start) matchesDate = false;
+      }
+      if (endDate) {
+        const end = safeParseDateISO(endDate);
+        if (end) {
+          // Adicionar 23:59:59 ao final do dia
+          const endOfDay = new Date(end);
+          endOfDay.setHours(23, 59, 59, 999);
+          if (itemDate > endOfDay) matchesDate = false;
+        }
+      }
+      
+      return matchesClient && matchesUser && matchesStatus && matchesDate;
+    } else {
+      // Modo calendário - apenas filtro de cliente e mês
+      const itemDate = safeParseDateISO(item.scheduledDate);
+      if (!itemDate) return false;
+      const matchesMonth = isSameMonth(itemDate, selectedMonth);
+      return matchesClient && matchesMonth;
+    }
   });
 
   // Agrupar conteúdo por dia para visualização de calendário
@@ -1042,10 +1128,108 @@ const StoryCalendar: React.FC = () => {
         
         {/* Visualização de Lista */}
         {viewMode === 'list' && (
-          <Paper sx={{ p: 3, borderRadius: 2 }}>
-            <Typography variant="h6" sx={{ mb: 3 }}>
-              Conteúdo Agendado
-            </Typography>
+          <>
+            {/* Filtros do modo lista */}
+            <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <FilterListIcon color="primary" />
+                  <Typography variant="h6">
+                    Filtros
+                  </Typography>
+                </Box>
+                <Button
+                  size="small"
+                  startIcon={<ClearIcon />}
+                  onClick={() => {
+                    setSelectedUserId('all');
+                    setSelectedStatus('all');
+                    setStartDate('');
+                    setEndDate('');
+                  }}
+                  disabled={selectedUserId === 'all' && selectedStatus === 'all' && !startDate && !endDate}
+                >
+                  Limpar Filtros
+                </Button>
+              </Box>
+              
+              <Grid container spacing={2}>
+                {/* Filtro por Usuário */}
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth>
+                    <InputLabel>Usuário</InputLabel>
+                    <Select
+                      value={selectedUserId}
+                      onChange={(e) => setSelectedUserId(e.target.value)}
+                      label="Usuário"
+                    >
+                      <MenuItem value="all">Todos os Usuários</MenuItem>
+                      {users.map((user) => (
+                        <MenuItem key={user.id} value={user.id}>
+                          {user.full_name || user.email || user.id.substring(0, 8) + '...'}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                
+                {/* Filtro por Status */}
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth>
+                    <InputLabel>Status</InputLabel>
+                    <Select
+                      value={selectedStatus}
+                      onChange={(e) => setSelectedStatus(e.target.value)}
+                      label="Status"
+                    >
+                      <MenuItem value="all">Todos os Status</MenuItem>
+                      <MenuItem value="pending">Pendente</MenuItem>
+                      <MenuItem value="sent_to_n8n">Enviado</MenuItem>
+                      <MenuItem value="processing">Processando</MenuItem>
+                      <MenuItem value="posted">Publicado</MenuItem>
+                      <MenuItem value="failed">Falhou</MenuItem>
+                      <MenuItem value="cancelled">Cancelado</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                
+                {/* Filtro por Data Inicial */}
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Data Inicial"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    InputLabelProps={{
+                      shrink: true,
+                    }}
+                  />
+                </Grid>
+                
+                {/* Filtro por Data Final */}
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Data Final"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    InputLabelProps={{
+                      shrink: true,
+                    }}
+                    inputProps={{
+                      min: startDate || undefined
+                    }}
+                  />
+                </Grid>
+              </Grid>
+            </Paper>
+            
+            <Paper sx={{ p: 3, borderRadius: 2 }}>
+              <Typography variant="h6" sx={{ mb: 3 }}>
+                Conteúdo Agendado {filteredContent.length > 0 && `(${filteredContent.length})`}
+              </Typography>
             
             {filteredContent.length === 0 ? (
               <Box sx={{ 
@@ -1170,6 +1354,7 @@ const StoryCalendar: React.FC = () => {
               </List>
             )}
           </Paper>
+          </>
         )}
       </Container>
 
