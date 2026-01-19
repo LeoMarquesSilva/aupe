@@ -16,6 +16,7 @@ import Header from './components/Header';
 import Login from './pages/Login';
 import ResetPassword from './pages/ResetPassword';
 import EmailConfirmation from './pages/EmailConfirmation'; // ✅ Nova importação
+import Landing from './pages/Landing';
 
 // Pages - Protected
 import CreatePost from './pages/CreatePost';
@@ -29,6 +30,11 @@ import ClientDashboard from './pages/ClientDashboard';
 import SingleClientDashboard from './pages/SingleClientDashboard';
 import Settings from './pages/Settings';
 import AdminSettings from './pages/AdminSettings';
+import SuperAdminLogin from './pages/SuperAdminLogin';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import Checkout from './pages/Checkout';
+import CheckoutSuccess from './pages/CheckoutSuccess';
+import CheckoutCancel from './pages/CheckoutCancel';
 
 // Layout compartilhado para todas as páginas protegidas
 const PageLayout = ({ children }: { children: React.ReactNode }) => (
@@ -102,6 +108,15 @@ const AdminPageLayout = ({ children }: { children: React.ReactNode }) => (
   </ProtectedRoute>
 );
 
+// Componente para páginas que requerem role de super_admin (sem header)
+const SuperAdminPageLayout = ({ children }: { children: React.ReactNode }) => (
+  <ProtectedRoute requiredRole="super_admin" redirectTo="/super-admin/login">
+    <CallbackLayout>
+      {children}
+    </CallbackLayout>
+  </ProtectedRoute>
+);
+
 // Componente para callback que precisa de autenticação
 const ProtectedCallbackLayout = ({ children }: { children: React.ReactNode }) => (
   <ProtectedRoute>
@@ -115,6 +130,10 @@ const ProtectedCallbackLayout = ({ children }: { children: React.ReactNode }) =>
 const router = createBrowserRouter([
   // Rotas públicas
   {
+    path: "/landing",
+    element: <PublicLayout><Landing /></PublicLayout>,
+  },
+  {
     path: "/login",
     element: <PublicLayout><Login /></PublicLayout>,
   },
@@ -125,6 +144,10 @@ const router = createBrowserRouter([
   {
     path: "/email-confirmation", // ✅ Nova rota para confirmação de email
     element: <PublicLayout><EmailConfirmation /></PublicLayout>,
+  },
+  {
+    path: "/super-admin/login",
+    element: <PublicLayout><SuperAdminLogin /></PublicLayout>,
   },
 
   // Rotas protegidas - Dashboard
@@ -189,6 +212,12 @@ const router = createBrowserRouter([
     element: <AdminPageLayout><AdminSettings /></AdminPageLayout>,
   },
   
+  // Rotas Super Admin - APENAS SUPER_ADMINS
+  {
+    path: "/super-admin",
+    element: <SuperAdminPageLayout><SuperAdminDashboard /></SuperAdminPageLayout>,
+  },
+  
   // Rotas protegidas - Callbacks do Instagram
   {
     path: "/api/instagram-auth/callback",
@@ -197,6 +226,20 @@ const router = createBrowserRouter([
   {
     path: "/callback",
     element: <ProtectedCallbackLayout><InstagramCallback /></ProtectedCallbackLayout>,
+  },
+  
+  // Rotas protegidas - Checkout Stripe
+  {
+    path: "/checkout",
+    element: <ProtectedCallbackLayout><Checkout /></ProtectedCallbackLayout>,
+  },
+  {
+    path: "/checkout/success",
+    element: <ProtectedCallbackLayout><CheckoutSuccess /></ProtectedCallbackLayout>,
+  },
+  {
+    path: "/checkout/cancel",
+    element: <ProtectedCallbackLayout><CheckoutCancel /></ProtectedCallbackLayout>,
   },
   
   // Rota catch-all - redireciona para dashboard se logado, senão para login

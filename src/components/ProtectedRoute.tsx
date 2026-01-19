@@ -30,7 +30,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     const roleHierarchy: Record<UserRole, number> = {
       'user': 1,
       'moderator': 2,
-      'admin': 3
+      'admin': 3,
+      'super_admin': 4
     };
 
     return roleHierarchy[userRole] >= roleHierarchy[requiredRole];

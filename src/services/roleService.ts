@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 
-export type UserRole = 'admin' | 'moderator' | 'user';
+export type UserRole = 'super_admin' | 'admin' | 'moderator' | 'user';
 
 export interface UserProfile {
   id: string;
@@ -33,7 +33,7 @@ class RoleService {
       if (error) {
         console.error('❌ Erro ao verificar admin via RPC:', error);
         // Fallback: tentar buscar diretamente
-        const profile = await this.getUserProfileDirect(user.id);
+        const profile = await this.getUserProfileById(user.id);
         return profile?.role === 'admin';
       }
 
@@ -45,9 +45,9 @@ class RoleService {
   }
 
   /**
-   * Buscar perfil diretamente (fallback)
+   * Buscar perfil por ID (método público)
    */
-  private async getUserProfileDirect(userId: string): Promise<UserProfile | null> {
+  async getUserProfileById(userId: string): Promise<UserProfile | null> {
     try {
       // Tentar profiles primeiro
       const { data: profile, error } = await supabase
@@ -77,7 +77,7 @@ class RoleService {
    * Obter perfil do usuário (sem recursão)
    */
   async getUserProfile(userId: string): Promise<UserProfile | null> {
-    return await this.getUserProfileDirect(userId);
+    return await this.getUserProfileById(userId);
   }
 
   /**
@@ -406,7 +406,8 @@ class RoleService {
       const roleHierarchy: Record<UserRole, number> = {
         'user': 1,
         'moderator': 2,
-        'admin': 3
+        'admin': 3,
+        'super_admin': 4
       };
 
       return roleHierarchy[profile.role] >= roleHierarchy[requiredRole];
@@ -427,6 +428,22 @@ class RoleService {
       return await this.hasPermission(user.id, requiredRole);
     } catch (error) {
       console.error('❌ Erro ao verificar permissão do usuário atual:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Verificar se usuário atual é super admin
+   */
+  async isCurrentUserSuperAdmin(): Promise<boolean> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return false;
+
+      const profile = await this.getUserProfileById(user.id);
+      return profile?.role === 'super_admin';
+    } catch (error) {
+      console.error('❌ Erro ao verificar se usuário é super admin:', error);
       return false;
     }
   }

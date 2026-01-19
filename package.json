@@ -12,6 +12,8 @@
     "@mui/x-charts": "^8.16.0",
     "@mui/x-date-pickers": "^6.20.2",
     "@react-spring/web": "^10.0.3",
+    "@stripe/react-stripe-js": "^5.4.1",
+    "@stripe/stripe-js": "^8.6.1",
     "@supabase/supabase-js": "^2.31.0",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
