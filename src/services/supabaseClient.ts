@@ -7,12 +7,15 @@ import { fixInstagramConnection } from 'services/instagramFixService';
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
 const supabaseKey = process.env.REACT_APP_SUPABASE_KEY || '';
 
-// Verificar se as variáveis de ambiente estão definidas
+// Verificar se as variáveis de ambiente estão definidas (apenas warning, não erro)
 if (!supabaseUrl || !supabaseKey) {
-  console.error('Erro: Variáveis de ambiente do Supabase não estão definidas!');
+  if (process.env.NODE_ENV === 'development') {
+    console.warn('⚠️ Variáveis de ambiente do Supabase não estão definidas!');
+  }
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// Criar cliente Supabase mesmo sem variáveis (para evitar erro no build)
+export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder-key');
 
 // Interface para perfil de usuário
 export interface UserProfile {
