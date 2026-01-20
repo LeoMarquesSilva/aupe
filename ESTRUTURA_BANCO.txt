@@ -1,0 +1,1848 @@
+1: [
+  {
+    "tabela": "organizations",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "tabela": "organizations",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "organizations",
+    "column_name": "email",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "organizations",
+    "column_name": "phone",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "organizations",
+    "column_name": "document",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "organizations",
+    "column_name": "address",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "organizations",
+    "column_name": "city",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "organizations",
+    "column_name": "state",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "organizations",
+    "column_name": "zip_code",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "organizations",
+    "column_name": "country",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": "'BR'::text"
+  },
+  {
+    "tabela": "organizations",
+    "column_name": "active",
+    "data_type": "boolean",
+    "is_nullable": "YES",
+    "column_default": "true"
+  },
+  {
+    "tabela": "organizations",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "tabela": "organizations",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  }
+]
+
+1.2:
+
+[
+  {
+    "tabela": "profiles",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "profiles",
+    "column_name": "email",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "profiles",
+    "column_name": "full_name",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "profiles",
+    "column_name": "avatar_url",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "profiles",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "tabela": "profiles",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "tabela": "profiles",
+    "column_name": "role",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": "'user'::text"
+  },
+  {
+    "tabela": "profiles",
+    "column_name": "organization_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  }
+]
+
+
+1.3:
+
+[
+  {
+    "tabela": "clients",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "uuid_generate_v4()"
+  },
+  {
+    "tabela": "clients",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "clients",
+    "column_name": "instagram",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "clients",
+    "column_name": "logo_url",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "clients",
+    "column_name": "access_token",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "clients",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "clients",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "tabela": "clients",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "tabela": "clients",
+    "column_name": "app_id",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "clients",
+    "column_name": "instagram_account_id",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "clients",
+    "column_name": "instagram_username",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "clients",
+    "column_name": "profile_picture",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "clients",
+    "column_name": "token_expiry",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "clients",
+    "column_name": "page_id",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "clients",
+    "column_name": "page_name",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "clients",
+    "column_name": "organization_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  }
+]
+
+1.4:
+
+[
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "uuid_generate_v4()"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "client_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "caption",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "images",
+    "data_type": "jsonb",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "scheduled_date",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "immediate",
+    "data_type": "boolean",
+    "is_nullable": "YES",
+    "column_default": "false"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": "'scheduled'::text"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "posted_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "error_message",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "user_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "post_type",
+    "data_type": "character varying",
+    "is_nullable": "YES",
+    "column_default": "'post'::character varying"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "n8n_job_id",
+    "data_type": "character varying",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "instagram_post_id",
+    "data_type": "character varying",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "retry_count",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": "0"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "last_retry_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "n8n_response",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "share_to_feed",
+    "data_type": "boolean",
+    "is_nullable": "YES",
+    "column_default": "false"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "cover_image",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "video",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "organization_id",
+    "data_type": "uuid",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "scheduled_posts",
+    "column_name": "grandfathered",
+    "data_type": "boolean",
+    "is_nullable": "YES",
+    "column_default": "false"
+  }
+]
+
+
+1.5:
+
+[
+  {
+    "tabela": "subscriptions",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "tabela": "subscriptions",
+    "column_name": "organization_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "subscriptions",
+    "column_name": "plan_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "subscriptions",
+    "column_name": "stripe_subscription_id",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "subscriptions",
+    "column_name": "stripe_customer_id",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "subscriptions",
+    "column_name": "status",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": "'active'::text"
+  },
+  {
+    "tabela": "subscriptions",
+    "column_name": "current_period_start",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "now()"
+  },
+  {
+    "tabela": "subscriptions",
+    "column_name": "current_period_end",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": "(now() + '1 mon'::interval)"
+  },
+  {
+    "tabela": "subscriptions",
+    "column_name": "cancel_at_period_end",
+    "data_type": "boolean",
+    "is_nullable": "YES",
+    "column_default": "false"
+  },
+  {
+    "tabela": "subscriptions",
+    "column_name": "canceled_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "subscriptions",
+    "column_name": "trial_start",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "subscriptions",
+    "column_name": "trial_end",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "subscriptions",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "tabela": "subscriptions",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  }
+]
+
+
+1.6:
+
+
+[
+  {
+    "tabela": "subscription_plans",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "tabela": "subscription_plans",
+    "column_name": "name",
+    "data_type": "text",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "subscription_plans",
+    "column_name": "stripe_price_id",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null
+  },
+  {
+    "tabela": "subscription_plans",
+    "column_name": "amount",
+    "data_type": "integer",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "subscription_plans",
+    "column_name": "currency",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": "'brl'::text"
+  },
+  {
+    "tabela": "subscription_plans",
+    "column_name": "interval",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": "'month'::text"
+  },
+  {
+    "tabela": "subscription_plans",
+    "column_name": "max_profiles",
+    "data_type": "integer",
+    "is_nullable": "NO",
+    "column_default": "1"
+  },
+  {
+    "tabela": "subscription_plans",
+    "column_name": "max_clients",
+    "data_type": "integer",
+    "is_nullable": "NO",
+    "column_default": "1"
+  },
+  {
+    "tabela": "subscription_plans",
+    "column_name": "max_posts_per_month",
+    "data_type": "integer",
+    "is_nullable": "NO",
+    "column_default": "10"
+  },
+  {
+    "tabela": "subscription_plans",
+    "column_name": "features",
+    "data_type": "jsonb",
+    "is_nullable": "YES",
+    "column_default": "'{}'::jsonb"
+  },
+  {
+    "tabela": "subscription_plans",
+    "column_name": "active",
+    "data_type": "boolean",
+    "is_nullable": "YES",
+    "column_default": "true"
+  },
+  {
+    "tabela": "subscription_plans",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "tabela": "subscription_plans",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  }
+]
+
+
+
+1.7:
+
+[
+  {
+    "tabela": "subscription_usage",
+    "column_name": "id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": "gen_random_uuid()"
+  },
+  {
+    "tabela": "subscription_usage",
+    "column_name": "organization_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "subscription_usage",
+    "column_name": "subscription_id",
+    "data_type": "uuid",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "subscription_usage",
+    "column_name": "period_start",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "subscription_usage",
+    "column_name": "period_end",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO",
+    "column_default": null
+  },
+  {
+    "tabela": "subscription_usage",
+    "column_name": "profiles_count",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": "0"
+  },
+  {
+    "tabela": "subscription_usage",
+    "column_name": "clients_count",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": "0"
+  },
+  {
+    "tabela": "subscription_usage",
+    "column_name": "posts_count",
+    "data_type": "integer",
+    "is_nullable": "YES",
+    "column_default": "0"
+  },
+  {
+    "tabela": "subscription_usage",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  },
+  {
+    "tabela": "subscription_usage",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES",
+    "column_default": "now()"
+  }
+]
+
+
+2:
+
+[
+  {
+    "tabela_origem": "clients",
+    "coluna_origem": "organization_id",
+    "tabela_referenciada": "organizations",
+    "coluna_referenciada": "id",
+    "nome_constraint": "clients_organization_id_fkey"
+  },
+  {
+    "tabela_origem": "profiles",
+    "coluna_origem": "organization_id",
+    "tabela_referenciada": "organizations",
+    "coluna_referenciada": "id",
+    "nome_constraint": "profiles_organization_id_fkey"
+  },
+  {
+    "tabela_origem": "scheduled_posts",
+    "coluna_origem": "client_id",
+    "tabela_referenciada": "clients",
+    "coluna_referenciada": "id",
+    "nome_constraint": "scheduled_posts_client_id_fkey"
+  },
+  {
+    "tabela_origem": "scheduled_posts",
+    "coluna_origem": "organization_id",
+    "tabela_referenciada": "organizations",
+    "coluna_referenciada": "id",
+    "nome_constraint": "scheduled_posts_organization_id_fkey"
+  },
+  {
+    "tabela_origem": "subscription_usage",
+    "coluna_origem": "organization_id",
+    "tabela_referenciada": "organizations",
+    "coluna_referenciada": "id",
+    "nome_constraint": "subscription_usage_organization_id_fkey"
+  },
+  {
+    "tabela_origem": "subscription_usage",
+    "coluna_origem": "subscription_id",
+    "tabela_referenciada": "subscriptions",
+    "coluna_referenciada": "id",
+    "nome_constraint": "subscription_usage_subscription_id_fkey"
+  },
+  {
+    "tabela_origem": "subscriptions",
+    "coluna_origem": "organization_id",
+    "tabela_referenciada": "organizations",
+    "coluna_referenciada": "id",
+    "nome_constraint": "subscriptions_organization_id_fkey"
+  },
+  {
+    "tabela_origem": "subscriptions",
+    "coluna_origem": "plan_id",
+    "tabela_referenciada": "subscription_plans",
+    "coluna_referenciada": "id",
+    "nome_constraint": "subscriptions_plan_id_fkey"
+  }
+]
+
+3:
+
+[
+  {
+    "tabela": "clients",
+    "indice": "clients_pkey",
+    "definicao": "CREATE UNIQUE INDEX clients_pkey ON public.clients USING btree (id)"
+  },
+  {
+    "tabela": "clients",
+    "indice": "idx_clients_instagram",
+    "definicao": "CREATE INDEX idx_clients_instagram ON public.clients USING btree (instagram)"
+  },
+  {
+    "tabela": "clients",
+    "indice": "idx_clients_organization_id",
+    "definicao": "CREATE INDEX idx_clients_organization_id ON public.clients USING btree (organization_id)"
+  },
+  {
+    "tabela": "clients",
+    "indice": "idx_clients_user_id",
+    "definicao": "CREATE INDEX idx_clients_user_id ON public.clients USING btree (user_id)"
+  },
+  {
+    "tabela": "organizations",
+    "indice": "idx_organizations_active",
+    "definicao": "CREATE INDEX idx_organizations_active ON public.organizations USING btree (active)"
+  },
+  {
+    "tabela": "organizations",
+    "indice": "idx_organizations_email",
+    "definicao": "CREATE INDEX idx_organizations_email ON public.organizations USING btree (email)"
+  },
+  {
+    "tabela": "organizations",
+    "indice": "organizations_pkey",
+    "definicao": "CREATE UNIQUE INDEX organizations_pkey ON public.organizations USING btree (id)"
+  },
+  {
+    "tabela": "profiles",
+    "indice": "idx_profiles_created_at",
+    "definicao": "CREATE INDEX idx_profiles_created_at ON public.profiles USING btree (created_at)"
+  },
+  {
+    "tabela": "profiles",
+    "indice": "idx_profiles_email",
+    "definicao": "CREATE INDEX idx_profiles_email ON public.profiles USING btree (email)"
+  },
+  {
+    "tabela": "profiles",
+    "indice": "idx_profiles_organization_id",
+    "definicao": "CREATE INDEX idx_profiles_organization_id ON public.profiles USING btree (organization_id)"
+  },
+  {
+    "tabela": "profiles",
+    "indice": "idx_profiles_role",
+    "definicao": "CREATE INDEX idx_profiles_role ON public.profiles USING btree (role)"
+  },
+  {
+    "tabela": "profiles",
+    "indice": "profiles_pkey",
+    "definicao": "CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)"
+  },
+  {
+    "tabela": "profiles",
+    "indice": "profiles_role_idx",
+    "definicao": "CREATE INDEX profiles_role_idx ON public.profiles USING btree (role)"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "indice": "idx_scheduled_posts_client_id",
+    "definicao": "CREATE INDEX idx_scheduled_posts_client_id ON public.scheduled_posts USING btree (client_id)"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "indice": "idx_scheduled_posts_client_id_status",
+    "definicao": "CREATE INDEX idx_scheduled_posts_client_id_status ON public.scheduled_posts USING btree (client_id, status)"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "indice": "idx_scheduled_posts_grandfathered",
+    "definicao": "CREATE INDEX idx_scheduled_posts_grandfathered ON public.scheduled_posts USING btree (grandfathered, user_id)"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "indice": "idx_scheduled_posts_organization_id",
+    "definicao": "CREATE INDEX idx_scheduled_posts_organization_id ON public.scheduled_posts USING btree (organization_id)"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "indice": "idx_scheduled_posts_post_type",
+    "definicao": "CREATE INDEX idx_scheduled_posts_post_type ON public.scheduled_posts USING btree (post_type)"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "indice": "idx_scheduled_posts_scheduled_date",
+    "definicao": "CREATE INDEX idx_scheduled_posts_scheduled_date ON public.scheduled_posts USING btree (scheduled_date)"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "indice": "idx_scheduled_posts_status",
+    "definicao": "CREATE INDEX idx_scheduled_posts_status ON public.scheduled_posts USING btree (status)"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "indice": "idx_scheduled_posts_user_id",
+    "definicao": "CREATE INDEX idx_scheduled_posts_user_id ON public.scheduled_posts USING btree (user_id)"
+  },
+  {
+    "tabela": "scheduled_posts",
+    "indice": "scheduled_posts_pkey",
+    "definicao": "CREATE UNIQUE INDEX scheduled_posts_pkey ON public.scheduled_posts USING btree (id)"
+  },
+  {
+    "tabela": "subscription_plans",
+    "indice": "idx_subscription_plans_active",
+    "definicao": "CREATE INDEX idx_subscription_plans_active ON public.subscription_plans USING btree (active)"
+  },
+  {
+    "tabela": "subscription_plans",
+    "indice": "idx_subscription_plans_name",
+    "definicao": "CREATE INDEX idx_subscription_plans_name ON public.subscription_plans USING btree (name)"
+  },
+  {
+    "tabela": "subscription_plans",
+    "indice": "subscription_plans_name_key",
+    "definicao": "CREATE UNIQUE INDEX subscription_plans_name_key ON public.subscription_plans USING btree (name)"
+  },
+  {
+    "tabela": "subscription_plans",
+    "indice": "subscription_plans_pkey",
+    "definicao": "CREATE UNIQUE INDEX subscription_plans_pkey ON public.subscription_plans USING btree (id)"
+  },
+  {
+    "tabela": "subscription_plans",
+    "indice": "subscription_plans_stripe_price_id_key",
+    "definicao": "CREATE UNIQUE INDEX subscription_plans_stripe_price_id_key ON public.subscription_plans USING btree (stripe_price_id)"
+  },
+  {
+    "tabela": "subscription_usage",
+    "indice": "idx_subscription_usage_organization_id",
+    "definicao": "CREATE INDEX idx_subscription_usage_organization_id ON public.subscription_usage USING btree (organization_id)"
+  },
+  {
+    "tabela": "subscription_usage",
+    "indice": "idx_subscription_usage_period",
+    "definicao": "CREATE INDEX idx_subscription_usage_period ON public.subscription_usage USING btree (period_start, period_end)"
+  },
+  {
+    "tabela": "subscription_usage",
+    "indice": "idx_subscription_usage_subscription_id",
+    "definicao": "CREATE INDEX idx_subscription_usage_subscription_id ON public.subscription_usage USING btree (subscription_id)"
+  },
+  {
+    "tabela": "subscription_usage",
+    "indice": "subscription_usage_organization_id_period_start_key",
+    "definicao": "CREATE UNIQUE INDEX subscription_usage_organization_id_period_start_key ON public.subscription_usage USING btree (organization_id, period_start)"
+  },
+  {
+    "tabela": "subscription_usage",
+    "indice": "subscription_usage_pkey",
+    "definicao": "CREATE UNIQUE INDEX subscription_usage_pkey ON public.subscription_usage USING btree (id)"
+  },
+  {
+    "tabela": "subscriptions",
+    "indice": "idx_subscriptions_organization_id",
+    "definicao": "CREATE INDEX idx_subscriptions_organization_id ON public.subscriptions USING btree (organization_id)"
+  },
+  {
+    "tabela": "subscriptions",
+    "indice": "idx_subscriptions_status",
+    "definicao": "CREATE INDEX idx_subscriptions_status ON public.subscriptions USING btree (status)"
+  },
+  {
+    "tabela": "subscriptions",
+    "indice": "idx_subscriptions_stripe_customer_id",
+    "definicao": "CREATE INDEX idx_subscriptions_stripe_customer_id ON public.subscriptions USING btree (stripe_customer_id)"
+  },
+  {
+    "tabela": "subscriptions",
+    "indice": "idx_subscriptions_stripe_subscription_id",
+    "definicao": "CREATE INDEX idx_subscriptions_stripe_subscription_id ON public.subscriptions USING btree (stripe_subscription_id)"
+  },
+  {
+    "tabela": "subscriptions",
+    "indice": "subscriptions_pkey",
+    "definicao": "CREATE UNIQUE INDEX subscriptions_pkey ON public.subscriptions USING btree (id)"
+  },
+  {
+    "tabela": "subscriptions",
+    "indice": "subscriptions_stripe_subscription_id_key",
+    "definicao": "CREATE UNIQUE INDEX subscriptions_stripe_subscription_id_key ON public.subscriptions USING btree (stripe_subscription_id)"
+  }
+]
+
+
+4.1:
+
+[
+  {
+    "schemaname": "public",
+    "tablename": "clients",
+    "rls_habilitado": true
+  },
+  {
+    "schemaname": "public",
+    "tablename": "organizations",
+    "rls_habilitado": true
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "rls_habilitado": true
+  },
+  {
+    "schemaname": "public",
+    "tablename": "scheduled_posts",
+    "rls_habilitado": true
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscription_plans",
+    "rls_habilitado": true
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscription_usage",
+    "rls_habilitado": true
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscriptions",
+    "rls_habilitado": true
+  }
+]
+
+4.2:
+
+[
+  {
+    "schemaname": "public",
+    "tablename": "clients",
+    "nome_politica": "clients_delete_policy",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "DELETE",
+    "condicao_using": "(is_super_admin(auth.uid()) OR (auth_user_is_admin() AND (organization_id = get_user_organization_id())))",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "clients",
+    "nome_politica": "clients_insert_policy",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "INSERT",
+    "condicao_using": null,
+    "condicao_with_check": "((auth.uid() IS NOT NULL) AND (organization_id = get_user_organization_id()))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "clients",
+    "nome_politica": "clients_select_policy",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "SELECT",
+    "condicao_using": "(is_super_admin(auth.uid()) OR (auth_user_is_admin_or_moderator() AND (organization_id = get_user_organization_id())) OR (organization_id = get_user_organization_id()))",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "clients",
+    "nome_politica": "clients_update_policy",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "UPDATE",
+    "condicao_using": "(is_super_admin(auth.uid()) OR (auth_user_is_admin_or_moderator() AND (organization_id = get_user_organization_id())) OR (organization_id = get_user_organization_id()))",
+    "condicao_with_check": "(is_super_admin(auth.uid()) OR (auth_user_is_admin_or_moderator() AND (organization_id = get_user_organization_id())) OR (organization_id = get_user_organization_id()))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "organizations",
+    "nome_politica": "Admins can manage all organizations",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "ALL",
+    "condicao_using": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'super_admin'::text])))))",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "organizations",
+    "nome_politica": "Users can view their organization",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "SELECT",
+    "condicao_using": "((id IN ( SELECT profiles.organization_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'super_admin'::text]))))))",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "nome_politica": "Enable all for service role",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "ALL",
+    "condicao_using": "(auth.role() = 'service_role'::text)",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "nome_politica": "profiles_delete_admin_only",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "DELETE",
+    "condicao_using": "(auth_user_is_admin() AND (auth.uid() <> id))",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "nome_politica": "profiles_delete_service_only",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "DELETE",
+    "condicao_using": "(auth.role() = 'service_role'::text)",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "nome_politica": "profiles_insert_own_or_service",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "INSERT",
+    "condicao_using": null,
+    "condicao_with_check": "((auth.uid() = id) OR (auth.role() = 'service_role'::text))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "nome_politica": "profiles_select_all",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "SELECT",
+    "condicao_using": "((auth.uid() = id) OR auth_user_is_admin_or_moderator())",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "nome_politica": "profiles_update_own_or_admin",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "UPDATE",
+    "condicao_using": "((auth.uid() = id) OR auth_user_is_admin())",
+    "condicao_with_check": "((auth.uid() = id) OR auth_user_is_admin())"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "scheduled_posts",
+    "nome_politica": "scheduled_posts_delete_policy",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "DELETE",
+    "condicao_using": "(is_super_admin(auth.uid()) OR (auth_user_is_admin() AND (organization_id = get_user_organization_id())))",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "scheduled_posts",
+    "nome_politica": "scheduled_posts_insert_policy",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "INSERT",
+    "condicao_using": null,
+    "condicao_with_check": "((auth.uid() IS NOT NULL) AND (organization_id = get_user_organization_id()))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "scheduled_posts",
+    "nome_politica": "scheduled_posts_select_policy",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "SELECT",
+    "condicao_using": "(is_super_admin(auth.uid()) OR (auth_user_is_admin_or_moderator() AND (organization_id = get_user_organization_id())) OR (organization_id = get_user_organization_id()))",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "scheduled_posts",
+    "nome_politica": "scheduled_posts_update_policy",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "UPDATE",
+    "condicao_using": "(is_super_admin(auth.uid()) OR (auth_user_is_admin_or_moderator() AND (organization_id = get_user_organization_id())) OR (organization_id = get_user_organization_id()))",
+    "condicao_with_check": "(is_super_admin(auth.uid()) OR (auth_user_is_admin_or_moderator() AND (organization_id = get_user_organization_id())) OR (organization_id = get_user_organization_id()))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscription_plans",
+    "nome_politica": "Anyone can view active subscription plans",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "SELECT",
+    "condicao_using": "((active = true) OR (EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'super_admin'::text)))))",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscription_plans",
+    "nome_politica": "Super admins can manage all plans",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "ALL",
+    "condicao_using": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'super_admin'::text))))",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscription_usage",
+    "nome_politica": "Super admins can manage all usage",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "ALL",
+    "condicao_using": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'super_admin'::text))))",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscription_usage",
+    "nome_politica": "Users can view their organization usage",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "SELECT",
+    "condicao_using": "((organization_id IN ( SELECT profiles.organization_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'super_admin'::text]))))))",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscriptions",
+    "nome_politica": "Super admins can manage all subscriptions",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "ALL",
+    "condicao_using": "(EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'super_admin'::text))))",
+    "condicao_with_check": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "subscriptions",
+    "nome_politica": "Users can view their organization subscription",
+    "permissive": "PERMISSIVE",
+    "roles": "{public}",
+    "comando": "SELECT",
+    "condicao_using": "((organization_id IN ( SELECT profiles.organization_id\n   FROM profiles\n  WHERE (profiles.id = auth.uid()))) OR (EXISTS ( SELECT 1\n   FROM profiles\n  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::text, 'super_admin'::text]))))))",
+    "condicao_with_check": null
+  }
+]
+
+
+5.1:
+
+[
+  {
+    "nome_funcao": "can_add_profile",
+    "argumentos": "p_organization_id uuid",
+    "tipo_retorno": "boolean",
+    "tipo_seguranca": "SECURITY DEFINER",
+    "definicao_completa": "CREATE OR REPLACE FUNCTION public.can_add_profile(p_organization_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nDECLARE\r\n    v_subscription RECORD;\r\n    v_current_profiles INTEGER;\r\n    v_max_profiles INTEGER;\r\nBEGIN\r\n    -- Buscar subscription ativa\r\n    SELECT s.*, sp.max_profiles INTO v_subscription\r\n    FROM subscriptions s\r\n    JOIN subscription_plans sp ON s.plan_id = sp.id\r\n    WHERE s.organization_id = p_organization_id\r\n        AND s.status = 'active'\r\n        AND s.current_period_end > NOW()\r\n    LIMIT 1;\r\n    \r\n    -- Se não tem subscription ativa, negar\r\n    IF v_subscription IS NULL THEN\r\n        RETURN FALSE;\r\n    END IF;\r\n    \r\n    -- Contar profiles da organização\r\n    SELECT COUNT(*) INTO v_current_profiles\r\n    FROM profiles\r\n    WHERE organization_id = p_organization_id;\r\n    \r\n    -- Verificar limite\r\n    IF v_current_profiles >= v_subscription.max_profiles THEN\r\n        RETURN FALSE;\r\n    END IF;\r\n    \r\n    RETURN TRUE;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "nome_funcao": "can_create_instagram_account",
+    "argumentos": "p_organization_id uuid",
+    "tipo_retorno": "boolean",
+    "tipo_seguranca": "SECURITY DEFINER",
+    "definicao_completa": "CREATE OR REPLACE FUNCTION public.can_create_instagram_account(p_organization_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nDECLARE\r\n    v_subscription RECORD;\r\n    v_current_clients INTEGER;\r\n    v_max_clients INTEGER;\r\nBEGIN\r\n    -- Buscar subscription ativa\r\n    SELECT s.*, sp.max_clients INTO v_subscription\r\n    FROM subscriptions s\r\n    JOIN subscription_plans sp ON s.plan_id = sp.id\r\n    WHERE s.organization_id = p_organization_id\r\n        AND s.status = 'active'\r\n        AND s.current_period_end > NOW()\r\n    LIMIT 1;\r\n    \r\n    -- Se não tem subscription ativa, negar\r\n    IF v_subscription IS NULL THEN\r\n        RETURN FALSE;\r\n    END IF;\r\n    \r\n    -- Contar contas Instagram conectadas\r\n    SELECT COUNT(*) INTO v_current_clients\r\n    FROM clients\r\n    WHERE organization_id = p_organization_id;\r\n    \r\n    -- Verificar limite\r\n    IF v_current_clients >= v_subscription.max_clients THEN\r\n        RETURN FALSE;\r\n    END IF;\r\n    \r\n    RETURN TRUE;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "nome_funcao": "can_schedule_post",
+    "argumentos": "p_organization_id uuid, p_post_type text DEFAULT 'post'::text",
+    "tipo_retorno": "boolean",
+    "tipo_seguranca": "SECURITY DEFINER",
+    "definicao_completa": "CREATE OR REPLACE FUNCTION public.can_schedule_post(p_organization_id uuid, p_post_type text DEFAULT 'post'::text)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\nAS $function$\r\nDECLARE\r\n    v_subscription RECORD;\r\n    v_posts_this_month INTEGER;\r\n    v_max_posts INTEGER;\r\nBEGIN\r\n    -- Buscar subscription ativa\r\n    SELECT s.*, sp.max_posts_per_month INTO v_subscription\r\n    FROM subscriptions s\r\n    JOIN subscription_plans sp ON s.plan_id = sp.id\r\n    WHERE s.organization_id = p_organization_id\r\n        AND s.status = 'active'\r\n        AND s.current_period_end > NOW()\r\n    LIMIT 1;\r\n    \r\n    -- Se não tem subscription, negar (exceto grandfathered)\r\n    IF v_subscription IS NULL THEN\r\n        RETURN FALSE;\r\n    END IF;\r\n    \r\n    -- Contar posts do mês (EXCLUINDO grandfathered)\r\n    SELECT COUNT(*) INTO v_posts_this_month\r\n    FROM scheduled_posts\r\n    WHERE organization_id = p_organization_id\r\n        AND scheduled_date >= date_trunc('month', NOW())\r\n        AND scheduled_date < date_trunc('month', NOW()) + INTERVAL '1 month'\r\n        AND grandfathered = false;\r\n    \r\n    -- Verificar limite\r\n    IF v_posts_this_month >= v_subscription.max_posts_per_month THEN\r\n        RETURN FALSE;\r\n    END IF;\r\n    \r\n    RETURN TRUE;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "nome_funcao": "get_user_organization_id",
+    "argumentos": "",
+    "tipo_retorno": "uuid",
+    "tipo_seguranca": "SECURITY DEFINER",
+    "definicao_completa": "CREATE OR REPLACE FUNCTION public.get_user_organization_id()\n RETURNS uuid\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\nDECLARE\r\n    v_organization_id UUID;\r\nBEGIN\r\n    SELECT organization_id INTO v_organization_id\r\n    FROM profiles\r\n    WHERE id = auth.uid()\r\n    LIMIT 1;\r\n    \r\n    RETURN v_organization_id;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "nome_funcao": "process_scheduled_posts_by_time",
+    "argumentos": "",
+    "tipo_retorno": "TABLE(processed_count integer, message text)",
+    "tipo_seguranca": "SECURITY DEFINER",
+    "definicao_completa": "CREATE OR REPLACE FUNCTION public.process_scheduled_posts_by_time()\n RETURNS TABLE(processed_count integer, message text)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\nDECLARE\r\n  post_record RECORD;\r\n  proc_count INTEGER := 0;\r\n  webhook_payload JSONB;\r\n  current_brasilia TIMESTAMPTZ;\r\n  webhook_result BIGINT;\r\n  error_count INTEGER := 0;\r\nBEGIN\r\n  current_brasilia := NOW() AT TIME ZONE 'America/Sao_Paulo';\r\n  \r\n  -- ✅ VALIDAÇÃO ADICIONAL: Garantir que estamos processando posts do passado/presente\r\n  FOR post_record IN \r\n    SELECT \r\n      sp.*,\r\n      c.instagram_account_id,\r\n      c.access_token,\r\n      c.instagram,\r\n      c.name as client_name,\r\n      sp.scheduled_date AT TIME ZONE 'America/Sao_Paulo' as scheduled_brasilia\r\n    FROM scheduled_posts sp\r\n    JOIN clients c ON sp.client_id = c.id\r\n    WHERE sp.status = 'pending' \r\n      -- ✅ CORREÇÃO: Verificar PRIMEIRO se o horário já passou\r\n      AND sp.scheduled_date <= NOW()  -- Deve ser menor ou igual a AGORA\r\n      -- ✅ CORREÇÃO: Verificar que não está muito no passado (máximo 24h atrás)\r\n      AND sp.scheduled_date > NOW() - INTERVAL '24 hours'\r\n      -- ✅ CORREÇÃO: Verificar que não está no futuro (garantia dupla)\r\n      AND sp.scheduled_date < NOW() + INTERVAL '1 minute'  -- Não pode estar no futuro\r\n      AND sp.immediate = false\r\n      -- ✅ ADICIONADO: Verificar que tem dados do cliente\r\n      AND c.access_token IS NOT NULL\r\n      AND c.instagram_account_id IS NOT NULL\r\n    ORDER BY sp.scheduled_date ASC\r\n    LIMIT 10\r\n  LOOP\r\n    BEGIN\r\n      -- ✅ VALIDAÇÃO TRIPLA: Garantir que ainda é pendente e o horário passou\r\n      IF post_record.scheduled_date > NOW() THEN\r\n        RAISE NOTICE '⚠️ Post % agendado para o futuro, pulando (scheduled: %, now: %)', \r\n          post_record.id, post_record.scheduled_date, NOW();\r\n        CONTINUE;  -- Pular posts futuros\r\n      END IF;\r\n      \r\n      -- Atualizar status ANTES do webhook (com verificação adicional)\r\n      UPDATE scheduled_posts \r\n      SET \r\n        status = 'sent_to_n8n',\r\n        n8n_job_id = 'cron_' || extract(epoch from NOW())::bigint,\r\n        last_retry_at = NOW()\r\n      WHERE id = post_record.id\r\n        AND status = 'pending'  -- ✅ Apenas se ainda estiver pendente\r\n        AND scheduled_date <= NOW();  -- ✅ Verificação adicional\r\n      \r\n      IF FOUND THEN\r\n        -- ✅ PAYLOAD COMPLETO\r\n        webhook_payload := jsonb_build_object(\r\n          'type', 'TIME_TRIGGER',\r\n          'table', 'scheduled_posts',\r\n          'record', jsonb_build_object(\r\n            'id', post_record.id,\r\n            'client_id', post_record.client_id,\r\n            'caption', post_record.caption,\r\n            'video', post_record.video,\r\n            'cover_image', post_record.cover_image,\r\n            'images', post_record.images,\r\n            'scheduled_date', post_record.scheduled_date,\r\n            'scheduled_date_brasilia', post_record.scheduled_brasilia::text,\r\n            'post_type', post_record.post_type,\r\n            'postType', post_record.post_type,  -- ✅ ADICIONADO: Compatibilidade com N8N\r\n            'status', 'sent_to_n8n',\r\n            'share_to_feed', post_record.share_to_feed,\r\n            'immediate', post_record.immediate,\r\n            'organization_id', post_record.organization_id,\r\n            'client_data', jsonb_build_object(\r\n              'instagram_account_id', post_record.instagram_account_id,\r\n              'access_token', post_record.access_token,\r\n              'instagram', post_record.instagram,\r\n              'name', post_record.client_name\r\n            )\r\n          ),\r\n          'triggered_by', 'pg_cron_time_based',\r\n          'triggered_at', NOW(),\r\n          'triggered_at_brasilia', current_brasilia::text,\r\n          'source', 'time_based_trigger'\r\n        );\r\n        \r\n        -- ✅ ENVIAR WEBHOOK COM TRATAMENTO DE ERRO MELHORADO\r\n        BEGIN\r\n          SELECT net.http_post(\r\n            url := 'https://ia-n8n.a8fvaf.easypanel.host/webhook/aupe-agendador',\r\n            body := webhook_payload,\r\n            headers := '{\"Content-Type\": \"application/json\"}'::jsonb,\r\n            timeout_milliseconds := 15000  -- ✅ Aumentado para 15 segundos\r\n          ) INTO webhook_result;\r\n          \r\n          RAISE NOTICE '✅ Post % processado e webhook enviado (request_id: %)', \r\n            post_record.id, webhook_result;\r\n          \r\n          proc_count := proc_count + 1;\r\n          \r\n        EXCEPTION WHEN OTHERS THEN\r\n          RAISE WARNING '❌ Erro ao enviar webhook para post %: %', post_record.id, SQLERRM;\r\n          \r\n          -- Reverter status para pending se webhook falhou\r\n          UPDATE scheduled_posts \r\n          SET \r\n            status = 'pending',\r\n            error_message = 'Erro webhook: ' || SQLERRM,\r\n            retry_count = COALESCE(retry_count, 0) + 1,\r\n            last_retry_at = NOW()\r\n          WHERE id = post_record.id;\r\n          \r\n          error_count := error_count + 1;\r\n        END;\r\n      ELSE\r\n        RAISE NOTICE '⚠️ Post % não foi atualizado (pode ter sido processado por outro processo)', post_record.id;\r\n      END IF;\r\n      \r\n    EXCEPTION WHEN OTHERS THEN\r\n      RAISE WARNING '❌ Erro ao processar post %: %', post_record.id, SQLERRM;\r\n      \r\n      UPDATE scheduled_posts \r\n      SET \r\n        status = 'failed',\r\n        error_message = 'Erro cron: ' || SQLERRM,\r\n        retry_count = COALESCE(retry_count, 0) + 1,\r\n        last_retry_at = NOW()\r\n      WHERE id = post_record.id;\r\n      \r\n      error_count := error_count + 1;\r\n    END;\r\n  END LOOP;\r\n  \r\n  -- ✅ RETORNAR ESTATÍSTICAS\r\n  IF error_count > 0 THEN\r\n    RETURN QUERY SELECT proc_count, \r\n      ('Processados ' || proc_count || ' posts, ' || error_count || ' erros')::TEXT;\r\n  ELSE\r\n    RETURN QUERY SELECT proc_count, ('Processados ' || proc_count || ' posts')::TEXT;\r\n  END IF;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "nome_funcao": "update_subscription_usage",
+    "argumentos": "",
+    "tipo_retorno": "trigger",
+    "tipo_seguranca": "SECURITY DEFINER",
+    "definicao_completa": "CREATE OR REPLACE FUNCTION public.update_subscription_usage()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\nDECLARE\r\n    v_organization_id UUID;\r\n    v_subscription_id UUID;\r\nBEGIN\r\n    -- Determinar organization_id baseado na tabela\r\n    IF TG_TABLE_NAME = 'profiles' THEN\r\n        v_organization_id := COALESCE(NEW.organization_id, OLD.organization_id);\r\n    ELSIF TG_TABLE_NAME = 'clients' THEN\r\n        v_organization_id := COALESCE(NEW.organization_id, OLD.organization_id);\r\n    ELSIF TG_TABLE_NAME = 'scheduled_posts' THEN\r\n        v_organization_id := COALESCE(NEW.organization_id, OLD.organization_id);\r\n    END IF;\r\n    \r\n    IF v_organization_id IS NULL THEN\r\n        RETURN COALESCE(NEW, OLD);\r\n    END IF;\r\n    \r\n    -- Buscar subscription ativa\r\n    SELECT id INTO v_subscription_id\r\n    FROM subscriptions\r\n    WHERE organization_id = v_organization_id\r\n        AND status = 'active'\r\n        AND current_period_end > NOW()\r\n    LIMIT 1;\r\n    \r\n    IF v_subscription_id IS NULL THEN\r\n        RETURN COALESCE(NEW, OLD);\r\n    END IF;\r\n    \r\n    -- Atualizar ou criar registro de uso\r\n    INSERT INTO subscription_usage (\r\n        organization_id,\r\n        subscription_id,\r\n        period_start,\r\n        period_end,\r\n        profiles_count,\r\n        clients_count,\r\n        posts_count\r\n    )\r\n    SELECT \r\n        v_organization_id,\r\n        v_subscription_id,\r\n        date_trunc('month', NOW()),\r\n        date_trunc('month', NOW()) + INTERVAL '1 month',\r\n        (SELECT COUNT(*) FROM profiles WHERE organization_id = v_organization_id),\r\n        (SELECT COUNT(*) FROM clients WHERE organization_id = v_organization_id),\r\n        (SELECT COUNT(*) FROM scheduled_posts \r\n         WHERE organization_id = v_organization_id \r\n         AND scheduled_date >= date_trunc('month', NOW())\r\n         AND scheduled_date < date_trunc('month', NOW()) + INTERVAL '1 month'\r\n         AND grandfathered = false)\r\n    ON CONFLICT (organization_id, period_start) DO UPDATE SET\r\n        profiles_count = EXCLUDED.profiles_count,\r\n        clients_count = EXCLUDED.clients_count,\r\n        posts_count = EXCLUDED.posts_count,\r\n        updated_at = NOW();\r\n    \r\n    RETURN COALESCE(NEW, OLD);\r\nEND;\r\n$function$\n"
+  }
+]
+
+5.2:
+
+[
+  {
+    "nome_funcao": "admin_create_profile",
+    "argumentos": "user_id uuid, user_email text, user_full_name text DEFAULT ''::text, user_role text DEFAULT 'user'::text",
+    "tipo_retorno": "boolean",
+    "tipo_seguranca": "SECURITY DEFINER"
+  },
+  {
+    "nome_funcao": "can_add_profile",
+    "argumentos": "p_organization_id uuid",
+    "tipo_retorno": "boolean",
+    "tipo_seguranca": "SECURITY DEFINER"
+  },
+  {
+    "nome_funcao": "can_schedule_post",
+    "argumentos": "p_organization_id uuid, p_post_type text DEFAULT 'post'::text",
+    "tipo_retorno": "boolean",
+    "tipo_seguranca": "SECURITY DEFINER"
+  },
+  {
+    "nome_funcao": "check_profile_limit",
+    "argumentos": "",
+    "tipo_retorno": "trigger",
+    "tipo_seguranca": "SECURITY INVOKER"
+  },
+  {
+    "nome_funcao": "check_scheduled_post_limits",
+    "argumentos": "",
+    "tipo_retorno": "trigger",
+    "tipo_seguranca": "SECURITY INVOKER"
+  },
+  {
+    "nome_funcao": "create_organization_and_profile_on_signup",
+    "argumentos": "p_user_id uuid, p_user_email text, p_user_full_name text, p_org_name text, p_org_email text, p_org_phone text DEFAULT NULL::text, p_org_document text DEFAULT NULL::text, p_org_country text DEFAULT 'BR'::text",
+    "tipo_retorno": "uuid",
+    "tipo_seguranca": "SECURITY DEFINER"
+  },
+  {
+    "nome_funcao": "create_organization_on_signup",
+    "argumentos": "p_name text, p_email text, p_phone text DEFAULT NULL::text, p_document text DEFAULT NULL::text, p_country text DEFAULT 'BR'::text",
+    "tipo_retorno": "uuid",
+    "tipo_seguranca": "SECURITY DEFINER"
+  },
+  {
+    "nome_funcao": "create_user_profile",
+    "argumentos": "user_id uuid, user_email text, user_full_name text DEFAULT NULL::text, user_role text DEFAULT 'user'::text",
+    "tipo_retorno": "boolean",
+    "tipo_seguranca": "SECURITY DEFINER"
+  },
+  {
+    "nome_funcao": "create_user_profile_manual",
+    "argumentos": "user_id uuid, user_email text, user_full_name text DEFAULT ''::text, user_role text DEFAULT 'user'::text",
+    "tipo_retorno": "boolean",
+    "tipo_seguranca": "SECURITY DEFINER"
+  },
+  {
+    "nome_funcao": "get_client_by_id",
+    "argumentos": "client_id_param uuid",
+    "tipo_retorno": "SETOF clients",
+    "tipo_seguranca": "SECURITY DEFINER"
+  },
+  {
+    "nome_funcao": "get_user_organization_id",
+    "argumentos": "",
+    "tipo_retorno": "uuid",
+    "tipo_seguranca": "SECURITY DEFINER"
+  },
+  {
+    "nome_funcao": "handle_scheduled_post_webhook",
+    "argumentos": "",
+    "tipo_retorno": "trigger",
+    "tipo_seguranca": "SECURITY INVOKER"
+  },
+  {
+    "nome_funcao": "process_scheduled_posts",
+    "argumentos": "",
+    "tipo_retorno": "void",
+    "tipo_seguranca": "SECURITY INVOKER"
+  },
+  {
+    "nome_funcao": "process_scheduled_posts_by_time",
+    "argumentos": "",
+    "tipo_retorno": "TABLE(processed_count integer, message text)",
+    "tipo_seguranca": "SECURITY DEFINER"
+  },
+  {
+    "nome_funcao": "trigger_scheduled_posts",
+    "argumentos": "",
+    "tipo_retorno": "void",
+    "tipo_seguranca": "SECURITY DEFINER"
+  },
+  {
+    "nome_funcao": "update_subscription_usage",
+    "argumentos": "",
+    "tipo_retorno": "trigger",
+    "tipo_seguranca": "SECURITY DEFINER"
+  }
+]
+
+
+6:
+[
+  {
+    "nome_trigger": "check_instagram_account_limit_trigger",
+    "tabela": "clients",
+    "funcao_trigger": "check_instagram_account_limit",
+    "status": "ENABLED",
+    "timing": "BEFORE",
+    "evento": "INSERT"
+  },
+  {
+    "nome_trigger": "update_clients_updated_at",
+    "tabela": "clients",
+    "funcao_trigger": "update_updated_at_column",
+    "status": "ENABLED",
+    "timing": "BEFORE",
+    "evento": "UPDATE"
+  },
+  {
+    "nome_trigger": "update_subscription_usage_clients",
+    "tabela": "clients",
+    "funcao_trigger": "update_subscription_usage",
+    "status": "ENABLED",
+    "timing": "AFTER",
+    "evento": "INSERT"
+  },
+  {
+    "nome_trigger": "update_organizations_updated_at",
+    "tabela": "organizations",
+    "funcao_trigger": "update_updated_at_column",
+    "status": "ENABLED",
+    "timing": "BEFORE",
+    "evento": "UPDATE"
+  },
+  {
+    "nome_trigger": "check_profile_limit_trigger",
+    "tabela": "profiles",
+    "funcao_trigger": "check_profile_limit",
+    "status": "ENABLED",
+    "timing": "BEFORE",
+    "evento": "INSERT"
+  },
+  {
+    "nome_trigger": "update_profiles_updated_at",
+    "tabela": "profiles",
+    "funcao_trigger": "update_updated_at_column",
+    "status": "ENABLED",
+    "timing": "BEFORE",
+    "evento": "UPDATE"
+  },
+  {
+    "nome_trigger": "update_subscription_usage_profiles",
+    "tabela": "profiles",
+    "funcao_trigger": "update_subscription_usage",
+    "status": "ENABLED",
+    "timing": "AFTER",
+    "evento": "INSERT"
+  },
+  {
+    "nome_trigger": "check_scheduled_post_limits_trigger",
+    "tabela": "scheduled_posts",
+    "funcao_trigger": "check_scheduled_post_limits",
+    "status": "ENABLED",
+    "timing": "BEFORE",
+    "evento": "INSERT"
+  },
+  {
+    "nome_trigger": "intelligent_scheduled_post_webhook",
+    "tabela": "scheduled_posts",
+    "funcao_trigger": "handle_scheduled_post_webhook",
+    "status": "ENABLED",
+    "timing": "AFTER",
+    "evento": "INSERT"
+  },
+  {
+    "nome_trigger": "update_subscription_usage_posts",
+    "tabela": "scheduled_posts",
+    "funcao_trigger": "update_subscription_usage",
+    "status": "ENABLED",
+    "timing": "AFTER",
+    "evento": "INSERT"
+  },
+  {
+    "nome_trigger": "update_subscription_plans_updated_at",
+    "tabela": "subscription_plans",
+    "funcao_trigger": "update_updated_at_column",
+    "status": "ENABLED",
+    "timing": "BEFORE",
+    "evento": "UPDATE"
+  },
+  {
+    "nome_trigger": "update_subscription_usage_updated_at",
+    "tabela": "subscription_usage",
+    "funcao_trigger": "update_updated_at_column",
+    "status": "ENABLED",
+    "timing": "BEFORE",
+    "evento": "UPDATE"
+  },
+  {
+    "nome_trigger": "update_subscriptions_updated_at",
+    "tabela": "subscriptions",
+    "funcao_trigger": "update_updated_at_column",
+    "status": "ENABLED",
+    "timing": "BEFORE",
+    "evento": "UPDATE"
+  }
+]
+
+
+6.2:
+
+[
+  {
+    "nome_funcao_trigger": "check_instagram_account_limit",
+    "argumentos": "",
+    "tipo_seguranca": "SECURITY INVOKER",
+    "definicao_completa": "CREATE OR REPLACE FUNCTION public.check_instagram_account_limit()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n    -- ✅ SEMPRE permitir atualizações\r\n    IF TG_OP = 'UPDATE' THEN\r\n        RETURN NEW;\r\n    END IF;\r\n    \r\n    -- ✅ Verificar limite apenas em INSERT\r\n    IF TG_OP = 'INSERT' THEN\r\n        -- Se não tem organization_id, buscar do profile\r\n        IF NEW.organization_id IS NULL AND NEW.user_id IS NOT NULL THEN\r\n            SELECT organization_id INTO NEW.organization_id\r\n            FROM profiles\r\n            WHERE id = NEW.user_id\r\n            LIMIT 1;\r\n        END IF;\r\n        \r\n        IF NEW.organization_id IS NOT NULL THEN\r\n            IF NOT can_create_instagram_account(NEW.organization_id) THEN\r\n                RAISE EXCEPTION 'Limite de contas Instagram do plano atingido. Faça upgrade para conectar mais contas.';\r\n            END IF;\r\n        END IF;\r\n    END IF;\r\n    \r\n    RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "nome_funcao_trigger": "check_profile_limit",
+    "argumentos": "",
+    "tipo_seguranca": "SECURITY INVOKER",
+    "definicao_completa": "CREATE OR REPLACE FUNCTION public.check_profile_limit()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n    -- ✅ SEMPRE permitir atualizações\r\n    IF TG_OP = 'UPDATE' THEN\r\n        RETURN NEW;\r\n    END IF;\r\n    \r\n    -- ✅ Verificar limite apenas em INSERT\r\n    IF TG_OP = 'INSERT' THEN\r\n        IF NEW.organization_id IS NOT NULL THEN\r\n            IF NOT can_add_profile(NEW.organization_id) THEN\r\n                RAISE EXCEPTION 'Limite de pessoas com acesso do plano atingido. Faça upgrade para adicionar mais pessoas.';\r\n            END IF;\r\n        END IF;\r\n    END IF;\r\n    \r\n    RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "nome_funcao_trigger": "check_scheduled_post_limits",
+    "argumentos": "",
+    "tipo_seguranca": "SECURITY INVOKER",
+    "definicao_completa": "CREATE OR REPLACE FUNCTION public.check_scheduled_post_limits()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nDECLARE\r\n    v_organization_id UUID;\r\nBEGIN\r\n    -- ✅ SEMPRE permitir posts grandfathered\r\n    IF NEW.grandfathered = true THEN\r\n        RETURN NEW;\r\n    END IF;\r\n    \r\n    -- ✅ SEMPRE permitir atualizações de posts existentes\r\n    IF TG_OP = 'UPDATE' THEN\r\n        RETURN NEW;\r\n    END IF;\r\n    \r\n    -- ✅ Buscar organization_id do client\r\n    IF NEW.organization_id IS NULL THEN\r\n        SELECT organization_id INTO v_organization_id\r\n        FROM clients\r\n        WHERE id = NEW.client_id;\r\n        \r\n        IF v_organization_id IS NOT NULL THEN\r\n            NEW.organization_id = v_organization_id;\r\n        END IF;\r\n    END IF;\r\n    \r\n    -- ✅ Apenas verificar limites em NOVOS posts (não grandfathered)\r\n    IF TG_OP = 'INSERT' AND NEW.grandfathered = false THEN\r\n        IF NEW.organization_id IS NOT NULL THEN\r\n            IF NOT can_schedule_post(NEW.organization_id, NEW.post_type) THEN\r\n                RAISE EXCEPTION 'Limite de posts do plano atingido. Faça upgrade para agendar mais posts.';\r\n            END IF;\r\n        END IF;\r\n    END IF;\r\n    \r\n    RETURN NEW;\r\nEND;\r\n$function$\n"
+  },
+  {
+    "nome_funcao_trigger": "handle_scheduled_post_webhook",
+    "argumentos": "",
+    "tipo_seguranca": "SECURITY INVOKER",
+    "definicao_completa": "CREATE OR REPLACE FUNCTION public.handle_scheduled_post_webhook()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nDECLARE\r\n    webhook_payload JSONB;\r\n    client_data RECORD;\r\nBEGIN\r\n    -- Buscar dados do cliente\r\n    SELECT \r\n        instagram_account_id,\r\n        access_token,\r\n        instagram,\r\n        name\r\n    INTO client_data\r\n    FROM clients \r\n    WHERE id = COALESCE(NEW.client_id, OLD.client_id);\r\n\r\n    -- Preparar payload baseado no tipo de operação\r\n    IF TG_OP = 'INSERT' THEN\r\n        -- Só enviar webhook se for post imediato\r\n        IF NEW.immediate = true THEN\r\n            webhook_payload := jsonb_build_object(\r\n                'type', 'INSERT',\r\n                'table', 'scheduled_posts',\r\n                'record', row_to_json(NEW)::jsonb || jsonb_build_object(\r\n                    'client_data', jsonb_build_object(\r\n                        'instagram_account_id', client_data.instagram_account_id,\r\n                        'access_token', client_data.access_token,\r\n                        'instagram', client_data.instagram,\r\n                        'name', client_data.name\r\n                    )\r\n                ),\r\n                'old_record', null,\r\n                'triggered_by', 'insert_trigger',\r\n                'triggered_at', NOW()\r\n            );\r\n            \r\n            -- Enviar webhook\r\n            PERFORM net.http_post(\r\n                url := 'https://ia-n8n.a8fvaf.easypanel.host/webhook/aupe-agendador',\r\n                body := webhook_payload,\r\n                headers := '{\"Content-Type\": \"application/json\"}'::jsonb,\r\n                timeout_milliseconds := 10000\r\n            );\r\n        END IF;\r\n        RETURN NEW;\r\n        \r\n    ELSIF TG_OP = 'UPDATE' THEN\r\n        -- Só enviar webhook se mudou para status que precisa processar\r\n        IF OLD.status != NEW.status AND NEW.status IN ('sent_to_n8n', 'posted', 'failed') THEN\r\n            webhook_payload := jsonb_build_object(\r\n                'type', 'UPDATE',\r\n                'table', 'scheduled_posts',\r\n                'record', row_to_json(NEW)::jsonb || jsonb_build_object(\r\n                    'client_data', jsonb_build_object(\r\n                        'instagram_account_id', client_data.instagram_account_id,\r\n                        'access_token', client_data.access_token,\r\n                        'instagram', client_data.instagram,\r\n                        'name', client_data.name\r\n                    )\r\n                ),\r\n                'old_record', row_to_json(OLD)::jsonb,\r\n                'triggered_by', 'update_trigger',\r\n                'triggered_at', NOW()\r\n            );\r\n            \r\n            -- Enviar webhook apenas para mudanças de status importantes\r\n            PERFORM net.http_post(\r\n                url := 'https://ia-n8n.a8fvaf.easypanel.host/webhook/aupe-agendador',\r\n                body := webhook_payload,\r\n                headers := '{\"Content-Type\": \"application/json\"}'::jsonb,\r\n                timeout_milliseconds := 10000\r\n            );\r\n        END IF;\r\n        RETURN NEW;\r\n        \r\n    ELSIF TG_OP = 'DELETE' THEN\r\n        webhook_payload := jsonb_build_object(\r\n            'type', 'DELETE',\r\n            'table', 'scheduled_posts',\r\n            'record', null,\r\n            'old_record', row_to_json(OLD)::jsonb,\r\n            'triggered_by', 'delete_trigger',\r\n            'triggered_at', NOW()\r\n        );\r\n        \r\n        PERFORM net.http_post(\r\n            url := 'https://ia-n8n.a8fvaf.easypanel.host/webhook/aupe-agendador',\r\n            body := webhook_payload,\r\n            headers := '{\"Content-Type\": \"application/json\"}'::jsonb,\r\n            timeout_milliseconds := 10000\r\n        );\r\n        RETURN OLD;\r\n    END IF;\r\n    \r\n    RETURN COALESCE(NEW, OLD);\r\nEND;\r\n$function$\n"
+  },
+  {
+    "nome_funcao_trigger": "update_subscription_usage",
+    "argumentos": "",
+    "tipo_seguranca": "SECURITY DEFINER",
+    "definicao_completa": "CREATE OR REPLACE FUNCTION public.update_subscription_usage()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\nDECLARE\r\n    v_organization_id UUID;\r\n    v_subscription_id UUID;\r\nBEGIN\r\n    -- Determinar organization_id baseado na tabela\r\n    IF TG_TABLE_NAME = 'profiles' THEN\r\n        v_organization_id := COALESCE(NEW.organization_id, OLD.organization_id);\r\n    ELSIF TG_TABLE_NAME = 'clients' THEN\r\n        v_organization_id := COALESCE(NEW.organization_id, OLD.organization_id);\r\n    ELSIF TG_TABLE_NAME = 'scheduled_posts' THEN\r\n        v_organization_id := COALESCE(NEW.organization_id, OLD.organization_id);\r\n    END IF;\r\n    \r\n    IF v_organization_id IS NULL THEN\r\n        RETURN COALESCE(NEW, OLD);\r\n    END IF;\r\n    \r\n    -- Buscar subscription ativa\r\n    SELECT id INTO v_subscription_id\r\n    FROM subscriptions\r\n    WHERE organization_id = v_organization_id\r\n        AND status = 'active'\r\n        AND current_period_end > NOW()\r\n    LIMIT 1;\r\n    \r\n    IF v_subscription_id IS NULL THEN\r\n        RETURN COALESCE(NEW, OLD);\r\n    END IF;\r\n    \r\n    -- Atualizar ou criar registro de uso\r\n    INSERT INTO subscription_usage (\r\n        organization_id,\r\n        subscription_id,\r\n        period_start,\r\n        period_end,\r\n        profiles_count,\r\n        clients_count,\r\n        posts_count\r\n    )\r\n    SELECT \r\n        v_organization_id,\r\n        v_subscription_id,\r\n        date_trunc('month', NOW()),\r\n        date_trunc('month', NOW()) + INTERVAL '1 month',\r\n        (SELECT COUNT(*) FROM profiles WHERE organization_id = v_organization_id),\r\n        (SELECT COUNT(*) FROM clients WHERE organization_id = v_organization_id),\r\n        (SELECT COUNT(*) FROM scheduled_posts \r\n         WHERE organization_id = v_organization_id \r\n         AND scheduled_date >= date_trunc('month', NOW())\r\n         AND scheduled_date < date_trunc('month', NOW()) + INTERVAL '1 month'\r\n         AND grandfathered = false)\r\n    ON CONFLICT (organization_id, period_start) DO UPDATE SET\r\n        profiles_count = EXCLUDED.profiles_count,\r\n        clients_count = EXCLUDED.clients_count,\r\n        posts_count = EXCLUDED.posts_count,\r\n        updated_at = NOW();\r\n    \r\n    RETURN COALESCE(NEW, OLD);\r\nEND;\r\n$function$\n"
+  },
+  {
+    "nome_funcao_trigger": "update_updated_at_column",
+    "argumentos": "",
+    "tipo_seguranca": "SECURITY INVOKER",
+    "definicao_completa": "CREATE OR REPLACE FUNCTION public.update_updated_at_column()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\r\nBEGIN\r\n    NEW.updated_at = NOW();\r\n    RETURN NEW;\r\nEND;\r\n$function$\n"
+  }
+]
+
+
+7.1:
+
+[
+  {
+    "extensao": "pg_cron",
+    "versao": "1.6.4"
+  }
+]
+
+
+7.2:
+
+[
+  {
+    "jobid": 2,
+    "schedule": "* * * * *",
+    "command": "SELECT process_scheduled_posts_by_time();",
+    "nodename": "localhost",
+    "nodeport": 5432,
+    "database": "postgres",
+    "username": "postgres",
+    "active": true,
+    "jobname": "instagram-posts-scheduler"
+  }
+]
+
+8.1:
+
+[
+  {
+    "tabela": "organizations",
+    "total_registros": 4
+  },
+  {
+    "tabela": "profiles",
+    "total_registros": 7
+  },
+  {
+    "tabela": "clients",
+    "total_registros": 14
+  },
+  {
+    "tabela": "scheduled_posts",
+    "total_registros": 156
+  },
+  {
+    "tabela": "subscriptions",
+    "total_registros": 3
+  },
+  {
+    "tabela": "subscription_plans",
+    "total_registros": 4
+  },
+  {
+    "tabela": "subscription_usage",
+    "total_registros": 2
+  }
+]
+
+8.2:
+
+[
+  {
+    "profiles_sem_organization_id": 7,
+    "total_null": 0
+  }
+]
+
+8.3:
+
+[
+  {
+    "clients_sem_organization_id": 14,
+    "total_null": 0
+  }
+]
+
+8.4:
+
+[
+  {
+    "posts_sem_organization_id": 156,
+    "total_null": 0
+  }
+]
+
+9.1:
+
+[
+  {
+    "role": "admin",
+    "quantidade": 2
+  },
+  {
+    "role": "moderator",
+    "quantidade": 4
+  },
+  {
+    "role": "super_admin",
+    "quantidade": 1
+  }
+]
+
+9.2:
+
+[
+  {
+    "organization_id": "fc5dd358-1e41-4491-921a-47ad35329dc0",
+    "quantidade_profiles": 5
+  },
+  {
+    "organization_id": "26d7c42d-05e3-483b-b273-0de832007d09",
+    "quantidade_profiles": 1
+  },
+  {
+    "organization_id": "b6397ba0-d67e-42b5-92ca-618b5abe958d",
+    "quantidade_profiles": 1
+  }
+]
+
+10.1:
+
+[
+  {
+    "tablename": "clients",
+    "policyname": "clients_delete_policy",
+    "condicao_using": "(is_super_admin(auth.uid()) OR (auth_user_is_admin() AND (organization_id = get_user_organization_id())))",
+    "condicao_with_check": null
+  },
+  {
+    "tablename": "clients",
+    "policyname": "clients_insert_policy",
+    "condicao_using": null,
+    "condicao_with_check": "((auth.uid() IS NOT NULL) AND (organization_id = get_user_organization_id()))"
+  },
+  {
+    "tablename": "clients",
+    "policyname": "clients_select_policy",
+    "condicao_using": "(is_super_admin(auth.uid()) OR (auth_user_is_admin_or_moderator() AND (organization_id = get_user_organization_id())) OR (organization_id = get_user_organization_id()))",
+    "condicao_with_check": null
+  },
+  {
+    "tablename": "clients",
+    "policyname": "clients_update_policy",
+    "condicao_using": "(is_super_admin(auth.uid()) OR (auth_user_is_admin_or_moderator() AND (organization_id = get_user_organization_id())) OR (organization_id = get_user_organization_id()))",
+    "condicao_with_check": "(is_super_admin(auth.uid()) OR (auth_user_is_admin_or_moderator() AND (organization_id = get_user_organization_id())) OR (organization_id = get_user_organization_id()))"
+  },
+  {
+    "tablename": "profiles",
+    "policyname": "profiles_delete_admin_only",
+    "condicao_using": "(auth_user_is_admin() AND (auth.uid() <> id))",
+    "condicao_with_check": null
+  },
+  {
+    "tablename": "profiles",
+    "policyname": "profiles_insert_own_or_service",
+    "condicao_using": null,
+    "condicao_with_check": "((auth.uid() = id) OR (auth.role() = 'service_role'::text))"
+  },
+  {
+    "tablename": "profiles",
+    "policyname": "profiles_select_all",
+    "condicao_using": "((auth.uid() = id) OR auth_user_is_admin_or_moderator())",
+    "condicao_with_check": null
+  },
+  {
+    "tablename": "profiles",
+    "policyname": "profiles_update_own_or_admin",
+    "condicao_using": "((auth.uid() = id) OR auth_user_is_admin())",
+    "condicao_with_check": "((auth.uid() = id) OR auth_user_is_admin())"
+  },
+  {
+    "tablename": "scheduled_posts",
+    "policyname": "scheduled_posts_delete_policy",
+    "condicao_using": "(is_super_admin(auth.uid()) OR (auth_user_is_admin() AND (organization_id = get_user_organization_id())))",
+    "condicao_with_check": null
+  },
+  {
+    "tablename": "scheduled_posts",
+    "policyname": "scheduled_posts_insert_policy",
+    "condicao_using": null,
+    "condicao_with_check": "((auth.uid() IS NOT NULL) AND (organization_id = get_user_organization_id()))"
+  },
+  {
+    "tablename": "scheduled_posts",
+    "policyname": "scheduled_posts_select_policy",
+    "condicao_using": "(is_super_admin(auth.uid()) OR (auth_user_is_admin_or_moderator() AND (organization_id = get_user_organization_id())) OR (organization_id = get_user_organization_id()))",
+    "condicao_with_check": null
+  },
+  {
+    "tablename": "scheduled_posts",
+    "policyname": "scheduled_posts_update_policy",
+    "condicao_using": "(is_super_admin(auth.uid()) OR (auth_user_is_admin_or_moderator() AND (organization_id = get_user_organization_id())) OR (organization_id = get_user_organization_id()))",
+    "condicao_with_check": "(is_super_admin(auth.uid()) OR (auth_user_is_admin_or_moderator() AND (organization_id = get_user_organization_id())) OR (organization_id = get_user_organization_id()))"
+  }
+]
+
+10.2:
+
+[
+  {
+    "tablename": "clients",
+    "policyname": "clients_insert_policy",
+    "comando": "INSERT",
+    "condicao_using": null
+  },
+  {
+    "tablename": "profiles",
+    "policyname": "Enable all for service role",
+    "comando": "ALL",
+    "condicao_using": "(auth.role() = 'service_role'::text)"
+  },
+  {
+    "tablename": "profiles",
+    "policyname": "profiles_delete_admin_only",
+    "comando": "DELETE",
+    "condicao_using": "(auth_user_is_admin() AND (auth.uid() <> id))"
+  },
+  {
+    "tablename": "profiles",
+    "policyname": "profiles_delete_service_only",
+    "comando": "DELETE",
+    "condicao_using": "(auth.role() = 'service_role'::text)"
+  },
+  {
+    "tablename": "profiles",
+    "policyname": "profiles_insert_own_or_service",
+    "comando": "INSERT",
+    "condicao_using": null
+  },
+  {
+    "tablename": "profiles",
+    "policyname": "profiles_select_all",
+    "comando": "SELECT",
+    "condicao_using": "((auth.uid() = id) OR auth_user_is_admin_or_moderator())"
+  },
+  {
+    "tablename": "profiles",
+    "policyname": "profiles_update_own_or_admin",
+    "comando": "UPDATE",
+    "condicao_using": "((auth.uid() = id) OR auth_user_is_admin())"
+  },
+  {
+    "tablename": "scheduled_posts",
+    "policyname": "scheduled_posts_insert_policy",
+    "comando": "INSERT",
+    "condicao_using": null
+  }
+]
+
+11.1:
+
+[
+  {
+    "nome_funcao": "process_scheduled_posts_by_time",
+    "tipo_seguranca": "SECURITY DEFINER",
+    "definicao_completa": "CREATE OR REPLACE FUNCTION public.process_scheduled_posts_by_time()\n RETURNS TABLE(processed_count integer, message text)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\nDECLARE\r\n  post_record RECORD;\r\n  proc_count INTEGER := 0;\r\n  webhook_payload JSONB;\r\n  current_brasilia TIMESTAMPTZ;\r\n  webhook_result BIGINT;\r\n  error_count INTEGER := 0;\r\nBEGIN\r\n  current_brasilia := NOW() AT TIME ZONE 'America/Sao_Paulo';\r\n  \r\n  -- ✅ VALIDAÇÃO ADICIONAL: Garantir que estamos processando posts do passado/presente\r\n  FOR post_record IN \r\n    SELECT \r\n      sp.*,\r\n      c.instagram_account_id,\r\n      c.access_token,\r\n      c.instagram,\r\n      c.name as client_name,\r\n      sp.scheduled_date AT TIME ZONE 'America/Sao_Paulo' as scheduled_brasilia\r\n    FROM scheduled_posts sp\r\n    JOIN clients c ON sp.client_id = c.id\r\n    WHERE sp.status = 'pending' \r\n      -- ✅ CORREÇÃO: Verificar PRIMEIRO se o horário já passou\r\n      AND sp.scheduled_date <= NOW()  -- Deve ser menor ou igual a AGORA\r\n      -- ✅ CORREÇÃO: Verificar que não está muito no passado (máximo 24h atrás)\r\n      AND sp.scheduled_date > NOW() - INTERVAL '24 hours'\r\n      -- ✅ CORREÇÃO: Verificar que não está no futuro (garantia dupla)\r\n      AND sp.scheduled_date < NOW() + INTERVAL '1 minute'  -- Não pode estar no futuro\r\n      AND sp.immediate = false\r\n      -- ✅ ADICIONADO: Verificar que tem dados do cliente\r\n      AND c.access_token IS NOT NULL\r\n      AND c.instagram_account_id IS NOT NULL\r\n    ORDER BY sp.scheduled_date ASC\r\n    LIMIT 10\r\n  LOOP\r\n    BEGIN\r\n      -- ✅ VALIDAÇÃO TRIPLA: Garantir que ainda é pendente e o horário passou\r\n      IF post_record.scheduled_date > NOW() THEN\r\n        RAISE NOTICE '⚠️ Post % agendado para o futuro, pulando (scheduled: %, now: %)', \r\n          post_record.id, post_record.scheduled_date, NOW();\r\n        CONTINUE;  -- Pular posts futuros\r\n      END IF;\r\n      \r\n      -- Atualizar status ANTES do webhook (com verificação adicional)\r\n      UPDATE scheduled_posts \r\n      SET \r\n        status = 'sent_to_n8n',\r\n        n8n_job_id = 'cron_' || extract(epoch from NOW())::bigint,\r\n        last_retry_at = NOW()\r\n      WHERE id = post_record.id\r\n        AND status = 'pending'  -- ✅ Apenas se ainda estiver pendente\r\n        AND scheduled_date <= NOW();  -- ✅ Verificação adicional\r\n      \r\n      IF FOUND THEN\r\n        -- ✅ PAYLOAD COMPLETO\r\n        webhook_payload := jsonb_build_object(\r\n          'type', 'TIME_TRIGGER',\r\n          'table', 'scheduled_posts',\r\n          'record', jsonb_build_object(\r\n            'id', post_record.id,\r\n            'client_id', post_record.client_id,\r\n            'caption', post_record.caption,\r\n            'video', post_record.video,\r\n            'cover_image', post_record.cover_image,\r\n            'images', post_record.images,\r\n            'scheduled_date', post_record.scheduled_date,\r\n            'scheduled_date_brasilia', post_record.scheduled_brasilia::text,\r\n            'post_type', post_record.post_type,\r\n            'postType', post_record.post_type,  -- ✅ ADICIONADO: Compatibilidade com N8N\r\n            'status', 'sent_to_n8n',\r\n            'share_to_feed', post_record.share_to_feed,\r\n            'immediate', post_record.immediate,\r\n            'organization_id', post_record.organization_id,\r\n            'client_data', jsonb_build_object(\r\n              'instagram_account_id', post_record.instagram_account_id,\r\n              'access_token', post_record.access_token,\r\n              'instagram', post_record.instagram,\r\n              'name', post_record.client_name\r\n            )\r\n          ),\r\n          'triggered_by', 'pg_cron_time_based',\r\n          'triggered_at', NOW(),\r\n          'triggered_at_brasilia', current_brasilia::text,\r\n          'source', 'time_based_trigger'\r\n        );\r\n        \r\n        -- ✅ ENVIAR WEBHOOK COM TRATAMENTO DE ERRO MELHORADO\r\n        BEGIN\r\n          SELECT net.http_post(\r\n            url := 'https://ia-n8n.a8fvaf.easypanel.host/webhook/aupe-agendador',\r\n            body := webhook_payload,\r\n            headers := '{\"Content-Type\": \"application/json\"}'::jsonb,\r\n            timeout_milliseconds := 15000  -- ✅ Aumentado para 15 segundos\r\n          ) INTO webhook_result;\r\n          \r\n          RAISE NOTICE '✅ Post % processado e webhook enviado (request_id: %)', \r\n            post_record.id, webhook_result;\r\n          \r\n          proc_count := proc_count + 1;\r\n          \r\n        EXCEPTION WHEN OTHERS THEN\r\n          RAISE WARNING '❌ Erro ao enviar webhook para post %: %', post_record.id, SQLERRM;\r\n          \r\n          -- Reverter status para pending se webhook falhou\r\n          UPDATE scheduled_posts \r\n          SET \r\n            status = 'pending',\r\n            error_message = 'Erro webhook: ' || SQLERRM,\r\n            retry_count = COALESCE(retry_count, 0) + 1,\r\n            last_retry_at = NOW()\r\n          WHERE id = post_record.id;\r\n          \r\n          error_count := error_count + 1;\r\n        END;\r\n      ELSE\r\n        RAISE NOTICE '⚠️ Post % não foi atualizado (pode ter sido processado por outro processo)', post_record.id;\r\n      END IF;\r\n      \r\n    EXCEPTION WHEN OTHERS THEN\r\n      RAISE WARNING '❌ Erro ao processar post %: %', post_record.id, SQLERRM;\r\n      \r\n      UPDATE scheduled_posts \r\n      SET \r\n        status = 'failed',\r\n        error_message = 'Erro cron: ' || SQLERRM,\r\n        retry_count = COALESCE(retry_count, 0) + 1,\r\n        last_retry_at = NOW()\r\n      WHERE id = post_record.id;\r\n      \r\n      error_count := error_count + 1;\r\n    END;\r\n  END LOOP;\r\n  \r\n  -- ✅ RETORNAR ESTATÍSTICAS\r\n  IF error_count > 0 THEN\r\n    RETURN QUERY SELECT proc_count, \r\n      ('Processados ' || proc_count || ' posts, ' || error_count || ' erros')::TEXT;\r\n  ELSE\r\n    RETURN QUERY SELECT proc_count, ('Processados ' || proc_count || ' posts')::TEXT;\r\n  END IF;\r\nEND;\r\n$function$\n"
+  }
+]
+
+12.1:
+
+[
+  {
+    "nome_trigger": "intelligent_scheduled_post_webhook",
+    "tabela": "scheduled_posts",
+    "funcao_trigger": "handle_scheduled_post_webhook"
+  }
+]
+
+13.1:
+
+[
+  {
+    "tabela": "profiles",
+    "tem_organization_id": true
+  },
+  {
+    "tabela": "clients",
+    "tem_organization_id": true
+  },
+  {
+    "tabela": "scheduled_posts",
+    "tem_organization_id": true
+  }
+]
+
+13.2:
+
+[
+  {
+    "tablename": "clients",
+    "rls_habilitado": true
+  },
+  {
+    "tablename": "profiles",
+    "rls_habilitado": true
+  },
+  {
+    "tablename": "scheduled_posts",
+    "rls_habilitado": true
+  }
+]
+
+
+
+
+
+
+
+
+
+

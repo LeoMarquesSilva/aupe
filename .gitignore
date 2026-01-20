@@ -22,3 +22,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Contexto do banco de dados (não commitar)
+CONTEXTO_ESTRUTURA_BANCO.json
+CONTEXTO_BANCO_DADOS.json
+VERIFICAR_ESTRUTURA_RLS.sql

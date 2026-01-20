@@ -39,7 +39,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } else {
           setSession(session);
           setUser(session?.user ?? null);
-          console.log('Sessão inicial:', session?.user?.email || 'Não logado');
         }
       } catch (error) {
         console.error('Erro ao verificar autenticação:', error);
@@ -53,18 +52,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Escutar mudanças na autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
-        
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
-
-        // Log adicional para debug
-        if (event === 'SIGNED_IN') {
-          console.log('✅ Usuário logado:', session?.user?.email);
-        } else if (event === 'SIGNED_OUT') {
-          console.log('👋 Usuário deslogado');
-        }
       }
     );
 

@@ -174,16 +174,33 @@ export const userProfileService = {
 
 // Serviços para gerenciar clientes
 export const clientService = {
-  // Buscar todos os clientes (AGORA TODOS OS USUÁRIOS VEEM TODOS OS CLIENTES)
+  // Buscar clientes da organização do usuário logado
   async getClients(): Promise<Client[]> {
     try {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
 
+      // Obter organization_id do perfil do usuário
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile) {
+        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        throw new Error('Perfil do usuário não encontrado');
+      }
+
+      if (!profile.organization_id) {
+        console.warn('⚠️ Usuário não possui organization_id');
+        return []; // Retornar array vazio se não tiver organização
+      }
+
       const { data, error } = await supabase
         .from('clients')
         .select('*')
-        // ✅ REMOVIDO: .eq('user_id', user.id) - AGORA TODOS VEEM TODOS
+        .eq('organization_id', profile.organization_id) // ✅ FILTRAR POR ORGANIZAÇÃO
         .order('name');
       
       if (error) {
@@ -230,11 +247,23 @@ export const clientService = {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
 
+      // Obter organization_id do perfil do usuário
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile?.organization_id) {
+        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        return null;
+      }
+
       const { data, error } = await supabase
         .from('clients')
         .select('*')
         .eq('id', clientId)
-        // ✅ TODOS PODEM VER TODOS OS CLIENTES (sem filtro por user_id)
+        .eq('organization_id', profile.organization_id) // ✅ FILTRAR POR ORGANIZAÇÃO
         .single();
       
       if (error) {
@@ -277,6 +306,18 @@ export const clientService = {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
 
+      // Obter organization_id do perfil do usuário
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile?.organization_id) {
+        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        throw new Error('Organização não encontrada. Entre em contato com o suporte.');
+      }
+
       // Remover campos vazios para evitar problemas de validação
       const filteredClient = Object.fromEntries(
         Object.entries(client).filter(([_, value]) => value !== '')
@@ -287,6 +328,9 @@ export const clientService = {
       
       // Converter camelCase para snake_case com mapeamento específico
       const clientData = convertToDbFormat(filteredClient);
+      
+      // Garantir que organization_id está presente
+      clientData.organization_id = profile.organization_id;
       
       console.log('Tentando adicionar cliente com dados:', clientData);
       
@@ -332,6 +376,21 @@ export const clientService = {
     // ✅ NOVA FUNÇÃO: Atualizar apenas foto de perfil (SEM restrição de user_id)
   async updateClientProfilePicture(clientId: string, profilePicture: string, username?: string): Promise<void> {
     try {
+      const user = await getCurrentUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      // Obter organization_id do perfil do usuário
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile?.organization_id) {
+        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        throw new Error('Organização não encontrada. Entre em contato com o suporte.');
+      }
+
       console.log(`🔄 Atualizando foto de perfil do cliente ${clientId}`);
       
       const updateData: any = {
@@ -347,8 +406,8 @@ export const clientService = {
       const { error } = await supabase
         .from('clients')
         .update(updateData)
-        .eq('id', clientId);
-        // ✅ SEM .eq('user_id', user.id) - permite atualizar qualquer cliente
+        .eq('id', clientId)
+        .eq('organization_id', profile.organization_id); // ✅ FILTRAR POR ORGANIZAÇÃO
       
       if (error) {
         console.error('❌ Erro ao atualizar foto de perfil:', error);
@@ -389,11 +448,23 @@ export const clientService = {
       
       console.log('Atualizando cliente com dados (SEM campos do Instagram):', clientData);
       
+      // Obter organization_id do perfil do usuário
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile?.organization_id) {
+        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        throw new Error('Organização não encontrada. Entre em contato com o suporte.');
+      }
+
       const { data, error } = await supabase
         .from('clients')
         .update(clientData)
         .eq('id', client.id)
-        .eq('user_id', user.id) // ✅ MANTER PROTEÇÃO PARA UPDATES - só o dono pode editar
+        .eq('organization_id', profile.organization_id) // ✅ FILTRAR POR ORGANIZAÇÃO
         .select()
         .single();
       
@@ -432,11 +503,23 @@ export const clientService = {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
 
+      // Obter organization_id do perfil do usuário
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile?.organization_id) {
+        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        throw new Error('Organização não encontrada. Entre em contato com o suporte.');
+      }
+
       const { error } = await supabase
         .from('clients')
         .delete()
         .eq('id', clientId)
-        .eq('user_id', user.id); // ✅ MANTER PROTEÇÃO PARA DELETES - só o dono pode excluir
+        .eq('organization_id', profile.organization_id); // ✅ FILTRAR POR ORGANIZAÇÃO
       
       if (error) {
         console.error('Erro ao excluir cliente:', error);
@@ -680,17 +763,51 @@ export const postService = {
     }
   },
 
-  // Buscar posts agendados por cliente (AGORA TODOS VEEM TODOS)
+  // Buscar posts agendados por cliente da organização do usuário
   async getScheduledPostsByClient(clientId: string): Promise<any[]> {
     try {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
 
+      // Obter organization_id do perfil do usuário
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile) {
+        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        return [];
+      }
+
+      if (!profile.organization_id) {
+        console.warn('⚠️ Usuário não possui organization_id');
+        return [];
+      }
+
+      // Verificar se o client pertence à organização do usuário
+      const { data: client, error: clientError } = await supabase
+        .from('clients')
+        .select('organization_id')
+        .eq('id', clientId)
+        .single();
+
+      if (clientError || !client) {
+        console.error('❌ Cliente não encontrado:', clientError);
+        return [];
+      }
+
+      if (client.organization_id !== profile.organization_id) {
+        console.warn('⚠️ Cliente não pertence à organização do usuário');
+        return [];
+      }
+
       const { data, error } = await supabase
         .from('scheduled_posts')
         .select('*')
         .eq('client_id', clientId)
-        // ✅ REMOVIDO: .eq('user_id', user.id) - AGORA TODOS VEEM TODOS
+        .eq('organization_id', profile.organization_id) // ✅ FILTRAR POR ORGANIZAÇÃO
         .order('scheduled_date', { ascending: true });
       
       if (error) {
@@ -706,11 +823,28 @@ export const postService = {
     }
   },
   
-  // Buscar todos os posts agendados (AGORA TODOS VEEM TODOS)
+  // Buscar todos os posts agendados da organização do usuário
   async getAllScheduledPosts(): Promise<any[]> {
     try {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
+
+      // Obter organization_id do perfil do usuário
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile) {
+        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        return [];
+      }
+
+      if (!profile.organization_id) {
+        console.warn('⚠️ Usuário não possui organization_id');
+        return [];
+      }
 
       const { data, error } = await supabase
         .from('scheduled_posts')
@@ -718,7 +852,7 @@ export const postService = {
           *,
           clients (*)
         `)
-        // ✅ REMOVIDO: .eq('user_id', user.id) - AGORA TODOS VEEM TODOS
+        .eq('organization_id', profile.organization_id) // ✅ FILTRAR POR ORGANIZAÇÃO
         .order('scheduled_date', { ascending: true });
       
       if (error) {
@@ -780,16 +914,31 @@ export const postService = {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
 
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('scheduled_posts')
         .delete()
         .eq('id', postId)
-        // ✅ REMOVIDO: .eq('user_id', user.id) - AGORA TODOS PODEM EXCLUIR (consistente com leitura)
+        .select();
       
       if (error) {
-        console.error('Erro ao excluir post agendado:', error);
-        throw new Error('Não foi possível excluir o post agendado');
+        console.error('❌ Erro detalhado ao excluir post agendado:', error);
+        // Mensagem de erro mais detalhada
+        if (error.code === '42501') {
+          throw new Error('Você não tem permissão para excluir este post. Apenas administradores e moderadores podem excluir posts da sua organização.');
+        } else if (error.code === 'PGRST116') {
+          throw new Error('Post não encontrado ou já foi excluído.');
+        } else {
+          throw new Error(`Não foi possível excluir o post: ${error.message}`);
+        }
       }
+      
+      // Verificar se algum registro foi deletado
+      if (!data || data.length === 0) {
+        console.warn('⚠️ Nenhum post foi deletado. Pode não existir ou você não tem permissão.');
+        throw new Error('Post não encontrado ou você não tem permissão para excluí-lo.');
+      }
+      
+      console.log('✅ Post excluído com sucesso:', postId);
     } catch (error) {
       console.error('Erro ao excluir post agendado:', error);
       throw error;
@@ -974,11 +1123,28 @@ export const postService = {
     }
   },
 
-  // Método para buscar posts com relacionamento de cliente (AGORA TODOS VEEM TODOS)
+  // Método para buscar posts com relacionamento de cliente da organização do usuário
   async getScheduledPostsWithClient(): Promise<ScheduledPost[]> {
     try {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
+
+      // Obter organization_id do perfil do usuário
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile) {
+        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        return [];
+      }
+
+      if (!profile.organization_id) {
+        console.warn('⚠️ Usuário não possui organization_id');
+        return [];
+      }
 
       const { data, error } = await supabase
         .from('scheduled_posts')
@@ -986,7 +1152,7 @@ export const postService = {
           *,
           clients (*)
         `)
-        // ✅ REMOVIDO: .eq('user_id', user.id) - AGORA TODOS VEEM TODOS
+        .eq('organization_id', profile.organization_id) // ✅ FILTRAR POR ORGANIZAÇÃO
         .order('scheduled_date', { ascending: true });
 
       if (error) {

@@ -7,6 +7,7 @@ export interface UserProfile {
   email: string;
   full_name: string | null;
   role: UserRole;
+  organization_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -96,26 +97,51 @@ class RoleService {
   }
 
   /**
-   * Listar todos os usuários com seus roles
+   * Listar todos os usuários com seus roles (da organização do usuário)
    */
   async getAllUsersWithRoles(): Promise<UserProfile[]> {
     try {
-      // Tentar profiles primeiro
-      let { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
 
-      // Se profiles não existir, tentar user_profiles
-      if (error && error.message.includes('does not exist')) {
-        const result = await supabase
-          .from('user_profiles')
+      // Obter organization_id do perfil do usuário atual
+      const { data: currentProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id, role')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !currentProfile) {
+        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        return [];
+      }
+
+      // Se for super_admin, pode ver todos os profiles
+      if (currentProfile.role === 'super_admin') {
+        const { data: profiles, error } = await supabase
+          .from('profiles')
           .select('*')
           .order('created_at', { ascending: false });
-        
-        profiles = result.data;
-        error = result.error;
+
+        if (error) {
+          console.error('❌ Erro ao buscar usuários:', error);
+          return [];
+        }
+
+        return profiles || [];
       }
+
+      // Caso contrário, filtrar por organization_id
+      if (!currentProfile.organization_id) {
+        console.warn('⚠️ Usuário não possui organization_id');
+        return [];
+      }
+
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('organization_id', currentProfile.organization_id) // ✅ FILTRAR POR ORGANIZAÇÃO
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Erro ao buscar usuários:', error);

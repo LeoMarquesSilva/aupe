@@ -48,7 +48,14 @@ const Login: React.FC = () => {
   // Redirecionar se já estiver logado
   React.useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      // Verificar se há redirecionamento salvo
+      const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+      if (redirectAfterLogin) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        navigate(redirectAfterLogin);
+      } else {
+        navigate('/dashboard');
+      }
     }
   }, [user, navigate]);
 
@@ -83,7 +90,15 @@ const Login: React.FC = () => {
       if (error) throw error;
 
       console.log('Login realizado com sucesso:', data.user?.email);
-      navigate('/dashboard');
+      
+      // Verificar se há redirecionamento salvo (ex: checkout com planId)
+      const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
+      if (redirectAfterLogin) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        navigate(redirectAfterLogin);
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       console.error('Erro na autenticação:', err);
       
@@ -445,6 +460,33 @@ const Login: React.FC = () => {
                 >
                   Esqueceu sua senha?
                 </Button>
+              </Box>
+
+              <Box sx={{ textAlign: 'center', mt: 2 }}>
+                <Typography variant="body2" sx={{ color: BRAND_COLORS.greenBlack, mb: 1 }}>
+                  Não tem uma conta?{' '}
+                  <Button
+                    variant="text"
+                    onClick={() => {
+                      const planId = sessionStorage.getItem('redirectAfterLogin')?.split('plan=')[1];
+                      if (planId) {
+                        navigate(`/signup?plan=${planId}`);
+                      } else {
+                        navigate('/signup');
+                      }
+                    }}
+                    sx={{ 
+                      textTransform: 'none',
+                      color: BRAND_COLORS.primary,
+                      fontWeight: 600,
+                      '&:hover': {
+                        background: alpha(BRAND_COLORS.primary, 0.1)
+                      }
+                    }}
+                  >
+                    Criar Conta
+                  </Button>
+                </Typography>
               </Box>
             </Box>
           </Paper>

@@ -99,6 +99,35 @@ class SubscriptionService {
   }
 
   async createOrganization(org: Partial<Organization>): Promise<Organization> {
+    // Tentar criar via RPC primeiro (para signup sem autenticação completa)
+    try {
+      const { data: orgId, error: rpcError } = await supabase.rpc('create_organization_on_signup', {
+        p_name: org.name,
+        p_email: org.email || null,
+        p_phone: org.phone || null,
+        p_document: org.document || null,
+        p_country: org.country || 'BR',
+      });
+
+      if (!rpcError && orgId) {
+        // Buscar organização criada
+        const { data, error: fetchError } = await supabase
+          .from('organizations')
+          .select('*')
+          .eq('id', orgId)
+          .single();
+
+        if (fetchError) {
+          throw fetchError;
+        }
+
+        return data;
+      }
+    } catch (rpcErr) {
+      console.log('⚠️ RPC não disponível ou falhou, tentando método direto:', rpcErr);
+    }
+
+    // Fallback: método direto (requer autenticação)
     const { data, error } = await supabase
       .from('organizations')
       .insert([org])

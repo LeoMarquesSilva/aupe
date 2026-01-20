@@ -19,14 +19,10 @@ class UrlRefreshService {
     this.refreshInterval = setInterval(() => {
       this.checkAndRefreshExpired();
     }, this.CHECK_INTERVAL);
-    
-    console.log('🕐 Sistema de refresh automático iniciado (verificação a cada 4h)');
   }
 
   // ✅ Verificação e refresh aprimorados
   private async checkAndRefreshExpired() {
-    console.log('🔍 Verificando URLs expiradas...');
-    
     const now = Date.now();
     const expiredClients: string[] = [];
     
@@ -43,8 +39,6 @@ class UrlRefreshService {
     });
     
     if (expiredClients.length > 0) {
-      console.log(`🔄 Fazendo refresh de ${expiredClients.length} URLs expiradas...`);
-      
       // Fazer refresh de todos os perfis
       const result = await instagramService.refreshAllClientProfiles();
       
@@ -57,9 +51,7 @@ class UrlRefreshService {
         }
       });
       
-      console.log(`✅ Refresh automático concluído: ${result.success} sucessos, ${result.failed} falhas`);
-    } else {
-      console.log('✅ Nenhuma URL expirada encontrada');
+      // Refresh automático concluído silenciosamente
     }
   }
 

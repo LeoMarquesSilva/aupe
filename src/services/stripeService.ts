@@ -4,7 +4,9 @@
 import { loadStripe } from '@stripe/stripe-js';
 import { supabase } from './supabaseClient';
 
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || '');
+// Carregar Stripe apenas se a chave estiver configurada
+const stripeKey = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY || '';
+const stripePromise = stripeKey ? loadStripe(stripeKey) : Promise.resolve(null);
 
 export const getStripe = () => stripePromise;
 
@@ -60,6 +62,9 @@ export class StripeService {
    */
   async redirectToCheckout(sessionId: string): Promise<void> {
     try {
+      if (!stripePromise) {
+        throw new Error('Stripe não inicializado. Verifique REACT_APP_STRIPE_PUBLISHABLE_KEY');
+      }
       const stripe = await stripePromise;
       if (!stripe) throw new Error('Stripe não inicializado. Verifique REACT_APP_STRIPE_PUBLISHABLE_KEY');
 

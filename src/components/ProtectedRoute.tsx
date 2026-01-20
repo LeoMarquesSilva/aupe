@@ -44,7 +44,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     const now = Date.now();
     
     if (cached && (now - cached.timestamp) < CACHE_DURATION) {
-      console.log('✅ Role obtida do cache:', cached.role);
       setUserRole(cached.role);
       return;
     }
@@ -58,7 +57,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       // Atualizar cache
       roleCache.set(userId, { role: currentUserRole, timestamp: now });
       
-      console.log('✅ Role obtida do servidor:', currentUserRole);
       setUserRole(currentUserRole);
     } catch (error) {
       console.error('❌ Erro ao verificar role do usuário:', error);

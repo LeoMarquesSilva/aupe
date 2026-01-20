@@ -14,6 +14,7 @@ import Header from './components/Header';
 
 // Pages - Public
 import Login from './pages/Login';
+import Signup from './pages/Signup';
 import ResetPassword from './pages/ResetPassword';
 import EmailConfirmation from './pages/EmailConfirmation'; // ✅ Nova importação
 import Landing from './pages/Landing';
@@ -136,6 +137,10 @@ const router = createBrowserRouter([
   {
     path: "/login",
     element: <PublicLayout><Login /></PublicLayout>,
+  },
+  {
+    path: "/signup",
+    element: <PublicLayout><Signup /></PublicLayout>,
   },
   {
     path: "/reset-password",

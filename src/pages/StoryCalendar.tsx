@@ -112,29 +112,12 @@ const StoryCalendar: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      console.log('🔄 Carregando dados do calendário...');
-      
       // Carregar dados em paralelo
       const [postsData, clientsData, profileData] = await Promise.all([
         postService.getScheduledPostsWithClient(),
         clientService.getClients(),
         userProfileService.getCurrentUserProfile()
       ]);
-      
-      console.log('📊 Dados carregados:', {
-        content: postsData?.length || 0,
-        clients: clientsData?.length || 0,
-        profile: !!profileData
-      });
-      
-      // Log detalhado dos dados para debug
-      if (postsData && postsData.length > 0) {
-        console.log('📝 Primeiro item de conteúdo:', postsData[0]);
-      }
-      
-      if (clientsData && clientsData.length > 0) {
-        console.log('👥 Primeiro cliente:', clientsData[0]);
-      }
       
       setContent(postsData || []);
       setClients(clientsData || []);
@@ -602,21 +585,28 @@ const StoryCalendar: React.FC = () => {
   };
 
   const handleDeleteConfirm = () => {
+    // NÃO limpar selectedContent aqui - precisamos dele no modal!
+    setMenuAnchorEl(null); // Apenas fechar o menu
     setDeleteConfirmOpen(true);
-    handleMenuClose();
   };
 
   const handleDelete = async () => {
-    if (selectedContent) {
-      try {
-        await postService.deleteScheduledPost(selectedContent.id);
-        await loadData(); // Recarregar dados
-        setDeleteConfirmOpen(false);
-        setSelectedContent(null);
-      } catch (error) {
-        console.error('Erro ao excluir conteúdo:', error);
-        setError('Erro ao excluir conteúdo');
-      }
+    if (!selectedContent) {
+      setError('Erro: Nenhum conteúdo selecionado para exclusão.');
+      return;
+    }
+    
+    try {
+      await postService.deleteScheduledPost(selectedContent.id);
+      await loadData(); // Recarregar dados
+      setDeleteConfirmOpen(false);
+      setSelectedContent(null);
+      setError(null); // Limpar erros anteriores
+    } catch (error: any) {
+      console.error('❌ Erro ao excluir conteúdo:', error);
+      // Mostrar mensagem de erro detalhada
+      const errorMessage = error?.message || 'Erro ao excluir conteúdo. Verifique se você tem permissão para excluir este post.';
+      setError(errorMessage);
     }
   };
 
@@ -1437,7 +1427,10 @@ const StoryCalendar: React.FC = () => {
       {/* Diálogo de confirmação de exclusão */}
       <Dialog 
         open={deleteConfirmOpen} 
-        onClose={() => setDeleteConfirmOpen(false)}
+        onClose={() => {
+          setDeleteConfirmOpen(false);
+          setSelectedContent(null); // Limpar apenas quando fechar o modal
+        }}
         maxWidth="sm"
         PaperProps={{
           sx: { borderRadius: 2 }
@@ -1448,10 +1441,15 @@ const StoryCalendar: React.FC = () => {
           Confirmar Exclusão
         </DialogTitle>
         <DialogContent>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
           <Typography>
             Tem certeza que deseja excluir este conteúdo? Esta ação não pode ser desfeita.
           </Typography>
-          {selectedContent && (
+          {selectedContent ? (
             <Box sx={{ mt: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
               <Typography variant="body2" color="text.secondary">
                 <strong>Cliente:</strong> {getClientById(selectedContent.clientId)?.name || 'Cliente não encontrado'}
@@ -1462,11 +1460,21 @@ const StoryCalendar: React.FC = () => {
               <Typography variant="body2" color="text.secondary">
                 <strong>Data:</strong> {safeFormatDate(selectedContent.scheduledDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
               </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontFamily: 'monospace', fontSize: '0.7rem' }}>
+                <strong>ID:</strong> {selectedContent.id}
+              </Typography>
             </Box>
+          ) : (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              ⚠️ Nenhum conteúdo selecionado!
+            </Alert>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>
+          <Button onClick={() => {
+            setDeleteConfirmOpen(false);
+            setSelectedContent(null); // Limpar quando cancelar
+          }}>
             Cancelar
           </Button>
           <Button 
@@ -1474,6 +1482,7 @@ const StoryCalendar: React.FC = () => {
             color="error" 
             onClick={handleDelete}
             startIcon={<DeleteIcon />}
+            disabled={!selectedContent}
           >
             Excluir
           </Button>

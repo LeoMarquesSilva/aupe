@@ -24,6 +24,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  CircularProgress,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import {
@@ -49,6 +50,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import CountUp from 'react-countup';
+import { subscriptionService, SubscriptionPlan } from '../services/subscriptionService';
+import { supabase } from '../services/supabaseClient';
 
 // Cores da identidade INSYT com gradientes tech
 const INSYT_COLORS = {
@@ -104,16 +107,121 @@ const Landing: React.FC = () => {
   const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
   const { scrollY } = useScroll();
   const opacity = useTransform(scrollY, [0, 300], [1, 0.3]);
   const scale = useTransform(scrollY, [0, 300], [1, 0.95]);
+
+  // Buscar planos reais do banco
+  useEffect(() => {
+    const loadPlans = async () => {
+      try {
+        const dbPlans = await subscriptionService.getAllPlans();
+        
+        // Mapear planos do banco para formato da UI
+        const mappedPlans = dbPlans
+          .filter(plan => plan.active && plan.stripe_price_id) // Apenas planos ativos com Stripe configurado
+          .map((plan, index) => {
+            // Formatar preço (amount está em centavos)
+            const priceInReais = (plan.amount / 100).toFixed(2);
+            const priceFormatted = `R$ ${priceInReais.replace('.', ',')}`;
+            
+            // Gerar features baseado nos limites do plano
+            const features = [
+              `Até ${plan.max_clients} contas Instagram`,
+              `${plan.max_posts_per_month.toLocaleString('pt-BR')} posts agendados/mês`,
+              `Até ${plan.max_profiles} pessoas com acesso`,
+              'Analytics avançados',
+              'Suporte por email',
+              'Agendamento de posts e stories',
+            ];
+
+            // Adicionar features extras do JSON se existirem
+            if (plan.features && typeof plan.features === 'object') {
+              if (plan.features.analytics) features.push('Analytics em tempo real');
+              if (plan.features.api_access) features.push('API access');
+              if (plan.features.support === 'priority') features.push('Suporte prioritário');
+            }
+
+            return {
+              id: plan.id,
+              name: plan.name.charAt(0).toUpperCase() + plan.name.slice(1), // Capitalizar primeira letra
+              price: priceFormatted,
+              period: '/mês',
+              description: plan.name === 'starter' ? 'Perfeito para começar' :
+                          plan.name === 'professional' ? 'Para profissionais e agências' :
+                          plan.name === 'business' ? 'Para empresas em crescimento' : 'Plano completo',
+              features,
+              popular: plan.name === 'professional', // Professional é o mais popular
+              gradient: plan.name === 'starter' 
+                ? 'linear-gradient(135deg, #2563EB 0%, #3B82F6 100%)'
+                : plan.name === 'professional'
+                ? INSYT_COLORS.gradientPrimary
+                : 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)',
+            };
+          })
+          .sort((a, b) => {
+            // Ordenar: Starter, Professional, Business
+            const order: { [key: string]: number } = { 'Starter': 1, 'Professional': 2, 'Business': 3 };
+            return (order[a.name] || 99) - (order[b.name] || 99);
+          });
+
+        setPlans(mappedPlans);
+      } catch (error) {
+        console.error('❌ Erro ao carregar planos:', error);
+        // Fallback para planos padrão em caso de erro
+        setPlans([
+          {
+            id: 'fallback-starter',
+            name: 'Starter',
+            price: 'R$ 87,90',
+            period: '/mês',
+            description: 'Perfeito para começar',
+            features: ['Até 3 contas Instagram', '900 posts agendados/mês', 'Analytics básicos', 'Suporte por email'],
+            popular: false,
+            gradient: 'linear-gradient(135deg, #2563EB 0%, #3B82F6 100%)',
+          },
+        ]);
+      } finally {
+        setLoadingPlans(false);
+      }
+    };
+
+    loadPlans();
+  }, []);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  const handleGetStarted = () => {
-    navigate('/login');
+  const handleGetStarted = async (planId?: string) => {
+    // Verificar se usuário está logado
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      // Se não estiver logado, redirecionar para CADASTRO (não login)
+      // Passar planId na URL para o cadastro
+      if (planId) {
+        navigate(`/signup?plan=${planId}`);
+      } else {
+        navigate('/signup');
+      }
+      return;
+    }
+
+    // Se estiver logado e tiver planId, ir direto para checkout
+    if (planId) {
+      navigate(`/checkout?plan=${planId}`);
+    } else {
+      // Se não tiver planId, ir para dashboard ou home
+      navigate('/');
+    }
+  };
+
+  // Wrapper para botões genéricos (sem planId)
+  const handleGetStartedGeneric = async () => {
+    await handleGetStarted();
   };
 
   const features = [
@@ -157,58 +265,7 @@ const Landing: React.FC = () => {
     { icon: <InstagramIcon />, name: 'Stories', color: '#E1306C', gradient: 'linear-gradient(135deg, #E1306C 0%, #F56040 100%)' },
   ];
 
-  const plans = [
-    {
-      name: 'Starter',
-      price: 'R$ 49',
-      period: '/mês',
-      description: 'Perfeito para começar',
-      features: [
-        'Até 3 contas Instagram',
-        '50 posts agendados/mês',
-        'Analytics básicos',
-        'Suporte por email',
-        'Agendamento de posts e stories',
-      ],
-      popular: false,
-      gradient: 'linear-gradient(135deg, #2563EB 0%, #3B82F6 100%)',
-    },
-    {
-      name: 'Professional',
-      price: 'R$ 149',
-      period: '/mês',
-      description: 'Para profissionais e agências',
-      features: [
-        'Até 10 contas Instagram',
-        'Posts ilimitados',
-        'Analytics avançados',
-        'Suporte prioritário',
-        'Multi-cliente',
-        'API access',
-        'Relatórios personalizados',
-      ],
-      popular: true,
-      gradient: INSYT_COLORS.gradientPrimary,
-    },
-    {
-      name: 'Enterprise',
-      price: 'Sob consulta',
-      period: '',
-      description: 'Para grandes empresas',
-      features: [
-        'Contas ilimitadas',
-        'Posts ilimitados',
-        'Analytics enterprise',
-        'Suporte dedicado 24/7',
-        'White label',
-        'Custom integrations',
-        'SLA garantido',
-        'Treinamento da equipe',
-      ],
-      popular: false,
-      gradient: 'linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)',
-    },
-  ];
+  // Planos agora são carregados do banco via useEffect acima
 
   const faqs = [
     {
@@ -374,7 +431,7 @@ const Landing: React.FC = () => {
               </Button>
                 <Button
                   variant="contained"
-                  onClick={handleGetStarted}
+                  onClick={handleGetStartedGeneric}
                   sx={{
                     background: INSYT_COLORS.gradientPrimary,
                     color: INSYT_COLORS.white,
@@ -465,7 +522,7 @@ const Landing: React.FC = () => {
                 <Button
                   fullWidth
                   variant="contained"
-                  onClick={handleGetStarted}
+                  onClick={handleGetStartedGeneric}
                   sx={{
                     background: INSYT_COLORS.gradientPrimary,
                     color: INSYT_COLORS.white,
@@ -584,7 +641,7 @@ const Landing: React.FC = () => {
                     <Button
                       variant="contained"
                       size="large"
-                      onClick={handleGetStarted}
+                      onClick={handleGetStartedGeneric}
                       endIcon={<ArrowForwardIcon />}
                       sx={{
                         background: INSYT_COLORS.gradientPrimary,
@@ -977,7 +1034,25 @@ const Landing: React.FC = () => {
             </Box>
 
             <Grid container spacing={4} justifyContent="center">
-              {plans.map((plan, index) => (
+              {loadingPlans ? (
+                <Grid item xs={12}>
+                  <Box sx={{ textAlign: 'center', py: 8 }}>
+                    <CircularProgress sx={{ color: INSYT_COLORS.primary }} />
+                    <Typography sx={{ color: INSYT_COLORS.gray400, mt: 2 }}>
+                      Carregando planos...
+                    </Typography>
+                  </Box>
+                </Grid>
+              ) : plans.length === 0 ? (
+                <Grid item xs={12}>
+                  <Box sx={{ textAlign: 'center', py: 8 }}>
+                    <Typography sx={{ color: INSYT_COLORS.gray400 }}>
+                      Nenhum plano disponível no momento.
+                    </Typography>
+                  </Box>
+                </Grid>
+              ) : (
+                plans.map((plan, index) => (
                 <Grid item xs={12} md={4} key={index}>
                   <motion.div
                     initial={{ opacity: 0, y: 30 }}
@@ -1082,7 +1157,7 @@ const Landing: React.FC = () => {
                       <Button
                         fullWidth
                         variant={plan.popular ? 'contained' : 'outlined'}
-                        onClick={handleGetStarted}
+                        onClick={() => handleGetStarted(plan.id)}
                         sx={{
                           background: plan.popular ? plan.gradient : 'transparent',
                           color: plan.popular ? INSYT_COLORS.white : INSYT_COLORS.primary,
@@ -1106,7 +1181,8 @@ const Landing: React.FC = () => {
                     </Card>
                   </motion.div>
                 </Grid>
-              ))}
+                ))
+              )}
             </Grid>
           </Container>
         </Box>
@@ -1363,7 +1439,7 @@ const Landing: React.FC = () => {
                 <Button
                   variant="contained"
                   size="large"
-                  onClick={handleGetStarted}
+                  onClick={handleGetStartedGeneric}
                   endIcon={<ArrowForwardIcon />}
                   sx={{
                     bgcolor: INSYT_COLORS.white,

@@ -54,10 +54,6 @@ export class ImageUrlService {
         
         // Se já for uma URL completa
         if (trimmedData.startsWith('http')) {
-          // Se for uma imagem do Facebook/Instagram, adiciona aviso no log
-          if (this.isFacebookImage(trimmedData)) {
-            console.info('🔗 URL do Facebook/Instagram detectada:', trimmedData.substring(0, 100) + '...');
-          }
           return trimmedData;
         }
         

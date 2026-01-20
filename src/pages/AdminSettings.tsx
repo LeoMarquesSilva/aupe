@@ -228,6 +228,27 @@ const AdminSettings: React.FC = () => {
     try {
       setLoading(true);
       
+      // Obter organization_id do usuário atual para filtrar estatísticas
+      const { data: { user } } = await supabase.auth.getUser();
+      let organizationFilter = null;
+      let isSuperAdmin = false;
+      
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('organization_id, role')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile) {
+          isSuperAdmin = profile.role === 'super_admin';
+          // Se não for super_admin, filtrar por organization_id
+          if (!isSuperAdmin && profile.organization_id) {
+            organizationFilter = profile.organization_id;
+          }
+        }
+      }
+      
       // Primeiro, vamos descobrir qual tabela usar (profiles ou user_profiles)
       let profilesTable = 'profiles';
       
@@ -243,11 +264,23 @@ const AdminSettings: React.FC = () => {
         console.log('📋 Usando tabela user_profiles em vez de profiles');
       }
       
-      // Buscar estatísticas do sistema
+      // Buscar estatísticas do sistema (filtradas por organização se necessário)
+      const usersQuery = organizationFilter 
+        ? supabase.from(profilesTable).select('id', { count: 'exact', head: true }).eq('organization_id', organizationFilter)
+        : supabase.from(profilesTable).select('id', { count: 'exact', head: true });
+      
+      const clientsQuery = organizationFilter
+        ? supabase.from('clients').select('id', { count: 'exact', head: true }).eq('organization_id', organizationFilter)
+        : supabase.from('clients').select('id', { count: 'exact', head: true });
+      
+      const postsQuery = organizationFilter
+        ? supabase.from('scheduled_posts').select('id', { count: 'exact', head: true }).eq('organization_id', organizationFilter)
+        : supabase.from('scheduled_posts').select('id', { count: 'exact', head: true });
+
       const [usersCount, clientsCount, postsCount] = await Promise.all([
-        supabase.from(profilesTable).select('id', { count: 'exact', head: true }),
-        supabase.from('clients').select('id', { count: 'exact', head: true }),
-        supabase.from('scheduled_posts').select('id', { count: 'exact', head: true })
+        usersQuery,
+        clientsQuery,
+        postsQuery
       ]);
 
       // Tentar buscar cache (pode não existir)
@@ -294,7 +327,6 @@ const AdminSettings: React.FC = () => {
 
   const loadUsersData = async () => {
     try {
-      console.log('🔄 Carregando dados dos usuários...');
       
       const usersWithRoles = await roleService.getAllUsersWithRoles();
       
@@ -309,10 +341,36 @@ const AdminSettings: React.FC = () => {
 
   const loadClientsData = async () => {
     try {
-      // Primeiro, carregar clientes sem join
-      const { data: clientsData, error: clientsError } = await supabase
+      // Obter organization_id do usuário atual
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id, role')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile) {
+        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        return;
+      }
+
+      // Se for super_admin, pode ver todos os clients
+      let clientsQuery = supabase
         .from('clients')
-        .select('*')
+        .select('*');
+
+      if (profile.role !== 'super_admin') {
+        if (!profile.organization_id) {
+          console.warn('⚠️ Usuário não possui organization_id');
+          setClients([]);
+          return;
+        }
+        clientsQuery = clientsQuery.eq('organization_id', profile.organization_id);
+      }
+
+      const { data: clientsData, error: clientsError } = await clientsQuery
         .order('created_at', { ascending: false });
 
       if (clientsError) throw clientsError;
@@ -369,10 +427,37 @@ const AdminSettings: React.FC = () => {
 
   const loadPostsData = async () => {
     try {
-      // Primeiro, carregar posts sem joins
-      const { data: postsData, error: postsError } = await supabase
+      // Obter organization_id do usuário atual
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id, role')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile) {
+        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        return;
+      }
+
+      // Se for super_admin, pode ver todos os posts
+      let postsQuery = supabase
         .from('scheduled_posts')
-        .select('*')
+        .select('*');
+
+      if (profile.role !== 'super_admin') {
+        if (!profile.organization_id) {
+          console.warn('⚠️ Usuário não possui organization_id');
+          setPosts([]);
+          return;
+        }
+        postsQuery = postsQuery.eq('organization_id', profile.organization_id);
+      }
+
+      // Primeiro, carregar posts sem joins
+      const { data: postsData, error: postsError } = await postsQuery
         .order('created_at', { ascending: false })
         .limit(100);
 
