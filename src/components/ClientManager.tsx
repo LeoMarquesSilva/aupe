@@ -25,10 +25,7 @@ import {
 import { 
   Add as AddIcon, 
   Delete as DeleteIcon, 
-  Edit as EditIcon, 
   Instagram as InstagramIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon,
   Search as SearchIcon,
   PhotoCamera as PhotoCameraIcon
 } from '@mui/icons-material';
@@ -66,7 +63,6 @@ const ClientManager: React.FC<ClientManagerProps> = ({
   const [userId, setUserId] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -118,32 +114,6 @@ const ClientManager: React.FC<ClientManagerProps> = ({
     }
   };
 
-  const handleUpdateClient = async () => {
-    if (!editingClient || !editingClient.name || !editingClient.instagram) {
-      setError('Nome e usuário do Instagram são obrigatórios');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const updatedClient = await clientService.updateClient(editingClient);
-      
-      // Notificar o componente pai sobre a atualização
-      if (onClientUpdated) {
-        onClientUpdated(updatedClient);
-      }
-      
-      setEditingClient(null);
-    } catch (error) {
-      console.error('Erro ao atualizar cliente:', error);
-      setError('Erro ao atualizar cliente');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDeleteClient = async () => {
     if (!clientToDelete) return;
 
@@ -172,14 +142,6 @@ const ClientManager: React.FC<ClientManagerProps> = ({
     if (onSelectClient) {
       onSelectClient(client.id);
     }
-  };
-
-  const handleEditClient = (client: Client) => {
-    setEditingClient({ ...client });
-  };
-
-  const handleCancelEdit = () => {
-    setEditingClient(null);
   };
 
   const handleConfirmDelete = (client: Client) => {
@@ -308,146 +270,76 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                     overflow: 'hidden'
                   }}
                 >
-                  {editingClient && editingClient.id === client.id ? (
-                    <Box sx={{ p: 2 }}>
-                      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>
-                        Editar Cliente
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                        <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)' } }}>
-                          <TextField
-                            fullWidth
-                            label="Nome"
-                            variant="outlined"
-                            value={editingClient.name}
-                            onChange={(e) => setEditingClient({...editingClient, name: e.target.value})}
-                            size="small"
-                          />
-                        </Box>
-                        <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)' } }}>
-                          <TextField
-                            fullWidth
-                            label="Instagram"
-                            variant="outlined"
-                            value={editingClient.instagram}
-                            onChange={(e) => setEditingClient({...editingClient, instagram: e.target.value})}
-                            InputProps={{
-                              startAdornment: <InputAdornment position="start">@</InputAdornment>,
-                            }}
-                            size="small"
-                          />
-                        </Box>
-                        <Box sx={{ flex: '1 1 100%' }}>
-                          <TextField
-                            fullWidth
-                            label="URL do Logo"
-                            variant="outlined"
-                            value={editingClient.logoUrl || ''}
-                            onChange={(e) => setEditingClient({...editingClient, logoUrl: e.target.value})}
-                            size="small"
-                          />
-                        </Box>
-                      </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                        <Button 
-                          startIcon={<CancelIcon />}
-                          onClick={handleCancelEdit}
-                          sx={{ mr: 1 }}
-                        >
-                          Cancelar
-                        </Button>
-                        <Button 
-                          variant="contained"
-                          color="primary"
-                          startIcon={<SaveIcon />}
-                          onClick={handleUpdateClient}
-                          disabled={loading}
-                        >
-                          {loading ? 'Salvando...' : 'Salvar'}
-                        </Button>
-                      </Box>
-                    </Box>
-                  ) : (
-                    <>
-                      <Box sx={{ 
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    p: 2
+                  }}>
+                    <Box 
+                      sx={{ 
                         display: 'flex', 
                         alignItems: 'center', 
-                        justifyContent: 'space-between',
-                        p: 2
-                      }}>
-                        <Box 
+                        cursor: onSelectClient ? 'pointer' : 'default',
+                        flexGrow: 1
+                      }}
+                      onClick={() => onSelectClient && handleSelectClient(client)}
+                    >
+                      <ListItemAvatar>
+                        <Avatar 
+                          src={getAvatarImage(client)} 
+                          alt={client.name}
                           sx={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            cursor: onSelectClient ? 'pointer' : 'default',
-                            flexGrow: 1
+                            width: 56, 
+                            height: 56,
+                            border: client.profilePicture ? '2px solid #E1306C' : 'none'
                           }}
-                          onClick={() => onSelectClient && handleSelectClient(client)}
                         >
-                          <ListItemAvatar>
-                            <Avatar 
-                              src={getAvatarImage(client)} 
-                              alt={client.name}
-                              sx={{ 
-                                width: 56, 
-                                height: 56,
-                                border: client.profilePicture ? '2px solid #E1306C' : 'none'
-                              }}
-                            >
-                              {client.name.charAt(0)}
-                            </Avatar>
-                          </ListItemAvatar>
-                          <ListItemText 
-                            primary={
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Typography component="span" variant="subtitle1" sx={{ fontWeight: 500 }}>
-                                  {client.name}
-                                </Typography>
-                                {client.profilePicture && (
-                                  <InstagramIcon sx={{ fontSize: 16, color: '#E1306C' }} />
-                                )}
-                              </Box>
-                            } 
-                            secondary={
-                              <Typography component="span" variant="body2">
-                                @{client.instagram}
-                              </Typography>
-                            }
-                          />
-                        </Box>
-                        <Box>
-                          <IconButton 
-                            size="small" 
-                            onClick={() => handleEditClient(client)}
-                            sx={{ mr: 1 }}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton 
-                            size="small" 
-                            onClick={() => handleConfirmDelete(client)}
-                            color="error"
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                      </Box>
-                      
-                      <Divider />
-                      
-                      <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.02)' }}>
-                        <Typography variant="subtitle2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-                          <InstagramIcon fontSize="small" sx={{ mr: 1, color: '#E1306C' }} />
-                          Conexão com Instagram
-                        </Typography>
-                        
-                        <ConnectInstagram 
-                          client={client}
-                          onConnectionUpdate={handleConnectionUpdate}
-                        />
-                      </Box>
-                    </>
-                  )}
+                          {client.name.charAt(0)}
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText 
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography component="span" variant="subtitle1" sx={{ fontWeight: 500 }}>
+                              {client.name}
+                            </Typography>
+                            {client.profilePicture && (
+                              <InstagramIcon sx={{ fontSize: 16, color: '#E1306C' }} />
+                            )}
+                          </Box>
+                        } 
+                        secondary={
+                          <Typography component="span" variant="body2">
+                            @{client.instagram}
+                          </Typography>
+                        }
+                      />
+                    </Box>
+                    <Box>
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleConfirmDelete(client)}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </Box>
+                  
+                  <Divider />
+                  
+                  <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.02)' }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                      <InstagramIcon fontSize="small" sx={{ mr: 1, color: '#E1306C' }} />
+                      Conexão com Instagram
+                    </Typography>
+                    
+                    <ConnectInstagram 
+                      client={client}
+                      onConnectionUpdate={handleConnectionUpdate}
+                    />
+                  </Box>
                 </Paper>
               ))}
             </List>

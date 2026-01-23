@@ -34,7 +34,8 @@ import {
   CardContent,
   SelectChangeEvent,
   TextField,
-  Collapse
+  Collapse,
+  Pagination
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -60,7 +61,7 @@ import {
   Clear as ClearIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, parseISO, isValid } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, parseISO, isValid, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useTheme } from '@mui/material/styles';
 import { postService, clientService, userProfileService, UserProfile, supabase } from '../services/supabaseClient';
@@ -94,6 +95,10 @@ const StoryCalendar: React.FC = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [users, setUsers] = useState<Array<{ id: string; email: string; full_name?: string }>>([]);
+  
+  // Estados para paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20); // 20 itens por página
   
   // Estados para menus e diálogos
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -215,6 +220,18 @@ const StoryCalendar: React.FC = () => {
     return clients.find(client => client.id === clientId);
   };
 
+  // Função para obter usuário criador por ID
+  const getCreatorUser = (userId: string | undefined) => {
+    if (!userId) return null;
+    return users.find(user => user.id === userId) || null;
+  };
+
+  // Função para verificar se o post pode ser editado
+  const canEditPost = (status: PostStatus | string): boolean => {
+    const statusStr = String(status).toLowerCase();
+    return statusStr !== 'posted' && statusStr !== 'published';
+  };
+
   // ✅ MOVER getClientLogo PARA ANTES de getFirstImageUrl
   const getClientLogo = (client: Client | undefined): string | undefined => {
     if (!client) return undefined;
@@ -315,12 +332,13 @@ const StoryCalendar: React.FC = () => {
   };
 
   // Função para obter label do status
-  const getStatusLabel = (status: PostStatus): string => {
+  const getStatusLabel = (status: PostStatus | string): string => {
     switch (status) {
       case 'pending': return 'Pendente';
       case 'sent_to_n8n': return 'Enviado';
       case 'processing': return 'Processando';
-      case 'posted': return 'Publicado';
+      case 'posted':
+      case 'published': return 'Publicado';
       case 'failed': return 'Falhou';
       case 'cancelled': return 'Cancelado';
       default: return status;
@@ -328,17 +346,23 @@ const StoryCalendar: React.FC = () => {
   };
 
   // Função para obter cor do status
-  const getStatusColor = (status: PostStatus): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
+  const getStatusColor = (status: PostStatus | string): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
     switch (status) {
       case 'pending': return 'warning';
       case 'sent_to_n8n': return 'info';
       case 'processing': return 'primary';
-      case 'posted': return 'success';
+      case 'posted':
+      case 'published': return 'success';
       case 'failed': return 'error';
       case 'cancelled': return 'default';
       default: return 'default';
     }
   };
+
+  // Resetar página quando filtros mudarem
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedClient, selectedUserId, selectedStatus, startDate, endDate, viewMode]);
 
   // Filtrar conteúdo
   const filteredContent = content.filter(item => {
@@ -563,8 +587,9 @@ const StoryCalendar: React.FC = () => {
 
   // Handlers para ações
   const handlePreview = () => {
+    // NÃO limpar selectedContent aqui - precisamos dele no modal!
+    setMenuAnchorEl(null); // Apenas fechar o menu
     setPreviewOpen(true);
-    handleMenuClose();
   };
 
   const handleEdit = () => {
@@ -696,19 +721,24 @@ const StoryCalendar: React.FC = () => {
             </Box>
             
             {/* Informações do usuário que criou */}
-            {userProfile && (
-              <Box sx={{ display: 'flex', alignItems: 'center', pt: 2, borderTop: 1, borderColor: 'divider' }}>
-                <PersonIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                <Typography variant="body2" color="text.secondary">
-                  Criado por: {userProfile.full_name || userProfile.email}
-                </Typography>
-                {createdDate && (
-                  <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
-                    em {safeFormatDate(selectedContent.createdAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+            {(() => {
+              const creatorUser = getCreatorUser(selectedContent.userId);
+              if (!creatorUser) return null;
+              
+              return (
+                <Box sx={{ display: 'flex', alignItems: 'center', pt: 2, borderTop: 1, borderColor: 'divider' }}>
+                  <PersonIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                  <Typography variant="body2" color="text.secondary">
+                    Criado por: {creatorUser.full_name || creatorUser.email}
                   </Typography>
-                )}
-              </Box>
-            )}
+                  {createdDate && (
+                    <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                      em {safeFormatDate(selectedContent.createdAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })()}
           </CardContent>
         </Card>
 
@@ -812,23 +842,13 @@ const StoryCalendar: React.FC = () => {
         )}
 
         {/* Informações adicionais */}
-        {(selectedContent.errorMessage || selectedContent.instagramPostId) && (
+        {selectedContent.errorMessage && (
           <Box sx={{ mt: 2 }}>
-            {selectedContent.instagramPostId && (
-              <Alert severity="success" sx={{ mb: 1 }}>
-                <Typography variant="body2">
-                  <strong>ID do Post no Instagram:</strong> {selectedContent.instagramPostId}
-                </Typography>
-              </Alert>
-            )}
-            
-            {selectedContent.errorMessage && (
-              <Alert severity="error">
-                <Typography variant="body2">
-                  <strong>Erro:</strong> {selectedContent.errorMessage}
-                </Typography>
-              </Alert>
-            )}
+            <Alert severity="error">
+              <Typography variant="body2">
+                <strong>Erro:</strong> {selectedContent.errorMessage}
+              </Typography>
+            </Alert>
           </Box>
         )}
       </Box>
@@ -839,6 +859,20 @@ const StoryCalendar: React.FC = () => {
   const monthStart = startOfMonth(selectedMonth);
   const monthEnd = endOfMonth(selectedMonth);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  
+  // Calcular o dia da semana do primeiro dia do mês (0 = domingo, 1 = segunda, etc.)
+  const firstDayOfWeek = getDay(monthStart);
+  
+  // Criar array com células vazias antes do primeiro dia + dias do mês
+  const calendarDays: (Date | null)[] = [];
+  
+  // Adicionar células vazias antes do primeiro dia do mês
+  for (let i = 0; i < firstDayOfWeek; i++) {
+    calendarDays.push(null);
+  }
+  
+  // Adicionar todos os dias do mês
+  daysInMonth.forEach(day => calendarDays.push(day));
 
   if (loading) {
     return (
@@ -986,14 +1020,33 @@ const StoryCalendar: React.FC = () => {
             
             {/* Dias do calendário */}
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1 }}>
-              {daysInMonth.map((day, index) => {
+              {calendarDays.map((day, index) => {
+                // Se for célula vazia (null), renderizar célula vazia
+                if (day === null) {
+                  return (
+                    <Paper
+                      key={`empty-${index}`}
+                      elevation={0} 
+                      sx={{ 
+                        p: 1, 
+                        height: '100%', 
+                        minHeight: 120,
+                        bgcolor: 'transparent',
+                        border: 'none',
+                        display: 'flex',
+                        flexDirection: 'column'
+                      }}
+                    />
+                  );
+                }
+                
                 const dayContent = getContentForDay(day);
                 const isCurrentMonth = isSameMonth(day, selectedMonth);
                 const isDayToday = isToday(day);
                 
                 return (
                   <Paper
-                    key={index}
+                    key={day.getTime()}
                     elevation={0} 
                     sx={{ 
                       p: 1, 
@@ -1246,15 +1299,44 @@ const StoryCalendar: React.FC = () => {
                 </Button>
               </Box>
             ) : (
-              <List>
-                {filteredContent
-                  .sort((a, b) => {
-                    const dateA = safeParseDateISO(a.scheduledDate);
-                    const dateB = safeParseDateISO(b.scheduledDate);
-                    if (!dateA || !dateB) return 0;
-                    return dateA.getTime() - dateB.getTime();
-                  })
-                  .map((content, index) => {
+              <>
+                <List>
+                  {(() => {
+                    // Ordenar conteúdo por proximidade da data atual
+                    // Prioriza posts futuros mais próximos, depois posts passados mais recentes
+                    const now = new Date().getTime();
+                    const sortedContent = [...filteredContent].sort((a, b) => {
+                      const dateA = safeParseDateISO(a.scheduledDate);
+                      const dateB = safeParseDateISO(b.scheduledDate);
+                      if (!dateA || !dateB) return 0;
+                      
+                      const timeA = dateA.getTime();
+                      const timeB = dateB.getTime();
+                      
+                      // Separar futuros e passados
+                      const isAFuture = timeA > now;
+                      const isBFuture = timeB > now;
+                      
+                      // Posts futuros vêm primeiro
+                      if (isAFuture && !isBFuture) return -1;
+                      if (!isAFuture && isBFuture) return 1;
+                      
+                      // Se ambos são futuros: ordenar crescente (mais próximo primeiro)
+                      if (isAFuture && isBFuture) {
+                        return timeA - timeB;
+                      }
+                      
+                      // Se ambos são passados: ordenar decrescente (mais recente primeiro)
+                      return timeB - timeA;
+                    });
+                    
+                    // Calcular paginação
+                    const totalPages = Math.ceil(sortedContent.length / itemsPerPage);
+                    const startIndex = (currentPage - 1) * itemsPerPage;
+                    const endIndex = startIndex + itemsPerPage;
+                    const paginatedContent = sortedContent.slice(startIndex, endIndex);
+                    
+                    return paginatedContent.map((content, index) => {
                     const client = content.clients || getClientById(content.clientId);
                     const contentDate = safeParseDateISO(content.scheduledDate);
                     
@@ -1308,14 +1390,18 @@ const StoryCalendar: React.FC = () => {
                                     size="small"
                                     color={getStatusColor(content.status)}
                                   />
-                                  {userProfile && (
-                                    <Chip 
-                                      icon={<PersonIcon />} 
-                                      label={`Por: ${userProfile.full_name || userProfile.email}`}
-                                      size="small"
-                                      variant="outlined"
-                                    />
-                                  )}
+                                  {(() => {
+                                    const creatorUser = getCreatorUser(content.userId);
+                                    if (!creatorUser) return null;
+                                    return (
+                                      <Chip 
+                                        icon={<PersonIcon />} 
+                                        label={`Por: ${creatorUser.full_name || creatorUser.email}`}
+                                        size="small"
+                                        variant="outlined"
+                                      />
+                                    );
+                                  })()}
                                 </Box>
                                 {content.caption && (
                                   <Typography 
@@ -1340,8 +1426,30 @@ const StoryCalendar: React.FC = () => {
                         </ListItem>
                       </React.Fragment>
                     );
-                  })}
-              </List>
+                  });
+                  })()}
+                </List>
+                
+                {/* Paginação */}
+                {(() => {
+                  const totalPages = Math.ceil(filteredContent.length / itemsPerPage);
+                  if (totalPages <= 1) return null;
+                  
+                  return (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 2 }}>
+                      <Pagination
+                        count={totalPages}
+                        page={currentPage}
+                        onChange={(_, page) => setCurrentPage(page)}
+                        color="primary"
+                        size="large"
+                        showFirstButton
+                        showLastButton
+                      />
+                    </Box>
+                  );
+                })()}
+              </>
             )}
           </Paper>
           </>
@@ -1360,12 +1468,14 @@ const StoryCalendar: React.FC = () => {
           </ListItemIcon>
           <ListItemText>Visualizar</ListItemText>
         </MenuItem>
-        <MenuItem onClick={handleEdit}>
-          <ListItemIcon>
-            <EditIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Editar</ListItemText>
-        </MenuItem>
+        {selectedContent && canEditPost(selectedContent.status) && (
+          <MenuItem onClick={handleEdit}>
+            <ListItemIcon>
+              <EditIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Editar</ListItemText>
+          </MenuItem>
+        )}
         <MenuItem onClick={handleDeleteConfirm} sx={{ color: 'error.main' }}>
           <ListItemIcon>
             <DeleteIcon fontSize="small" color="error" />
@@ -1377,7 +1487,10 @@ const StoryCalendar: React.FC = () => {
       {/* Diálogo de visualização */}
       <Dialog 
         open={previewOpen} 
-        onClose={() => setPreviewOpen(false)}
+        onClose={() => {
+          setPreviewOpen(false);
+          setSelectedContent(null); // Limpar apenas quando fechar o modal
+        }}
         maxWidth="md"
         fullWidth
         PaperProps={{
@@ -1409,10 +1522,13 @@ const StoryCalendar: React.FC = () => {
           {renderPreviewContent()}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setPreviewOpen(false)}>
+          <Button onClick={() => {
+            setPreviewOpen(false);
+            setSelectedContent(null); // Limpar quando fechar
+          }}>
             Fechar
           </Button>
-          {selectedContent && (
+          {selectedContent && canEditPost(selectedContent.status) && (
             <Button 
               variant="contained" 
               onClick={handleEdit}

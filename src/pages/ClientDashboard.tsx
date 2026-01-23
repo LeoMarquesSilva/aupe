@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Box, 
   Container, 
@@ -11,7 +11,6 @@ import {
   CardMedia, 
   CardActionArea,
   CardActions,
-  Avatar, 
   IconButton, 
   TextField,
   InputAdornment,
@@ -38,11 +37,19 @@ import {
   VideoCall as ReelsIcon,
   Collections as CarouselIcon,
   Image as StoryIcon,
-  PersonAdd as PersonAddIcon
+  PersonAdd as PersonAddIcon,
+  Schedule as ScheduleIcon,
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon
 } from '@mui/icons-material';
 import { clientService, postService } from '../services/supabaseClient';
 import { Client } from '../types';
 import ClientManager from '../components/ClientManager';
+import EditClientDialog from '../components/EditClientDialog';
+import ConnectInstagram from '../components/ConnectInstagram';
+import SmartImage from '../components/SmartImage';
+import { imageUrlService } from '../services/imageUrlService';
+import { InstagramAuthData } from '../services/instagramAuthService';
 
 const ClientDashboard: React.FC = () => {
   const theme = useTheme();
@@ -55,6 +62,8 @@ const ClientDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [clientDialogOpen, setClientDialogOpen] = useState<boolean>(false);
+  const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
+  const [connectInstagramOpen, setConnectInstagramOpen] = useState<boolean>(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clientActionMenuOpen, setClientActionMenuOpen] = useState<boolean>(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
@@ -132,11 +141,46 @@ const ClientDashboard: React.FC = () => {
   const handleAddClient = (client: Client) => {
     setClients(prevClients => [...prevClients, client]);
     setClientDialogOpen(false);
+    setSelectedClient(null);
     // Atualizar estatísticas
     setClientStats(prev => ({
       ...prev,
       [client.id]: { scheduled: 0, posted: 0, draft: 0 }
     }));
+  };
+
+  // Função para lidar com a atualização de um cliente
+  const handleUpdateClient = (updatedClient: Client) => {
+    setClients(prevClients => 
+      prevClients.map(client => 
+        client.id === updatedClient.id ? updatedClient : client
+      )
+    );
+    setClientDialogOpen(false);
+    setSelectedClient(null);
+  };
+
+  // Função para lidar com a atualização da conexão do Instagram
+  const handleInstagramConnectionUpdate = (clientId: string, instagramData: InstagramAuthData | null) => {
+    setClients(prevClients => 
+      prevClients.map(client => {
+        if (client.id === clientId) {
+          return {
+            ...client,
+            instagramAccountId: instagramData?.instagramAccountId,
+            accessToken: instagramData?.accessToken,
+            username: instagramData?.username,
+            profilePicture: instagramData?.profilePicture,
+            tokenExpiry: instagramData?.tokenExpiry,
+            pageId: instagramData?.pageId,
+            pageName: instagramData?.pageName
+          };
+        }
+        return client;
+      })
+    );
+    // Recarregar estatísticas após conexão
+    fetchClients();
   };
   
   // Função para lidar com a exclusão de um cliente
@@ -182,14 +226,26 @@ const ClientDashboard: React.FC = () => {
     navigate(`/create-story?clientId=${client.id}`);
   };
 
+  // Função para verificar se o Instagram está conectado
+  const isInstagramConnected = useCallback((client: Client): boolean => {
+    return !!(
+      client.instagramAccountId && 
+      client.accessToken && 
+      client.username
+    );
+  }, []);
+
   // Função para obter a imagem do avatar
   const getAvatarImage = (client: Client) => {
     // Priorizar a foto do perfil do Instagram
     if (client.profilePicture) {
-      return client.profilePicture;
+      return imageUrlService.getPublicUrl(client.profilePicture);
     }
     // Fallback para o logo do cliente
-    return client.logoUrl;
+    if (client.logoUrl) {
+      return imageUrlService.getPublicUrl(client.logoUrl);
+    }
+    return undefined;
   };
   
   return (
@@ -297,16 +353,22 @@ const ClientDashboard: React.FC = () => {
           {filteredClients.map(client => (
             <Grid item xs={12} sm={6} md={4} key={client.id}>
               <Card 
-                elevation={2}
+                elevation={1}
                 sx={{ 
                   height: '100%', 
                   display: 'flex', 
                   flexDirection: 'column',
                   borderRadius: 2,
-                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  transition: 'all 0.2s ease-in-out',
+                  overflow: 'hidden',
+                  bgcolor: 'background.paper',
                   '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 6
+                    elevation: 4,
+                    boxShadow: theme.shadows[4],
+                    borderColor: 'primary.light',
+                    transform: 'translateY(-2px)'
                   }
                 }}
               >
@@ -315,184 +377,247 @@ const ClientDashboard: React.FC = () => {
                 sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
                 >
                   <Box sx={{ 
-                    height: 120, 
-                    bgcolor: 'primary.light', 
+                    pt: 3,
+                    pb: 1.5,
+                    px: 2,
                     display: 'flex', 
                     justifyContent: 'center',
                     alignItems: 'center',
-                    position: 'relative'
+                    position: 'relative',
+                    bgcolor: 'background.paper'
                   }}>
-                    <Avatar 
-                      src={getAvatarImage(client)} 
-                      alt={client.name}
-                      sx={{ 
-                        width: 80, 
-                        height: 80,
-                        border: client.profilePicture ? '3px solid #e0e0e0ff' : '4px solid white',
-                        boxShadow: 2
-                      }}
-                    >
-                      {client.name.charAt(0)}
-                    </Avatar>
-                    {client.profilePicture && (
+                    <Box sx={{ 
+                      position: 'relative',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 1
+                    }}>
                       <Box
                         sx={{
-                          position: 'absolute',
-                          bottom: 8,
-                          right: 8,
-                          bgcolor: '#000000ff',
-                          borderRadius: '50%',
-                          p: 0.5,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
+                          position: 'relative',
+                          width: 70,
+                          height: 70,
                         }}
                       >
-                        <InstagramIcon sx={{ fontSize: 16, color: 'white' }} />
+                        <SmartImage
+                          src={getAvatarImage(client)}
+                          clientId={client.id}
+                          alt={client.name}
+                          width={70}
+                          height={70}
+                          borderRadius="50%"
+                          fallbackText={client.name.charAt(0)}
+                          sx={{
+                            border: '2px solid',
+                            borderColor: 'divider',
+                            boxShadow: '0 1px 4px rgba(0, 0, 0, 0.1)',
+                            objectFit: 'cover',
+                            bgcolor: 'grey.100'
+                          }}
+                        />
+                        {client.profilePicture && (
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              bottom: -2,
+                              right: -2,
+                              bgcolor: '#E1306C',
+                              borderRadius: '50%',
+                              p: 0.4,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: '2px solid white',
+                              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.15)'
+                            }}
+                          >
+                            <InstagramIcon sx={{ fontSize: 14, color: 'white' }} />
+                          </Box>
+                        )}
                       </Box>
-                    )}
+                    </Box>
                   </Box>
                   
-                  <CardContent sx={{ flexGrow: 1, pb: 2 }}>
-                    <Typography variant="h6" align="center" noWrap sx={{ mb: 1 }}>
-                      {client.name}
-                    </Typography>
+                  <CardContent sx={{ flexGrow: 1, pb: 1.5, pt: 1.5, px: 2 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                      <Typography 
+                        variant="subtitle1" 
+                        align="center" 
+                        noWrap 
+                        sx={{ 
+                          fontWeight: 600,
+                          fontSize: '0.95rem',
+                          color: 'text.primary'
+                        }}
+                      >
+                        {client.name}
+                      </Typography>
+                      
+                      <Chip
+                        icon={<InstagramIcon sx={{ fontSize: 12 }} />}
+                        label={isInstagramConnected(client) ? 'Conectado' : 'Desconectado'}
+                        size="small"
+                        color={isInstagramConnected(client) ? 'success' : 'default'}
+                        sx={{
+                          height: 20,
+                          fontSize: '0.65rem',
+                          fontWeight: 500,
+                          '& .MuiChip-icon': {
+                            fontSize: 12
+                          }
+                        }}
+                      />
+                    </Box>
                     
                     <Typography 
-                      variant="body2" 
+                      variant="caption" 
                       color="text.secondary" 
                       align="center"
                       sx={{ 
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'center',
-                        mb: 3
+                        mb: 1.5,
+                        gap: 0.5,
+                        fontSize: '0.75rem'
                       }}
                     >
-                      <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: '#E1306C' }} />
+                      <InstagramIcon sx={{ fontSize: 14, color: '#E1306C' }} />
                       @{client.instagram}
                     </Typography>
                     
-                    <Divider sx={{ my: 2 }} />
+                    <Divider sx={{ my: 1 }} />
                     
-                    {/* Cards de estatísticas */}
+                    {/* Estatísticas melhoradas */}
                     <Box sx={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(3, 1fr)', 
-                      gap: 2,
-                      mt: 2 
+                      display: 'flex', 
+                      justifyContent: 'space-around',
+                      alignItems: 'center',
+                      mt: 1.5,
+                      gap: 1
                     }}>
-                      <Paper
-                        elevation={0}
-                        sx={{ 
-                          p: 1.5, 
-                          textAlign: 'center',
-                          bgcolor: 'rgba(25, 118, 210, 0.08)',
-                          borderRadius: 1.5,
-                          border: '1px solid rgba(25, 118, 210, 0.12)'
-                        }}
-                      >
-                        <Typography 
-                          variant="h6" 
-                          color="primary" 
-                          sx={{ 
-                            fontWeight: 'bold',
-                            fontSize: '1.1rem',
-                            mb: 0.5
-                          }}
-                        >
-                          {clientStats[client.id]?.scheduled || 0}
-                        </Typography>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        flex: 1
+                      }}>
+                        <Box sx={{ 
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          mb: 0.25
+                        }}>
+                          <ScheduleIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+                          <Typography 
+                            variant="h6" 
+                            color="primary" 
+                            sx={{ 
+                              fontWeight: 700,
+                              fontSize: '1.1rem',
+                              lineHeight: 1
+                            }}
+                          >
+                            {clientStats[client.id]?.scheduled || 0}
+                          </Typography>
+                        </Box>
                         <Typography 
                           variant="caption" 
                           color="text.secondary"
                           sx={{ 
                             fontSize: '0.7rem',
-                            fontWeight: 500,
-                            textTransform: 'uppercase',
-                            letterSpacing: 0.5
+                            fontWeight: 500
                           }}
                         >
                           Agendados
                         </Typography>
-                      </Paper>
+                      </Box>
                       
-                      <Paper
-                        elevation={0}
-                        sx={{ 
-                          p: 1.5, 
-                          textAlign: 'center',
-                          bgcolor: 'rgba(46, 125, 50, 0.08)',
-                          borderRadius: 1.5,
-                          border: '1px solid rgba(46, 125, 50, 0.12)'
-                        }}
-                      >
-                        <Typography 
-                          variant="h6" 
-                          color="success.main" 
-                          sx={{ 
-                            fontWeight: 'bold',
-                            fontSize: '1.1rem',
-                            mb: 0.5
-                          }}
-                        >
-                          {clientStats[client.id]?.posted || 0}
-                        </Typography>
+                      <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+                      
+                      <Box sx={{ 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        flex: 1
+                      }}>
+                        <Box sx={{ 
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          mb: 0.25
+                        }}>
+                          <CheckCircleIcon sx={{ fontSize: 16, color: 'success.main' }} />
+                          <Typography 
+                            variant="h6" 
+                            color="success.main" 
+                            sx={{ 
+                              fontWeight: 700,
+                              fontSize: '1.1rem',
+                              lineHeight: 1
+                            }}
+                          >
+                            {clientStats[client.id]?.posted || 0}
+                          </Typography>
+                        </Box>
                         <Typography 
                           variant="caption" 
                           color="text.secondary"
                           sx={{ 
                             fontSize: '0.7rem',
-                            fontWeight: 500,
-                            textTransform: 'uppercase',
-                            letterSpacing: 0.5
+                            fontWeight: 500
                           }}
                         >
                           Publicados
                         </Typography>
-                      </Paper>
+                      </Box>
                       
-                      <Paper
-                        elevation={0}
-                        sx={{ 
-                          p: 1.5, 
-                          textAlign: 'center',
-                          bgcolor: 'rgba(117, 117, 117, 0.08)',
-                          borderRadius: 1.5,
-                          border: '1px solid rgba(117, 117, 117, 0.12)'
-                        }}
-                      >
-                        <Typography 
-                          variant="h6" 
-                          color="text.secondary" 
-                          sx={{ 
-                            fontWeight: 'bold',
-                            fontSize: '1.1rem',
-                            mb: 0.5
-                          }}
-                        >
-                          {clientStats[client.id]?.draft || 0}
-                        </Typography>
+                      <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+                      
+                      <Box sx={{ 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        flex: 1
+                      }}>
+                        <Box sx={{ 
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          mb: 0.25
+                        }}>
+                          <CancelIcon sx={{ fontSize: 16, color: 'error.main' }} />
+                          <Typography 
+                            variant="h6" 
+                            color="error.main" 
+                            sx={{ 
+                              fontWeight: 700,
+                              fontSize: '1.1rem',
+                              lineHeight: 1
+                            }}
+                          >
+                            {clientStats[client.id]?.draft || 0}
+                          </Typography>
+                        </Box>
                         <Typography 
                           variant="caption" 
                           color="text.secondary"
                           sx={{ 
                             fontSize: '0.7rem',
-                            fontWeight: 500,
-                            textTransform: 'uppercase',
-                            letterSpacing: 0.5
+                            fontWeight: 500
                           }}
                         >
                           Falhados
                         </Typography>
-                      </Paper>
+                      </Box>
                     </Box>
                   </CardContent>
                 </CardActionArea>
                 
                 <Divider />
                 
-                <CardActions sx={{ justifyContent: 'space-between', px: 2, py: 1.5 }}>
+                <CardActions sx={{ justifyContent: 'space-between', px: 1.5, py: 1 }}>
                   <Box>
                     <Tooltip title="Editar cliente">
                       <IconButton 
@@ -500,10 +625,27 @@ const ClientDashboard: React.FC = () => {
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedClient(client);
-                          setClientDialogOpen(true);
+                          setEditDialogOpen(true);
                         }}
                       >
                         <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    
+                    <Tooltip title={isInstagramConnected(client) ? "Instagram conectado" : "Conectar Instagram"}>
+                      <IconButton 
+                        size="small" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedClient(client);
+                          setConnectInstagramOpen(true);
+                        }}
+                        sx={{ 
+                          color: isInstagramConnected(client) ? '#4caf50' : '#E1306C',
+                          '&:hover': { bgcolor: isInstagramConnected(client) ? 'rgba(76, 175, 80, 0.1)' : 'rgba(225, 48, 108, 0.1)' }
+                        }}
+                      >
+                        <InstagramIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     
@@ -522,30 +664,68 @@ const ClientDashboard: React.FC = () => {
                     </Tooltip>
                   </Box>
                   
-                  <Box>
-                    <Tooltip title="Criar post">
+                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                    <Tooltip title="Criar Post">
                       <IconButton 
                         size="small" 
-                        color="primary"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleCreatePost(client);
+                        }}
+                        sx={{ 
+                          color: '#E1306C',
+                          '&:hover': { bgcolor: 'rgba(225, 48, 108, 0.1)' }
                         }}
                       >
                         <PostAddIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     
-                    <Tooltip title="Criar story">
+                    <Tooltip title="Criar Story">
                       <IconButton 
                         size="small" 
-                        color="secondary"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleCreateStory(client);
                         }}
+                        sx={{ 
+                          color: '#FCAF45',
+                          '&:hover': { bgcolor: 'rgba(252, 175, 69, 0.1)' }
+                        }}
                       >
                         <StoryIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    
+                    <Tooltip title="Criar Reel">
+                      <IconButton 
+                        size="small" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/create-reels?clientId=${client.id}`);
+                        }}
+                        sx={{ 
+                          color: '#F56040',
+                          '&:hover': { bgcolor: 'rgba(245, 96, 64, 0.1)' }
+                        }}
+                      >
+                        <ReelsIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    
+                    <Tooltip title="Criar Carrossel">
+                      <IconButton 
+                        size="small" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCreatePost(client);
+                        }}
+                        sx={{ 
+                          color: '#833AB4',
+                          '&:hover': { bgcolor: 'rgba(131, 58, 180, 0.1)' }
+                        }}
+                      >
+                        <CarouselIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     
@@ -555,6 +735,10 @@ const ClientDashboard: React.FC = () => {
                         onClick={(e) => {
                           e.stopPropagation();
                           handleViewCalendar(client);
+                        }}
+                        sx={{ 
+                          color: 'text.secondary',
+                          '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.05)' }
                         }}
                       >
                         <CalendarIcon fontSize="small" />
@@ -581,7 +765,7 @@ const ClientDashboard: React.FC = () => {
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <PersonAddIcon sx={{ mr: 1 }} />
-            {selectedClient ? 'Editar Cliente' : 'Adicionar Novo Cliente'}
+            Adicionar Novo Cliente
           </Box>
         </DialogTitle>
         <DialogContent dividers>
@@ -589,12 +773,58 @@ const ClientDashboard: React.FC = () => {
             clients={clients} 
             onAddClient={handleAddClient} 
             onSelectClient={() => {}} 
-            selectedClientId={selectedClient?.id || ""}
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => {
             setClientDialogOpen(false);
+            setSelectedClient(null);
+          }}>
+            Fechar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de edição de cliente */}
+      <EditClientDialog
+        open={editDialogOpen}
+        client={selectedClient}
+        onClose={() => {
+          setEditDialogOpen(false);
+          setSelectedClient(null);
+        }}
+        onClientUpdated={handleUpdateClient}
+      />
+
+      {/* Modal de conexão com Instagram */}
+      <Dialog
+        open={connectInstagramOpen}
+        onClose={() => {
+          setConnectInstagramOpen(false);
+          setSelectedClient(null);
+        }}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <InstagramIcon sx={{ color: '#E1306C' }} />
+            <Typography variant="h6">
+              {selectedClient ? `Conectar Instagram - ${selectedClient.name}` : 'Conectar Instagram'}
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedClient && (
+            <ConnectInstagram 
+              client={selectedClient}
+              onConnectionUpdate={handleInstagramConnectionUpdate}
+            />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setConnectInstagramOpen(false);
             setSelectedClient(null);
           }}>
             Fechar

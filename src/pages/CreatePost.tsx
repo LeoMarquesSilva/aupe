@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { clientService, postService } from '../services/supabaseClient';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Box, 
   Container, 
@@ -51,6 +51,7 @@ import { scheduleInstagramPost, uploadImagesToSupabaseStorage } from '../service
 const CreatePost: React.FC = () => {
   // ... resto do código permanece exatamente igual
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [images, setImages] = useState<PostImage[]>([]);
@@ -77,6 +78,12 @@ const CreatePost: React.FC = () => {
       try {
         const supabaseClients = await clientService.getClients();
         setClients(supabaseClients);
+        
+        // Verificar se há clientId na URL e pré-selecionar
+        const clientIdFromUrl = searchParams.get('clientId');
+        if (clientIdFromUrl && supabaseClients.some(c => c.id === clientIdFromUrl)) {
+          setSelectedClientId(clientIdFromUrl);
+        }
       } catch (error) {
         console.error('Erro ao carregar clientes:', error);
         showNotification('Erro ao carregar clientes', 'error');
@@ -84,7 +91,7 @@ const CreatePost: React.FC = () => {
     };
 
     loadClients();
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     console.log("Estado de imagens atualizado:", images.length);
