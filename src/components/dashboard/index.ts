@@ -8,3 +8,4 @@ export { default as ScheduledPostsList } from './ScheduledPostsList';
 export { default as QuickFilters } from './QuickFilters';
 export { default as ConversionFunnel } from './ConversionFunnel';
 export { default as TopPerformingPosts } from './TopPerformingPosts';
+export { default as PDFExportDialog } from './PDFExportDialog';

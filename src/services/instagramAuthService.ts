@@ -65,6 +65,7 @@ const API_BASE_URL = window.location.origin;
 export const getAuthorizationUrl = (clientId?: string): string => {
   const scopes = [
     'instagram_basic',
+    'instagram_manage_insights', // ✅ NECESSÁRIO para acessar insights (impressões, reach, etc.)
     'instagram_content_publish',
     'pages_read_engagement',
     'pages_show_list',

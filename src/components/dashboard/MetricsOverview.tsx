@@ -41,9 +41,35 @@ interface MetricsOverviewProps {
       reach?: number;
       impressions?: number;
     }>;
+    // Dados adicionais para informações detalhadas
+    engagementBreakdown?: {
+      likes: number;
+      comments: number;
+      saved: number;
+      shares: number;
+      total: number;
+    };
+    postsByType?: Record<string, number>;
   };
   loading?: boolean;
   onPeriodChange?: (period: string) => void;
+  periodComparisons?: {
+    posts: number;
+    likes: number;
+    comments: number;
+    reach: number;
+    impressions: number;
+    engagementRate: number;
+  };
+  // Valores absolutos do período anterior para comparação
+  previousPeriodValues?: {
+    posts: number;
+    likes: number;
+    comments: number;
+    reach: number;
+    impressions: number;
+    engagementRate: number;
+  };
 }
 
 type Period = '7d' | '30d' | '90d';
@@ -51,17 +77,70 @@ type Period = '7d' | '30d' | '90d';
 const MetricsOverview: React.FC<MetricsOverviewProps> = ({ 
   metrics, 
   loading = false,
-  onPeriodChange 
+  onPeriodChange,
+  periodComparisons,
+  previousPeriodValues
 }) => {
   const theme = useTheme();
   const [period, setPeriod] = useState<Period>('30d');
+  
+  // Calcular informações detalhadas para cada métrica
+  const getDetailedInfo = (card: any) => {
+    const changeValue = Math.abs(card.change);
+    const isPositive = card.change > 0;
+    
+    switch (card.title) {
+      case 'Posts':
+        return {
+          description: 'Total de publicações no período',
+          trend: isPositive ? 'Aumento' : 'Redução',
+          detail: `${changeValue.toFixed(1)}% ${isPositive ? 'a mais' : 'a menos'} que o período anterior`
+        };
+      case 'Curtidas':
+        return {
+          description: 'Total de curtidas recebidas',
+          trend: isPositive ? 'Crescimento' : 'Queda',
+          detail: `${changeValue.toFixed(1)}% ${isPositive ? 'mais' : 'menos'} engajamento`
+        };
+      case 'Comentários':
+        return {
+          description: 'Total de comentários recebidos',
+          trend: isPositive ? 'Aumento' : 'Redução',
+          detail: `${changeValue.toFixed(1)}% ${isPositive ? 'mais' : 'menos'} interação`
+        };
+      case 'Alcance':
+        return {
+          description: 'Pessoas que viram o conteúdo',
+          trend: isPositive ? 'Expansão' : 'Contração',
+          detail: `${changeValue.toFixed(1)}% ${isPositive ? 'maior' : 'menor'} alcance`
+        };
+      case 'Engajamento':
+        return {
+          description: 'Taxa de engajamento média',
+          trend: isPositive ? 'Melhoria' : 'Declínio',
+          detail: `${changeValue.toFixed(1)}% ${isPositive ? 'melhor' : 'pior'} performance`
+        };
+      default:
+        return {
+          description: 'Métrica de performance',
+          trend: isPositive ? 'Positivo' : 'Negativo',
+          detail: `${changeValue.toFixed(1)}% de variação`
+        };
+    }
+  };
+  
+  // Se onPeriodChange for fornecido, usar período externo (controlado pelo pai)
+  // Caso contrário, usar estado interno
 
-  // Calcular métricas filtradas por período
+  // Usar métricas diretamente - o filtro de período é aplicado no nível da página
+  // Quando usado no SingleClientDashboard, os dados já vêm filtrados
   const filteredMetrics = useMemo(() => {
+    // Se não há metricsByMonth, usar métricas diretamente (dados já filtrados)
     if (!metrics.metricsByMonth || metrics.metricsByMonth.length === 0) {
       return metrics;
     }
 
+    // Se há metricsByMonth, aplicar filtro local (para quando usado independentemente)
     const days = { '7d': 7, '30d': 30, '90d': 90 }[period];
     const cutoffDate = subDays(new Date(), days);
 
@@ -82,13 +161,19 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
       ? ((totals.likes + totals.comments) / totals.reach) * 100 
       : metrics.engagementRate;
 
+    // Se os totais calculados são diferentes dos totais passados, significa que os dados já vêm filtrados
+    // Nesse caso, usar os totais passados (mais precisos)
+    if (Math.abs(totals.posts - metrics.totalPosts) > 0 && metrics.totalPosts > 0) {
+      return metrics; // Dados já filtrados, usar diretamente
+    }
+
     return {
-      totalPosts: totals.posts,
-      totalLikes: totals.likes,
-      totalComments: totals.comments,
-      totalReach: totals.reach,
-      totalImpressions: totals.impressions,
-      engagementRate
+      totalPosts: totals.posts || metrics.totalPosts,
+      totalLikes: totals.likes || metrics.totalLikes,
+      totalComments: totals.comments || metrics.totalComments,
+      totalReach: totals.reach || metrics.totalReach,
+      totalImpressions: totals.impressions || metrics.totalImpressions,
+      engagementRate: engagementRate || metrics.engagementRate
     };
   }, [metrics, period]);
 
@@ -105,90 +190,62 @@ const MetricsOverview: React.FC<MetricsOverviewProps> = ({
       value: filteredMetrics.totalPosts,
       icon: Image,
       color: theme.palette.primary.main,
-      change: Math.random() * 20 - 10 // Simulado
+      change: periodComparisons?.posts || 0,
+      previousValue: previousPeriodValues?.posts,
+      additionalInfo: metrics.postsByType
     },
     {
       title: 'Curtidas',
       value: filteredMetrics.totalLikes,
       icon: Heart,
       color: '#e91e63',
-      change: Math.random() * 20 - 10
+      change: periodComparisons?.likes || 0,
+      previousValue: previousPeriodValues?.likes,
+      avgPerPost: filteredMetrics.totalPosts > 0 ? (filteredMetrics.totalLikes / filteredMetrics.totalPosts).toFixed(0) : '0',
+      saved: metrics.engagementBreakdown?.saved,
+      shares: metrics.engagementBreakdown?.shares
     },
     {
       title: 'Comentários',
       value: filteredMetrics.totalComments,
       icon: MessageCircle,
       color: '#9c27b0',
-      change: Math.random() * 20 - 10
+      change: periodComparisons?.comments || 0,
+      previousValue: previousPeriodValues?.comments,
+      avgPerPost: filteredMetrics.totalPosts > 0 ? (filteredMetrics.totalComments / filteredMetrics.totalPosts).toFixed(1) : '0'
     },
     {
       title: 'Alcance',
       value: filteredMetrics.totalReach || 0,
       icon: Users,
       color: '#2196f3',
-      change: Math.random() * 20 - 10
-    },
-    {
-      title: 'Impressões',
-      value: filteredMetrics.totalImpressions || 0,
-      icon: Eye,
-      color: '#00bcd4',
-      change: Math.random() * 20 - 10
+      change: periodComparisons?.reach || 0,
+      previousValue: previousPeriodValues?.reach,
+      avgPerPost: filteredMetrics.totalPosts > 0 && filteredMetrics.totalReach ? (filteredMetrics.totalReach / filteredMetrics.totalPosts).toFixed(0) : '0',
+      impressions: filteredMetrics.totalImpressions
     },
     {
       title: 'Engajamento',
       value: `${filteredMetrics.engagementRate.toFixed(1)}%`,
       icon: BarChart3,
       color: '#4caf50',
-      change: Math.random() * 20 - 10,
-      isPercentage: true
+      change: periodComparisons?.engagementRate || 0,
+      previousValue: previousPeriodValues?.engagementRate,
+      isPercentage: true,
+      totalEngagement: metrics.engagementBreakdown?.total
     }
   ];
 
   return (
     <Box>
-      {/* Header */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        mb: 4,
-        flexWrap: 'wrap',
-        gap: 2
-      }}>
-        <Typography variant="h5" fontWeight="bold">
-          Métricas de Performance
-        </Typography>
-        
-        <ToggleButtonGroup
-          value={period}
-          exclusive
-          onChange={handlePeriodChange}
-          size="small"
-          sx={{
-            '& .MuiToggleButton-root': {
-              px: 2,
-              py: 1,
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              '&.Mui-selected': {
-                backgroundColor: theme.palette.primary.main,
-                color: 'white',
-                '&:hover': {
-                  backgroundColor: theme.palette.primary.dark,
-                }
-              }
-            }
-          }}
-        >
-          <ToggleButton value="7d">7 dias</ToggleButton>
-          <ToggleButton value="30d">30 dias</ToggleButton>
-          <ToggleButton value="90d">90 dias</ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
-
       {/* Cards */}
-      <Grid container spacing={3}>
+      <Grid 
+        container 
+        spacing={3}
+        sx={{
+          justifyContent: { xs: 'flex-start', lg: 'center' }
+        }}
+      >
         {cards.map((card, index) => (
           <MetricCard 
             key={index} 
@@ -208,135 +265,456 @@ const MetricCard: React.FC<{
   loading: boolean;
   index: number;
 }> = ({ card, loading, index }) => {
+  // TODOS OS HOOKS DEVEM SER OS PRIMEIROS - ANTES DE QUALQUER OUTRA LÓGICA
+  const [hovered, setHovered] = useState(false);
   const theme = useTheme();
-  const IconComponent = card.icon;
   
-  // Animação com react-spring
   const cardAnimation = useSpring({
     from: { opacity: 0, transform: 'translateY(20px)' },
     to: { opacity: 1, transform: 'translateY(0px)' },
-    delay: index * 100,
+    delay: index * 50,
     config: { tension: 280, friction: 60 }
   });
-
-  const [hovered, setHovered] = useState(false);
   
   const hoverAnimation = useSpring({
-    transform: hovered ? 'translateY(-4px)' : 'translateY(0px)',
-    boxShadow: hovered 
-      ? `0 8px 25px ${card.color}25` 
-      : '0 2px 10px rgba(0,0,0,0.1)',
+    transform: hovered ? 'translateY(-2px)' : 'translateY(0px)',
     config: { tension: 300, friction: 30 }
   });
 
-  if (loading) {
-    return (
-      <Grid item xs={12} sm={6} md={4} lg={2}>
-        <Card sx={{ height: 140 }}>
-          <CardContent sx={{ p: 3 }}>
-            <Skeleton variant="rectangular" width="100%" height={20} sx={{ mb: 2 }} />
-            <Skeleton variant="text" width="60%" height={40} sx={{ mb: 1 }} />
-            <Skeleton variant="text" width="80%" height={20} />
-          </CardContent>
-        </Card>
-      </Grid>
-    );
-  }
+  const flipAnimation = useSpring({
+    rotateY: hovered ? 180 : 0,
+    config: { tension: 300, friction: 25 }
+  });
 
+  // Agora podemos usar variáveis e lógica
+  const IconComponent = card.icon;
+
+  // Renderização condicional dentro do JSX, não early return
   return (
     <Grid item xs={12} sm={6} md={4} lg={2}>
-      <animated.div style={cardAnimation}>
-        <animated.div style={hoverAnimation}>
-          <Card 
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
-            sx={{ 
-              height: 140,
-              cursor: 'pointer',
-              border: `1px solid ${card.color}20`,
+      {loading ? (
+        <Card sx={{ 
+          height: 160,
+          bgcolor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
+          boxShadow: 'none'
+        }}>
+          <CardContent sx={{ p: 2.5 }}>
+            <Skeleton variant="rectangular" width="100%" height={16} sx={{ mb: 1.5 }} />
+            <Skeleton variant="text" width="50%" height={32} sx={{ mb: 1 }} />
+            <Skeleton variant="text" width="70%" height={14} />
+          </CardContent>
+        </Card>
+      ) : (
+        <animated.div style={cardAnimation}>
+        <Box
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          sx={{
+            perspective: '1000px',
+            height: 160,
+            position: 'relative',
+            width: '100%',
+            cursor: 'pointer'
+          }}
+        >
+          <animated.div
+            style={{
+              transform: flipAnimation.rotateY.to(ry => `perspective(1000px) rotateY(${ry}deg)`),
+              transformStyle: 'preserve-3d',
               position: 'relative',
-              overflow: 'hidden',
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 3,
-                background: `linear-gradient(90deg, ${card.color}, ${card.color}80)`,
-              }
+              width: '100%',
+              height: '100%'
             }}
           >
-            <CardContent sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-              {/* Header */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                <Box sx={{ flex: 1 }}>
-                  <Typography 
-                    variant="h4" 
-                    sx={{ 
-                      fontWeight: 'bold', 
-                      color: card.color, 
-                      mb: 0.5,
-                      fontSize: { xs: '1.5rem', sm: '1.75rem' }
-                    }}
-                  >
-                    {card.isPercentage ? (
-                      card.value
+            {/* Frente do Card */}
+            <Box
+              sx={{
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+                transform: 'rotateY(0deg)'
+              }}
+            >
+              <Card 
+                sx={{ 
+                  height: '100%',
+                  bgcolor: 'background.paper',
+                  border: '1px solid',
+                  borderColor: hovered ? card.color : 'divider',
+                  boxShadow: 'none',
+                  transition: 'border-color 0.3s ease',
+                  cursor: 'pointer'
+                }}
+              >
+                <CardContent sx={{ p: 2.5, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  {/* Header com ícone e valor */}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography 
+                        variant="h5" 
+                        sx={{ 
+                          fontWeight: 700, 
+                          color: 'text.primary',
+                          fontSize: { xs: '1.5rem', sm: '1.75rem' },
+                          lineHeight: 1.2,
+                          mb: 0.5
+                        }}
+                      >
+                        {card.isPercentage ? (
+                          card.value
+                        ) : (
+                          <CountUp 
+                            end={typeof card.value === 'number' ? card.value : 0} 
+                            duration={1.5} 
+                            separator="." 
+                            decimals={0}
+                          />
+                        )}
+                      </Typography>
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary" 
+                        fontWeight={500}
+                        sx={{ fontSize: '0.8125rem' }}
+                      >
+                        {card.title}
+                      </Typography>
+                    </Box>
+                    
+                    <Box sx={{ 
+                      width: 40,
+                      height: 40,
+                      borderRadius: '10px',
+                      bgcolor: `${card.color}15`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      ml: 1,
+                      transition: 'all 0.3s ease',
+                      transform: hovered ? 'scale(1.1)' : 'scale(1)'
+                    }}>
+                      <IconComponent size={20} color={card.color} />
+                    </Box>
+                  </Box>
+                  
+                  {/* Change indicator */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 0.5,
+                    mt: 2,
+                    pt: 1.5,
+                    borderTop: '1px solid',
+                    borderColor: 'divider'
+                  }}>
+                    {card.change > 0 ? (
+                      <TrendingUp size={14} color={theme.palette.success.main} />
                     ) : (
-                      <CountUp 
-                        end={typeof card.value === 'number' ? card.value : 0} 
-                        duration={1.5} 
-                        separator="," 
-                      />
+                      <TrendingDown size={14} color={theme.palette.error.main} />
                     )}
-                  </Typography>
-                  <Typography 
-                    variant="body2" 
-                    color="text.secondary" 
-                    fontWeight={600}
-                    sx={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: 0.5 }}
-                  >
-                    {card.title}
-                  </Typography>
-                </Box>
-                
-                <Avatar sx={{ 
-                  backgroundColor: `${card.color}15`, 
-                  color: card.color,
-                  width: 40,
-                  height: 40
-                }}>
-                  <IconComponent size={20} />
-                </Avatar>
-              </Box>
-              
-              {/* Change indicator */}
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 0.5,
-                mt: 'auto'
-              }}>
-                {card.change > 0 ? (
-                  <TrendingUp size={14} color={theme.palette.success.main} />
-                ) : (
-                  <TrendingDown size={14} color={theme.palette.error.main} />
-                )}
-                <Typography 
-                  variant="caption" 
-                  color={card.change > 0 ? 'success.main' : 'error.main'}
-                  fontWeight={600}
-                >
-                  {card.change > 0 ? '+' : ''}{card.change.toFixed(1)}%
-                </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-                  vs anterior
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </animated.div>
+                    <Typography 
+                      variant="caption" 
+                      color={card.change > 0 ? 'success.main' : 'error.main'}
+                      fontWeight={600}
+                      sx={{ fontSize: '0.75rem' }}
+                    >
+                      {card.change > 0 ? '+' : ''}{card.change.toFixed(1)}%
+                    </Typography>
+                    <Typography 
+                      variant="caption" 
+                      color="text.secondary" 
+                      sx={{ fontSize: '0.75rem' }}
+                    >
+                      vs anterior
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Box>
+
+            {/* Verso do Card - Informações Detalhadas */}
+            <Box
+              sx={{
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+                transform: 'rotateY(180deg)'
+              }}
+            >
+              <Card 
+                sx={{ 
+                  height: '100%',
+                  bgcolor: card.color,
+                  color: 'white',
+                  border: 'none',
+                  boxShadow: `0 8px 24px ${card.color}40`
+                }}
+              >
+                <CardContent sx={{ p: 2.5, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  {/* Header do verso */}
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                      <Typography 
+                        variant="h6" 
+                        sx={{ 
+                          fontWeight: 700,
+                          color: 'white',
+                          fontSize: '1rem'
+                        }}
+                      >
+                        {card.title}
+                      </Typography>
+                      <Box sx={{ 
+                        width: 32,
+                        height: 32,
+                        borderRadius: '8px',
+                        bgcolor: 'rgba(255, 255, 255, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <IconComponent size={16} color="white" />
+                      </Box>
+                    </Box>
+
+                    {/* Valor principal */}
+                    <Typography 
+                      variant="h4" 
+                      sx={{ 
+                        fontWeight: 700,
+                        color: 'white',
+                        mb: 1.5,
+                        fontSize: '1.75rem'
+                      }}
+                    >
+                      {card.isPercentage ? (
+                        card.value
+                      ) : (
+                        <CountUp 
+                          end={typeof card.value === 'number' ? card.value : 0} 
+                          duration={1.5} 
+                          separator="." 
+                          decimals={0}
+                        />
+                      )}
+                    </Typography>
+                  </Box>
+
+                  {/* Informações detalhadas */}
+                  <Box>
+                    {(() => {
+                      // Calcular informações detalhadas
+                      const changeValue = Math.abs(card.change);
+                      const isPositive = card.change > 0;
+                      const currentValue = typeof card.value === 'number' ? card.value : parseFloat(card.value.replace('%', '').replace('.', ''));
+                      const previousValue = card.previousValue || 0;
+                      
+                      let details: { 
+                        description: string; 
+                        trend: string; 
+                        detail: string;
+                        additionalStats?: Array<{ label: string; value: string }>;
+                      };
+                      
+                      switch (card.title) {
+                        case 'Posts':
+                          const postsByType = card.additionalInfo as Record<string, number> | undefined;
+                          const topType = postsByType ? Object.entries(postsByType).sort((a, b) => b[1] - a[1])[0] : null;
+                          details = {
+                            description: 'Total de publicações no período',
+                            trend: isPositive ? 'Aumento' : 'Redução',
+                            detail: `${changeValue.toFixed(1)}% ${isPositive ? 'a mais' : 'a menos'} que o período anterior`,
+                            additionalStats: [
+                              { label: 'Período anterior', value: previousValue > 0 ? previousValue.toString() : 'N/A' },
+                              ...(topType ? [{ label: 'Tipo mais usado', value: `${topType[0]}: ${topType[1]}` }] : [])
+                            ]
+                          };
+                          break;
+                        case 'Curtidas':
+                          const avgLikes = card.avgPerPost || '0';
+                          const saved = card.saved || 0;
+                          const shares = card.shares || 0;
+                          details = {
+                            description: 'Total de curtidas recebidas',
+                            trend: isPositive ? 'Crescimento' : 'Queda',
+                            detail: `${changeValue.toFixed(1)}% ${isPositive ? 'mais' : 'menos'} engajamento`,
+                            additionalStats: [
+                              { label: 'Média por post', value: `${avgLikes} curtidas` },
+                              { label: 'Período anterior', value: previousValue > 0 ? previousValue.toLocaleString('pt-BR') : 'N/A' },
+                              ...(saved > 0 ? [{ label: 'Salvos', value: saved.toLocaleString('pt-BR') }] : []),
+                              ...(shares > 0 ? [{ label: 'Compartilhamentos', value: shares.toLocaleString('pt-BR') }] : [])
+                            ]
+                          };
+                          break;
+                        case 'Comentários':
+                          const avgComments = card.avgPerPost || '0';
+                          details = {
+                            description: 'Total de comentários recebidos',
+                            trend: isPositive ? 'Aumento' : 'Redução',
+                            detail: `${changeValue.toFixed(1)}% ${isPositive ? 'mais' : 'menos'} interação`,
+                            additionalStats: [
+                              { label: 'Média por post', value: `${avgComments} comentários` },
+                              { label: 'Período anterior', value: previousValue > 0 ? previousValue.toLocaleString('pt-BR') : 'N/A' }
+                            ]
+                          };
+                          break;
+                        case 'Alcance':
+                          const avgReach = card.avgPerPost || '0';
+                          const impressions = card.impressions || 0;
+                          details = {
+                            description: 'Pessoas que viram o conteúdo',
+                            trend: isPositive ? 'Expansão' : 'Contração',
+                            detail: `${changeValue.toFixed(1)}% ${isPositive ? 'maior' : 'menor'} alcance`,
+                            additionalStats: [
+                              { label: 'Média por post', value: `${avgReach} pessoas` },
+                              { label: 'Período anterior', value: previousValue > 0 ? previousValue.toLocaleString('pt-BR') : 'N/A' },
+                              ...(impressions > 0 ? [{ label: 'Impressões totais', value: impressions.toLocaleString('pt-BR') }] : [])
+                            ]
+                          };
+                          break;
+                        case 'Engajamento':
+                          const totalEngagement = card.totalEngagement || 0;
+                          details = {
+                            description: 'Taxa de engajamento média',
+                            trend: isPositive ? 'Melhoria' : 'Declínio',
+                            detail: `${changeValue.toFixed(1)}% ${isPositive ? 'melhor' : 'pior'} performance`,
+                            additionalStats: [
+                              { label: 'Período anterior', value: previousValue > 0 ? `${previousValue.toFixed(1)}%` : 'N/A' },
+                              ...(totalEngagement > 0 ? [{ label: 'Engajamento total', value: totalEngagement.toLocaleString('pt-BR') }] : [])
+                            ]
+                          };
+                          break;
+                        default:
+                          details = {
+                            description: 'Métrica de performance',
+                            trend: isPositive ? 'Positivo' : 'Negativo',
+                            detail: `${changeValue.toFixed(1)}% de variação`
+                          };
+                      }
+                      
+                      return (
+                        <>
+                          <Typography 
+                            variant="caption" 
+                            sx={{ 
+                              color: 'rgba(255, 255, 255, 0.9)',
+                              fontSize: '0.75rem',
+                              display: 'block',
+                              mb: 1.5,
+                              lineHeight: 1.4
+                            }}
+                          >
+                            {details.description}
+                          </Typography>
+                          
+                          <Box sx={{ 
+                            p: 1.5,
+                            borderRadius: 1.5,
+                            bgcolor: 'rgba(255, 255, 255, 0.15)',
+                            mb: 1.5
+                          }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                              <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.75rem', fontWeight: 500 }}>
+                                Tendência
+                              </Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                {card.change > 0 ? (
+                                  <TrendingUp size={14} color="white" />
+                                ) : (
+                                  <TrendingDown size={14} color="white" />
+                                )}
+                                <Typography 
+                                  variant="caption" 
+                                  sx={{ 
+                                    color: 'white',
+                                    fontWeight: 700,
+                                    fontSize: '0.75rem'
+                                  }}
+                                >
+                                  {details.trend}
+                                </Typography>
+                              </Box>
+                            </Box>
+                            
+                            <Typography 
+                              variant="caption" 
+                              sx={{ 
+                                color: 'rgba(255, 255, 255, 0.85)',
+                                fontSize: '0.6875rem',
+                                display: 'block',
+                                lineHeight: 1.4,
+                                mb: details.additionalStats && details.additionalStats.length > 0 ? 1 : 0
+                              }}
+                            >
+                              {details.detail}
+                            </Typography>
+
+                            {/* Estatísticas adicionais */}
+                            {details.additionalStats && details.additionalStats.length > 0 && (
+                              <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                                {details.additionalStats.map((stat, idx) => (
+                                  <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                    <Typography 
+                                      variant="caption" 
+                                      sx={{ 
+                                        color: 'rgba(255, 255, 255, 0.75)',
+                                        fontSize: '0.625rem'
+                                      }}
+                                    >
+                                      {stat.label}:
+                                    </Typography>
+                                    <Typography 
+                                      variant="caption" 
+                                      sx={{ 
+                                        color: 'white',
+                                        fontWeight: 600,
+                                        fontSize: '0.625rem'
+                                      }}
+                                    >
+                                      {stat.value}
+                                    </Typography>
+                                  </Box>
+                                ))}
+                              </Box>
+                            )}
+                          </Box>
+
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            gap: 0.5,
+                            mt: 1
+                          }}>
+                            <Typography 
+                              variant="caption" 
+                              sx={{ 
+                                color: 'rgba(255, 255, 255, 0.7)',
+                                fontSize: '0.625rem',
+                                textAlign: 'center'
+                              }}
+                            >
+                              Comparado ao período anterior
+                            </Typography>
+                          </Box>
+                        </>
+                      );
+                    })()}
+                  </Box>
+                </CardContent>
+              </Card>
+            </Box>
+          </animated.div>
+        </Box>
       </animated.div>
+      )}
     </Grid>
   );
 };

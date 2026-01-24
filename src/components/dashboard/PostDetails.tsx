@@ -6,16 +6,11 @@ import {
   DialogActions,
   Button,
   Grid,
-  Card,
   CardMedia,
   Typography,
   Box,
   Chip,
-  Paper,
-  IconButton,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails
+  IconButton
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -70,213 +65,245 @@ const PostDetails: React.FC<PostDetailsProps> = ({
     }
   };
 
-  // Cálculo correto do engajamento: Likes + Comments + Saved
+  // Métricas reais
   const likes = post.like_count || 0;
   const comments = post.comments_count || 0;
   const saved = post.insights?.saved || 0;
+  const shares = post.insights?.shares || 0;
   const reach = post.insights?.reach || 0;
   const impressions = post.insights?.impressions || 0;
   
-  const totalEngagement = likes + comments + saved;
-  const engagementRate = reach > 0 ? (totalEngagement / reach) : 0;
+  // Engajamento total (métricas reais)
+  const totalEngagement = likes + comments + saved + shares;
+  const engagementRate = reach > 0 ? (totalEngagement / reach) * 100 : 0;
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="sm"
       fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          boxShadow: 'none',
+          border: '1px solid',
+          borderColor: 'divider'
+        }
+      }}
     >
-      <DialogTitle>
-        Detalhes do Post
+      <DialogTitle sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        pb: 2,
+        borderBottom: '1px solid',
+        borderColor: 'divider'
+      }}>
+        <Typography variant="h6" fontWeight={600}>
+          Detalhes do Post
+        </Typography>
         <IconButton
           aria-label="close"
           onClick={onClose}
+          size="small"
           sx={{
-            position: 'absolute',
-            right: 8,
-            top: 8,
+            color: 'text.secondary'
           }}
         >
           <CloseIcon />
         </IconButton>
       </DialogTitle>
-      <DialogContent>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardMedia
-                component="img"
-                image={post.thumbnail_url || post.media_url}
-                alt={post.caption}
-                sx={{ maxHeight: 400, objectFit: 'contain' }}
-              />
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Typography variant="subtitle1" gutterBottom>
-              Informações do Post
-            </Typography>
-            
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                Data de publicação
-              </Typography>
-              <Typography variant="body1">
-                {formatTimestamp(post.timestamp)}
-              </Typography>
-            </Box>
-            
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                Tipo de mídia
-              </Typography>
-              <Chip 
-                icon={getMediaTypeIcon(post.media_type)}
-                label={getMediaTypeLabel(post.media_type)}
-                size="small"
-              />
-            </Box>
-            
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                Métricas de Engajamento
-              </Typography>
-              <Grid container spacing={1} sx={{ mt: 0.5 }}>
-                <Grid item xs={4}>
-                  <Paper elevation={0} sx={{ p: 1, textAlign: 'center', bgcolor: 'secondary.light' }}>
-                    <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 'bold' }}>{likes}</Typography>
-                    <Typography variant="caption" sx={{ color: '#ffffff' }}>Curtidas</Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={4}>
-                  <Paper elevation={0} sx={{ p: 1, textAlign: 'center', bgcolor: 'success.light' }}>
-                    <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 'bold' }}>{comments}</Typography>
-                    <Typography variant="caption" sx={{ color: '#ffffff' }}>Comentários</Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={4}>
-                  <Paper elevation={0} sx={{ p: 1, textAlign: 'center', bgcolor: 'warning.light' }}>
-                    <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 'bold' }}>{saved}</Typography>
-                    <Typography variant="caption" sx={{ color: '#ffffff' }}>Salvos</Typography>
-                  </Paper>
-                </Grid>
-              </Grid>
-            </Box>
+      <DialogContent sx={{ pt: 3 }}>
+        {/* Imagem */}
+        <Box sx={{ mb: 3, borderRadius: 1.5, overflow: 'hidden', bgcolor: 'grey.100' }}>
+          <CardMedia
+            component="img"
+            image={post.thumbnail_url || post.media_url}
+            alt={post.caption}
+            sx={{ width: '100%', maxHeight: 400, objectFit: 'contain' }}
+          />
+        </Box>
 
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                Engajamento Total
-              </Typography>
-              <Grid container spacing={1} sx={{ mt: 0.5 }}>
-                <Grid item xs={6}>
-                  <Paper elevation={0} sx={{ p: 1, textAlign: 'center', bgcolor: 'info.light' }}>
-                    <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 'bold' }}>
-                      {totalEngagement}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#ffffff' }}>Engajamento</Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6}>
-                  <Paper elevation={0} sx={{ p: 1, textAlign: 'center', bgcolor: 'info.dark' }}>
-                    <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 'bold' }}>
-                      {(engagementRate * 100).toFixed(2)}%
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#ffffff' }}>Taxa Eng.</Typography>
-                  </Paper>
-                </Grid>
-              </Grid>
-            </Box>
+        {/* Informações básicas */}
+        <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem', display: 'block', mb: 0.5 }}>
+              Publicado em
+            </Typography>
+            <Typography variant="body2" fontWeight={500}>
+              {formatTimestamp(post.timestamp)}
+            </Typography>
+          </Box>
+          <Chip 
+            icon={getMediaTypeIcon(post.media_type)}
+            label={getMediaTypeLabel(post.media_type)}
+            size="small"
+            sx={{ 
+              height: 28,
+              fontSize: '0.75rem',
+              fontWeight: 500
+            }}
+          />
+        </Box>
             
-            {post.insights && (reach > 0 || impressions > 0) && (
-              <Box sx={{ mb: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Métricas de Alcance
+        {/* Métricas */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 2 }}>
+            Métricas
+          </Typography>
+          <Grid container spacing={1.5}>
+            <Grid item xs={6}>
+              <Box sx={{ 
+                p: 1.5, 
+                borderRadius: 1.5, 
+                border: '1px solid',
+                borderColor: 'divider',
+                bgcolor: 'grey.50'
+              }}>
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', mb: 0.5 }}>
+                  Curtidas
                 </Typography>
-                <Grid container spacing={1} sx={{ mt: 0.5 }}>
-                  {reach > 0 && (
-                    <Grid item xs={impressions > 0 ? 6 : 12}>
-                      <Paper elevation={0} sx={{ p: 1, textAlign: 'center', bgcolor: 'primary.light' }}>
-                        <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 'bold' }}>{reach}</Typography>
-                        <Typography variant="caption" sx={{ color: '#ffffff' }}>Alcance</Typography>
-                      </Paper>
-                    </Grid>
-                  )}
-                  {impressions > 0 && (
-                    <Grid item xs={reach > 0 ? 6 : 12}>
-                      <Paper elevation={0} sx={{ p: 1, textAlign: 'center', bgcolor: 'primary.dark' }}>
-                        <Typography variant="h6" sx={{ color: '#ffffff', fontWeight: 'bold' }}>{impressions}</Typography>
-                        <Typography variant="caption" sx={{ color: '#ffffff' }}>Impressões</Typography>
-                      </Paper>
-                    </Grid>
-                  )}
-                </Grid>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  {likes.toLocaleString()}
+                </Typography>
               </Box>
-            )}
-            
-            <Button 
-              variant="outlined" 
-              startIcon={<LinkIcon />}
-              href={post.permalink}
-              target="_blank"
-              rel="noopener noreferrer"
-              fullWidth
-              sx={{ mt: 1 }}
-            >
-              Ver no Instagram
-            </Button>
-          </Grid>
-          
-          <Grid item xs={12}>
-            <Accordion defaultExpanded>
-              <AccordionSummary
-                expandIcon={<ExpandMoreIcon />}
-                aria-controls="caption-content"
-                id="caption-header"
-              >
-                <Typography>Legenda</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {post.caption || 'Sem legenda'}
+            </Grid>
+            <Grid item xs={6}>
+              <Box sx={{ 
+                p: 1.5, 
+                borderRadius: 1.5, 
+                border: '1px solid',
+                borderColor: 'divider',
+                bgcolor: 'grey.50'
+              }}>
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', mb: 0.5 }}>
+                  Comentários
                 </Typography>
-                
-                {post.caption && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Tempo de leitura estimado: {instagramMetricsService.estimateReadingTime(post.caption)} min
-                    </Typography>
-                    
-                    {instagramMetricsService.extractHashtags(post.caption).length > 0 && (
-                      <Box sx={{ mt: 1 }}>
-                        <Typography variant="body2" color="text.secondary">Hashtags:</Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                          {instagramMetricsService.extractHashtags(post.caption).map((tag, idx) => (
-                            <Chip key={idx} label={tag} size="small" />
-                          ))}
-                        </Box>
-                      </Box>
-                    )}
-                    
-                    {instagramMetricsService.extractMentions(post.caption).length > 0 && (
-                      <Box sx={{ mt: 1 }}>
-                        <Typography variant="body2" color="text.secondary">Menções:</Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                          {instagramMetricsService.extractMentions(post.caption).map((mention, idx) => (
-                            <Chip key={idx} label={mention} size="small" color="primary" />
-                          ))}
-                        </Box>
-                      </Box>
-                    )}
-                  </Box>
-                )}
-              </AccordionDetails>
-            </Accordion>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  {comments.toLocaleString()}
+                </Typography>
+              </Box>
+            </Grid>
+            {reach > 0 && (
+              <Grid item xs={6}>
+                <Box sx={{ 
+                  p: 1.5, 
+                  borderRadius: 1.5, 
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: 'grey.50'
+                }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', mb: 0.5 }}>
+                    Alcance
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {reach.toLocaleString()}
+                  </Typography>
+                </Box>
+              </Grid>
+            )}
+            {impressions > 0 && (
+              <Grid item xs={6}>
+                <Box sx={{ 
+                  p: 1.5, 
+                  borderRadius: 1.5, 
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: 'grey.50'
+                }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', mb: 0.5 }}>
+                    Impressões
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {impressions.toLocaleString()}
+                  </Typography>
+                </Box>
+              </Grid>
+            )}
+            <Grid item xs={6}>
+              <Box sx={{ 
+                p: 1.5, 
+                borderRadius: 1.5, 
+                border: '1px solid',
+                borderColor: 'divider',
+                bgcolor: 'grey.50'
+              }}>
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.75rem', mb: 0.5 }}>
+                  Engajamento
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  {totalEngagement.toLocaleString()}
+                </Typography>
+              </Box>
+            </Grid>
+            {engagementRate > 0 && (
+              <Grid item xs={6}>
+                <Box sx={{ 
+                  p: 1.5, 
+                  borderRadius: 1.5, 
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: 'success.light'
+                }}>
+                  <Typography variant="body2" sx={{ fontSize: '0.75rem', mb: 0.5, color: 'white' }}>
+                    Taxa de Engajamento
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: 'white' }}>
+                    {engagementRate.toFixed(2)}%
+                  </Typography>
+                </Box>
+              </Grid>
+            )}
           </Grid>
-        </Grid>
+        </Box>
+
+        {/* Legenda */}
+        {post.caption && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
+              Legenda
+            </Typography>
+            <Typography variant="body2" sx={{ 
+              whiteSpace: 'pre-wrap',
+              lineHeight: 1.6,
+              color: 'text.secondary'
+            }}>
+              {post.caption}
+            </Typography>
+          </Box>
+        )}
+
+        {/* Botão */}
+        <Button 
+          variant="outlined" 
+          startIcon={<LinkIcon />}
+          href={post.permalink}
+          target="_blank"
+          rel="noopener noreferrer"
+          fullWidth
+          sx={{ 
+            mt: 2,
+            borderRadius: 1.5,
+            textTransform: 'none',
+            fontWeight: 500
+          }}
+        >
+          Ver no Instagram
+        </Button>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Fechar</Button>
+      <DialogActions sx={{ px: 3, pb: 2, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+        <Button 
+          onClick={onClose}
+          variant="outlined"
+          sx={{ 
+            borderRadius: 1.5,
+            textTransform: 'none',
+            fontWeight: 500
+          }}
+        >
+          Fechar
+        </Button>
       </DialogActions>
     </Dialog>
   );

@@ -11,22 +11,17 @@ import {
   Button,
   useTheme,
   useMediaQuery,
-  Avatar,
-  Divider,
-  IconButton
+  Divider
 } from '@mui/material';
 import {
   ThumbUp as LikeIcon,
   ChatBubbleOutline as CommentIcon,
   Visibility as VisibilityIcon,
-  Link as LinkIcon,
   Image as ImageIcon,
   VideoLibrary as VideoIcon,
   ViewCarousel as CarouselIcon,
   TrendingUp as TrendingUpIcon,
   People as ReachIcon,
-  Share as ShareIcon,
-  Bookmark as SaveIcon,
   Launch as LaunchIcon
 } from '@mui/icons-material';
 import { InstagramPost } from '../../services/instagramMetricsService';
@@ -86,64 +81,70 @@ const FeaturedPost: React.FC<FeaturedPostProps> = ({ post, onViewDetails, format
     }
   };
 
-  // Calcular métricas
-  const engagement = post.insights?.engagement || (post.like_count + post.comments_count);
-  const reach = post.insights?.reach || 0;
+  // Calcular métricas reais
+  const likes = post.like_count || 0;
+  const comments = post.comments_count || 0;
   const saved = post.insights?.saved || 0;
   const shares = post.insights?.shares || 0;
+  const reach = post.insights?.reach || 0;
+  const impressions = post.insights?.impressions || 0;
+  
+  // Engajamento total (métricas reais)
+  const totalEngagement = likes + comments + saved + shares;
+  
+  // Taxa de engajamento (se tiver reach)
+  const engagementRate = reach > 0 ? (totalEngagement / reach) * 100 : 0;
 
   return (
     <Grid item xs={12}>
       <Paper 
-        elevation={3} 
+        elevation={0} 
         sx={{ 
-          borderRadius: 3,
+          borderRadius: 2,
           overflow: 'hidden',
-          background: `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.grey[50]} 100%)`,
-          border: `1px solid ${theme.palette.divider}`,
-          transition: 'all 0.3s ease',
+          bgcolor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
+          transition: 'all 0.2s ease',
           '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: theme.shadows[8]
+            borderColor: getMediaTypeColor(post.media_type, post.media_product_type),
+            boxShadow: `0 4px 12px ${getMediaTypeColor(post.media_type, post.media_product_type)}20`
           }
         }}
       >
-        {/* Header */}
+        {/* Header Minimalista */}
         <Box sx={{ 
-          p: 3, 
-          pb: 2,
-          background: `linear-gradient(135deg, ${getMediaTypeColor(post.media_type, post.media_product_type)}15 0%, transparent 100%)`
+          p: 2.5, 
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 2
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h5" sx={{ 
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1
-            }}>
-              <TrendingUpIcon sx={{ color: theme.palette.success.main }} />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <TrendingUpIcon sx={{ color: theme.palette.success.main, fontSize: 20 }} />
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
               Post Mais Engajado
             </Typography>
-            
             <Chip 
               icon={getMediaTypeIcon(post.media_type, post.media_product_type)}
               label={getMediaTypeLabel(post.media_type, post.media_product_type)}
+              size="small"
               sx={{ 
-                fontWeight: 600,
-                backgroundColor: `${getMediaTypeColor(post.media_type, post.media_product_type)}20`,
+                fontWeight: 500,
+                fontSize: '0.75rem',
+                height: 24,
+                bgcolor: `${getMediaTypeColor(post.media_type, post.media_product_type)}10`,
                 color: getMediaTypeColor(post.media_type, post.media_product_type),
-                border: `1px solid ${getMediaTypeColor(post.media_type, post.media_product_type)}40`
+                border: `1px solid ${getMediaTypeColor(post.media_type, post.media_product_type)}30`
               }}
             />
           </Box>
-
-          <Typography variant="body2" color="text.secondary" sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 1,
-            fontWeight: 500
-          }}>
-            📅 Publicado {formatTimeAgo(post.timestamp)}
+          
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
+            {formatTimeAgo(post.timestamp)}
           </Typography>
         </Box>
 
@@ -154,174 +155,193 @@ const FeaturedPost: React.FC<FeaturedPostProps> = ({ post, onViewDetails, format
           backgroundColor: 'transparent'
         }}>
           {/* Imagem */}
-          <Box sx={{ position: 'relative' }}>
+          <Box sx={{ position: 'relative', flexShrink: 0 }}>
             <CardMedia
               component="img"
               sx={{ 
-                width: isMobile ? '100%' : 280,
-                height: isMobile ? 250 : 280,
-                objectFit: 'cover'
+                width: isMobile ? '100%' : 240,
+                height: isMobile ? 240 : 240,
+                objectFit: 'cover',
+                bgcolor: 'grey.100'
               }}
               image={post.thumbnail_url || post.media_url}
               alt={post.caption || 'Post do Instagram'}
             />
             
-            {/* Badge de Engajamento */}
-            <Box sx={{
-              position: 'absolute',
-              top: 12,
-              right: 12,
-              backgroundColor: 'rgba(0,0,0,0.8)',
-              borderRadius: 2,
-              px: 1.5,
-              py: 0.5,
-              backdropFilter: 'blur(10px)'
-            }}>
-              <Typography variant="caption" sx={{ 
-                color: 'white', 
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5
+            {/* Badge de Engajamento Minimalista */}
+            {engagementRate > 0 && (
+              <Box sx={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                bgcolor: 'success.main',
+                borderRadius: 1.5,
+                px: 1,
+                py: 0.5
               }}>
-                🔥 {post.engagement_rate?.toFixed(1) || '0.0'}%
-              </Typography>
-            </Box>
+                <Typography variant="caption" sx={{ 
+                  color: 'white', 
+                  fontWeight: 700,
+                  fontSize: '0.6875rem'
+                }}>
+                  {engagementRate.toFixed(1)}%
+                </Typography>
+              </Box>
+            )}
           </Box>
 
           {/* Conteúdo */}
           <CardContent sx={{ 
             flex: '1 0 auto', 
-            p: 3,
+            p: 2.5,
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between'
           }}>
             {/* Caption */}
-            <Box>
-              <Typography variant="body1" sx={{ 
-                mb: 3,
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" sx={{ 
                 lineHeight: 1.6,
-                color: theme.palette.text.primary,
-                fontWeight: 400
+                color: 'text.secondary',
+                fontSize: '0.875rem'
               }}>
-                {post.caption && post.caption.length > 150 
-                  ? `${post.caption.substring(0, 150)}...` 
+                {post.caption && post.caption.length > 120 
+                  ? `${post.caption.substring(0, 120)}...` 
                   : post.caption || 'Sem legenda'}
               </Typography>
             </Box>
 
-            {/* Métricas */}
-            <Box sx={{ mb: 3 }}>
-              <Grid container spacing={2}>
+            {/* Métricas Minimalistas */}
+            <Box sx={{ mb: 2 }}>
+              <Grid container spacing={1.5}>
                 <Grid item xs={6} sm={3}>
-                  <Box sx={{ textAlign: 'center', p: 1.5, borderRadius: 2, backgroundColor: theme.palette.error.main + '10' }}>
-                    <LikeIcon sx={{ color: theme.palette.error.main, mb: 0.5 }} />
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.error.main }}>
-                      {post.like_count.toLocaleString()}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Curtidas
-                    </Typography>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 1,
+                    p: 1,
+                    borderRadius: 1,
+                    bgcolor: 'grey.50'
+                  }}>
+                    <LikeIcon sx={{ color: 'error.main', fontSize: 18 }} />
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                        {likes.toLocaleString()}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem' }}>
+                        Curtidas
+                      </Typography>
+                    </Box>
                   </Box>
                 </Grid>
 
                 <Grid item xs={6} sm={3}>
-                  <Box sx={{ textAlign: 'center', p: 1.5, borderRadius: 2, backgroundColor: theme.palette.info.main + '10' }}>
-                    <CommentIcon sx={{ color: theme.palette.info.main, mb: 0.5 }} />
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.info.main }}>
-                      {post.comments_count.toLocaleString()}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Comentários
-                    </Typography>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 1,
+                    p: 1,
+                    borderRadius: 1,
+                    bgcolor: 'grey.50'
+                  }}>
+                    <CommentIcon sx={{ color: 'info.main', fontSize: 18 }} />
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                        {comments.toLocaleString()}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem' }}>
+                        Comentários
+                      </Typography>
+                    </Box>
                   </Box>
                 </Grid>
 
                 {reach > 0 && (
                   <Grid item xs={6} sm={3}>
-                    <Box sx={{ textAlign: 'center', p: 1.5, borderRadius: 2, backgroundColor: theme.palette.warning.main + '10' }}>
-                      <ReachIcon sx={{ color: theme.palette.warning.main, mb: 0.5 }} />
-                      <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.warning.main }}>
-                        {reach.toLocaleString()}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Alcance
-                      </Typography>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 1,
+                      p: 1,
+                      borderRadius: 1,
+                      bgcolor: 'grey.50'
+                    }}>
+                      <ReachIcon sx={{ color: 'warning.main', fontSize: 18 }} />
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                          {reach.toLocaleString()}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem' }}>
+                          Alcance
+                        </Typography>
+                      </Box>
                     </Box>
                   </Grid>
                 )}
 
-                {saved > 0 && (
+                {impressions > 0 && (
                   <Grid item xs={6} sm={3}>
-                    <Box sx={{ textAlign: 'center', p: 1.5, borderRadius: 2, backgroundColor: theme.palette.success.main + '10' }}>
-                      <SaveIcon sx={{ color: theme.palette.success.main, mb: 0.5 }} />
-                      <Typography variant="h6" sx={{ fontWeight: 700, color: theme.palette.success.main }}>
-                        {saved.toLocaleString()}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Salvos
-                      </Typography>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 1,
+                      p: 1,
+                      borderRadius: 1,
+                      bgcolor: 'grey.50'
+                    }}>
+                      <VisibilityIcon sx={{ color: 'primary.main', fontSize: 18 }} />
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                          {impressions.toLocaleString()}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem' }}>
+                          Impressões
+                        </Typography>
+                      </Box>
                     </Box>
                   </Grid>
                 )}
               </Grid>
             </Box>
 
-            <Divider sx={{ my: 2 }} />
+            <Divider sx={{ my: 1.5 }} />
 
-            {/* Ações */}
-            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+            {/* Ações Minimalistas */}
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
               <Button 
-                startIcon={<VisibilityIcon />}
-                variant="contained"
+                variant="outlined"
+                size="small"
                 onClick={() => onViewDetails(post)}
                 sx={{ 
-                  borderRadius: 2,
+                  borderRadius: 1.5,
                   textTransform: 'none',
-                  fontWeight: 600,
-                  px: 3
+                  fontWeight: 500,
+                  fontSize: '0.8125rem',
+                  px: 2,
+                  py: 0.75
                 }}
               >
                 Ver Detalhes
               </Button>
               
               <Button 
-                startIcon={<LaunchIcon />}
                 variant="outlined"
+                size="small"
                 href={post.permalink}
                 target="_blank"
                 rel="noopener noreferrer"
+                startIcon={<LaunchIcon sx={{ fontSize: 16 }} />}
                 sx={{ 
-                  borderRadius: 2,
+                  borderRadius: 1.5,
                   textTransform: 'none',
-                  fontWeight: 600,
-                  px: 3
+                  fontWeight: 500,
+                  fontSize: '0.8125rem',
+                  px: 2,
+                  py: 0.75
                 }}
               >
-                Abrir no Instagram
+                Instagram
               </Button>
-
-              {/* Botão de Compartilhar */}
-              <IconButton 
-                onClick={() => {
-                  if (navigator.share) {
-                    navigator.share({
-                      title: 'Post do Instagram',
-                      text: post.caption || '',
-                      url: post.permalink
-                    });
-                  } else {
-                    navigator.clipboard.writeText(post.permalink);
-                  }
-                }}
-                sx={{ 
-                  border: `1px solid ${theme.palette.divider}`,
-                  borderRadius: 2
-                }}
-              >
-                <ShareIcon />
-              </IconButton>
             </Box>
           </CardContent>
         </Card>

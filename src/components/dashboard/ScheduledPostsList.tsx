@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Grid,
   Typography,
@@ -9,7 +9,11 @@ import {
   Chip,
   IconButton,
   Tooltip,
-  Alert
+  Alert,
+  ToggleButtonGroup,
+  ToggleButton,
+  Avatar,
+  Divider
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -22,7 +26,8 @@ import {
   Sync as SyncIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
-  Cancel as CancelIcon
+  Cancel as CancelIcon,
+  Person as PersonIcon
 } from '@mui/icons-material';
 
 interface ScheduledPost {
@@ -30,10 +35,17 @@ interface ScheduledPost {
   caption: string;
   images: string[];
   scheduled_date: string;
-  status: 'pending' | 'sent_to_n8n' | 'processing' | 'published' | 'failed' | 'cancelled';
+  status: 'pending' | 'sent_to_n8n' | 'processing' | 'published' | 'posted' | 'failed' | 'cancelled';
   created_at: string;
   post_type?: 'post' | 'carousel' | 'reels' | 'stories';
   video?: string;
+  user_id?: string;
+  profiles?: {
+    id: string;
+    email: string;
+    full_name?: string;
+  };
+  posted_at?: string;
 }
 
 interface ScheduledPostsListProps {
@@ -47,6 +59,8 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
   onEditPost,
   onDeletePost
 }) => {
+  const [filter, setFilter] = useState<'all' | 'scheduled' | 'published'>('all');
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
@@ -56,6 +70,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
       case 'processing':
         return 'primary';
       case 'published':
+      case 'posted':
         return 'success';
       case 'failed':
         return 'error';
@@ -75,6 +90,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
       case 'processing':
         return 'Processando';
       case 'published':
+      case 'posted':
         return 'Publicado';
       case 'failed':
         return 'Falhou';
@@ -94,6 +110,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
       case 'processing':
         return <SyncIcon fontSize="small" />;
       case 'published':
+      case 'posted':
         return <CheckCircleIcon fontSize="small" />;
       case 'failed':
         return <ErrorIcon fontSize="small" />;
@@ -106,11 +123,11 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
 
   const getMediaTypeIcon = (post: ScheduledPost) => {
     if (post.video) {
-      return <VideoIcon fontSize="small" color="action" />;
+      return <VideoIcon fontSize="small" />;
     } else if (post.images && post.images.length > 1) {
-      return <ViewCarouselIcon fontSize="small" color="action" />;
+      return <ViewCarouselIcon fontSize="small" />;
     } else {
-      return <ImageIcon fontSize="small" color="action" />;
+      return <ImageIcon fontSize="small" />;
     }
   };
 
@@ -120,7 +137,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
     } else if (post.post_type === 'stories') {
       return 'Stories';
     } else if (post.images && post.images.length > 1) {
-      return `Carrossel (${post.images.length} imagens)`;
+      return 'Carrossel';
     } else if (post.video) {
       return 'Vídeo';
     } else {
@@ -138,75 +155,217 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
     });
   };
 
+  // Filtrar posts
+  const filteredPosts = useMemo(() => {
+    if (filter === 'all') return posts;
+    if (filter === 'scheduled') {
+      return posts.filter(p => p.status === 'pending' || p.status === 'sent_to_n8n' || p.status === 'processing');
+    }
+    if (filter === 'published') {
+      return posts.filter(p => p.status === 'published' || p.status === 'posted');
+    }
+    return posts;
+  }, [posts, filter]);
+
   if (posts.length === 0) {
     return (
-      <Alert severity="info">
+      <Alert severity="info" sx={{ borderRadius: 2 }}>
         Não há posts agendados para este cliente.
       </Alert>
     );
   }
 
   return (
-    <Grid container spacing={2}>
-      {posts.map((post) => (
-        <Grid item xs={12} sm={6} md={4} key={post.id}>
-          <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {post.images && post.images.length > 0 && (
-              <CardMedia
-                component="img"
-                height="200"
-                image={post.images[0]}
-                alt={post.caption}
-                sx={{ objectFit: 'cover' }}
-              />
-            )}
-            
-            <CardContent sx={{ flexGrow: 1 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                <Chip 
-                  label={getStatusLabel(post.status)}
-                  color={getStatusColor(post.status) as any}
-                  size="small"
-                  icon={getStatusIcon(post.status)}
-                />
-                <Box>
-                  <Tooltip title="Editar">
-                    <IconButton size="small" onClick={() => onEditPost(post)}>
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Excluir">
-                    <IconButton size="small" onClick={() => onDeletePost(post.id)} color="error">
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </Box>
-              
-              <Typography variant="body2" sx={{ mb: 2, height: 60, overflow: 'hidden' }}>
-                {post.caption && post.caption.length > 100 
-                  ? `${post.caption.substring(0, 100)}...` 
-                  : post.caption || 'Sem legenda'}
-              </Typography>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <ScheduleIcon fontSize="small" color="action" />
-                <Typography variant="caption" color="text.secondary">
-                  {formatScheduledDate(post.scheduled_date)}
-                </Typography>
-              </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {getMediaTypeIcon(post)}
-                <Typography variant="caption" color="text.secondary">
-                  {getMediaTypeLabel(post)}
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      ))}
-    </Grid>
+    <Box>
+      {/* Filtros */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+        <Typography variant="h6" fontWeight={600}>
+          Posts Agendados
+        </Typography>
+        
+        <ToggleButtonGroup
+          value={filter}
+          exclusive
+          onChange={(_, newFilter) => {
+            if (newFilter) setFilter(newFilter);
+          }}
+          size="small"
+          sx={{
+            '& .MuiToggleButton-root': {
+              px: 2,
+              py: 0.75,
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              border: '1px solid',
+              borderColor: 'divider',
+              '&.Mui-selected': {
+                bgcolor: 'primary.main',
+                color: 'white',
+                borderColor: 'primary.main',
+                '&:hover': {
+                  bgcolor: 'primary.dark',
+                }
+              },
+              '&:not(.Mui-selected)': {
+                bgcolor: 'background.paper',
+                '&:hover': {
+                  bgcolor: 'action.hover'
+                }
+              }
+            }
+          }}
+        >
+          <ToggleButton value="all">Todos</ToggleButton>
+          <ToggleButton value="scheduled">Agendados</ToggleButton>
+          <ToggleButton value="published">Publicados</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
+      {/* Cards */}
+      <Grid container spacing={2}>
+        {filteredPosts.map((post) => {
+          const imageUrl = Array.isArray(post.images) && post.images.length > 0 
+            ? (typeof post.images[0] === 'string' 
+                ? post.images[0] 
+                : (post.images[0] as any)?.url || null)
+            : null;
+          
+          const userName = post.profiles?.full_name || post.profiles?.email?.split('@')[0] || 'Usuário';
+
+          return (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={post.id}>
+              <Card sx={{ 
+                height: '100%', 
+                display: 'flex', 
+                flexDirection: 'column',
+                border: '1px solid',
+                borderColor: 'divider',
+                boxShadow: 'none',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  borderColor: 'primary.main',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                }
+              }}>
+                {/* Imagem */}
+                {imageUrl && (
+                  <CardMedia
+                    component="img"
+                    height="140"
+                    image={imageUrl}
+                    alt={post.caption}
+                    sx={{ 
+                      objectFit: 'cover',
+                      bgcolor: 'grey.100'
+                    }}
+                  />
+                )}
+                
+                <CardContent sx={{ flexGrow: 1, p: 2, display: 'flex', flexDirection: 'column' }}>
+                  {/* Status e Ações */}
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                    <Chip 
+                      label={getStatusLabel(post.status)}
+                      color={getStatusColor(post.status) as any}
+                      size="small"
+                      icon={getStatusIcon(post.status)}
+                      sx={{ 
+                        fontSize: '0.6875rem',
+                        height: 24,
+                        fontWeight: 500
+                      }}
+                    />
+                    <Box>
+                      <Tooltip title="Editar">
+                        <IconButton 
+                          size="small" 
+                          onClick={() => onEditPost(post)}
+                          sx={{ p: 0.5 }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Excluir">
+                        <IconButton 
+                          size="small" 
+                          onClick={() => onDeletePost(post.id)} 
+                          color="error"
+                          sx={{ p: 0.5 }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </Box>
+                  
+                  {/* Caption */}
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      mb: 1.5, 
+                      minHeight: 40,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      fontSize: '0.8125rem',
+                      color: 'text.secondary',
+                      lineHeight: 1.4
+                    }}
+                  >
+                    {post.caption || 'Sem legenda'}
+                  </Typography>
+                  
+                  <Divider sx={{ my: 1 }} />
+                  
+                  {/* Informações */}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 'auto' }}>
+                    {/* Tipo de mídia */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {getMediaTypeIcon(post)}
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                        {getMediaTypeLabel(post)}
+                      </Typography>
+                    </Box>
+                    
+                    {/* Data agendada */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <ScheduleIcon fontSize="small" sx={{ color: 'text.secondary', fontSize: 14 }} />
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                        {formatScheduledDate(post.scheduled_date)}
+                      </Typography>
+                    </Box>
+                    
+                    {/* Data de publicação (se publicado) */}
+                    {post.posted_at && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CheckCircleIcon fontSize="small" sx={{ color: 'success.main', fontSize: 14 }} />
+                        <Typography variant="caption" color="success.main" sx={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                          Publicado em {formatScheduledDate(post.posted_at)}
+                        </Typography>
+                      </Box>
+                    )}
+                    
+                    {/* Usuário que criou */}
+                    {post.profiles && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                        <Avatar sx={{ width: 20, height: 20, bgcolor: 'primary.main', fontSize: '0.625rem' }}>
+                          {userName.charAt(0).toUpperCase()}
+                        </Avatar>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+                          {userName}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          );
+        })}
+      </Grid>
+    </Box>
   );
 };
 

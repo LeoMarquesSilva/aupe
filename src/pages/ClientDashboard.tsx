@@ -773,6 +773,7 @@ const ClientDashboard: React.FC = () => {
             clients={clients} 
             onAddClient={handleAddClient} 
             onSelectClient={() => {}} 
+            addOnly={true}
           />
         </DialogContent>
         <DialogActions>

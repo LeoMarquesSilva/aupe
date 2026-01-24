@@ -166,8 +166,6 @@ class InstagramMetricsService {
    */
   private async getPostInsights(postId: string, accessToken: string, mediaType: string, mediaProductType?: string): Promise<InstagramInsights | null> {
     try {
-      console.log(`🔍 Buscando insights para post ${postId} (${mediaType}${mediaProductType ? ` - ${mediaProductType}` : ''})`);
-      
       // ✅ MÉTRICAS CORRIGIDAS - SEM 'plays' que foi descontinuado
       let metricsStrategies: string[][] = [];
       
@@ -203,13 +201,15 @@ class InstagramMetricsService {
         ];
       }
 
+      let permissionError = false;
+      let lastError: any = null;
+
       // Tentar cada estratégia - OTIMIZADO
       for (let i = 0; i < metricsStrategies.length; i++) {
         const metrics = metricsStrategies[i];
         
         try {
           const url = `${this.baseUrl}/${postId}/insights?metric=${metrics.join(',')}&access_token=${accessToken}`;
-          console.log(`📊 Tentativa ${i + 1}/${metricsStrategies.length}: ${metrics.join(', ')}`);
           
           const response = await fetch(url);
           
@@ -222,7 +222,6 @@ class InstagramMetricsService {
               insightsData.data.forEach((metric: any) => {
                 if (metric.values && metric.values.length > 0) {
                   const value = metric.values[0].value;
-                  console.log(`📈 ${metric.name} = ${value}`);
                   hasData = true;
                   
                   switch (metric.name) {
@@ -253,23 +252,39 @@ class InstagramMetricsService {
             }
 
             if (hasData) {
-              console.log(`✅ Insights obtidos: ${Object.keys(insights).length} métricas`);
               return insights;
             }
           } else {
             const errorData = await response.json().catch(() => ({}));
-            console.log(`❌ Erro ${response.status}: ${errorData.error?.message?.substring(0, 100) || 'Erro desconhecido'}`);
+            const errorCode = errorData.error?.code;
+            const errorMessage = errorData.error?.message || '';
+            
+            // Detectar erro de permissão (#10)
+            if (errorCode === 10 || errorMessage.includes('permission')) {
+              permissionError = true;
+              lastError = errorData;
+              // Se é erro de permissão, não adianta tentar outras estratégias
+              break;
+            }
+            
+            lastError = errorData;
           }
         } catch (strategyError) {
-          console.log(`❌ Erro na tentativa ${i + 1}:`, strategyError);
+          lastError = strategyError;
           continue;
         }
       }
 
-      console.log(`⚠️ Nenhum insight disponível para post ${postId}`);
+      // Se foi erro de permissão, retornar null silenciosamente (sem log)
+      // Os logs de permissão serão feitos apenas uma vez no início do processamento
+      if (permissionError) {
+        return null;
+      }
+
+      // Outros erros também retornam null sem log (para não poluir o console)
       return null;
     } catch (error) {
-      console.error(`❌ Erro geral ao buscar insights do post ${postId}:`, error);
+      // Erros gerais também sem log
       return null;
     }
   }
@@ -419,6 +434,7 @@ class InstagramMetricsService {
       // ✅ PROCESSAMENTO OTIMIZADO COM BATCH
       const postsWithInsights = [];
       const batchSize = 5; // Processar 5 posts por vez
+      let permissionErrorDetected = false;
       
       for (let i = 0; i < posts.length; i += batchSize) {
         const batch = posts.slice(i, i + batchSize);
@@ -427,15 +443,33 @@ class InstagramMetricsService {
         // Processar lote em paralelo
         const batchPromises = batch.map(async (post: any, batchIndex: number) => {
           const postIndex = i + batchIndex + 1;
-          console.log(`📝 Post ${postIndex}/${posts.length}: ${post.id}`);
           
-          // Buscar insights
+          // Buscar insights (sem log individual para reduzir verbosidade)
           const insights = await this.getPostInsights(
             post.id, 
             client.access_token, 
             post.media_type,
             post.media_product_type
           );
+          
+          // Detectar erro de permissão no primeiro post que falhar (apenas uma vez)
+          if (!insights && !permissionErrorDetected && postIndex === 1) {
+            try {
+              const testUrl = `${this.baseUrl}/${post.id}/insights?metric=reach&access_token=${client.access_token}`;
+              const testResponse = await fetch(testUrl);
+              if (!testResponse.ok) {
+                const testError = await testResponse.json().catch(() => ({}));
+                if (testError.error?.code === 10) {
+                  permissionErrorDetected = true;
+                  console.warn(`⚠️ Token não tem permissão para acessar insights do Instagram (código #10).`);
+                  console.warn(`💡 SOLUÇÃO: Reconecte a conta do Instagram para gerar um novo token com a permissão 'instagram_manage_insights'.`);
+                  console.warn(`   Isso permitirá acessar impressões, reach e outras métricas detalhadas.`);
+                }
+              }
+            } catch (e) {
+              // Ignorar erro de teste
+            }
+          }
           
           // Calcular engajamento total
           const likes = insights?.likes || post.like_count || 0;

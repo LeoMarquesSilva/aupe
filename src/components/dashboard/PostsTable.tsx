@@ -30,7 +30,7 @@ import {
   Favorite as FavoriteIcon,
   Comment as CommentIcon,
   Visibility as ReachIcon,
-  BarChart as BarChartIcon
+  Instagram as InstagramIcon
 } from '@mui/icons-material';
 import { InstagramPost } from '../../services/instagramMetricsService';
 
@@ -203,98 +203,103 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
   return (
     <Grid item xs={12}>
       <Paper 
-        elevation={3} 
+        elevation={0} 
         sx={{ 
-          borderRadius: 3,
+          borderRadius: 2,
           overflow: 'hidden',
-          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.02)} 0%, ${alpha(theme.palette.secondary.main, 0.02)} 100%)`,
-          border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+          border: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper'
         }}
       >
-        {/* Header */}
+        {/* Header - Minimalista */}
         <Box sx={{ 
-          p: 3, 
-          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          background: `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`
+          p: 2, 
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 2
         }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box sx={{ 
-                p: 1.5, 
-                borderRadius: 2, 
-                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <BarChartIcon sx={{ color: 'white', fontSize: 24 }} />
-              </Box>
-              <Box>
-                <Typography variant="h5" fontWeight="bold" color="primary">
-                  Posts do Instagram
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Análise detalhada de performance • Clique nos cabeçalhos para ordenar
-                </Typography>
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Chip 
-                label={`Ordenado por: ${
-                  sortField === 'date' ? 'Data' :
-                  sortField === 'likes' ? 'Curtidas' :
-                  sortField === 'comments' ? 'Comentários' :
-                  sortField === 'reach' ? 'Alcance' :
-                  sortField === 'engagement' ? 'Engajamento Total' :
-                  'Taxa de Engajamento'
-                } (${sortOrder === 'desc' ? 'Maior→Menor' : 'Menor→Maior'})`}
-                size="small"
-                sx={{ 
-                  fontWeight: 'medium',
-                  backgroundColor: theme.palette.secondary.main,
-                  color: 'white',
-                  '& .MuiChip-label': {
-                    color: 'white'
-                  }
-                }}
-              />
-                  <Chip 
-                    label={`${posts.length} posts`}
-                    color="primary"
-                    variant="outlined"
-                    sx={{ 
-                      fontWeight: 'bold',
-                      color: 'white',
-                      borderColor: 'white',
-                      '& .MuiChip-label': {
-                        color: 'white'
-                      }
-                    }}
-                  />
-            </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <InstagramIcon sx={{ color: '#E1306C', fontSize: 20 }} />
+            <Typography variant="h6" fontWeight={600}>
+              Posts do Instagram
+            </Typography>
+            <Chip 
+              label={posts.length}
+              size="small"
+              sx={{ 
+                height: 22,
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                bgcolor: 'primary.main',
+                color: 'white'
+              }}
+            />
+          </Box>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
+              Ordenado por:
+            </Typography>
+            <Chip 
+              label={
+                sortField === 'date' ? 'Data' :
+                sortField === 'likes' ? 'Curtidas' :
+                sortField === 'comments' ? 'Comentários' :
+                sortField === 'reach' ? 'Alcance' :
+                sortField === 'engagement' ? 'Engajamento' :
+                'Taxa de Engajamento'
+              }
+              size="small"
+              sx={{ 
+                height: 22,
+                fontSize: '0.75rem',
+                fontWeight: 500,
+                bgcolor: 'action.selected',
+                border: '1px solid',
+                borderColor: 'divider'
+              }}
+            />
+            <Chip 
+              icon={sortOrder === 'desc' ? <TrendingUpIcon sx={{ fontSize: 14 }} /> : <TrendingUpIcon sx={{ fontSize: 14, transform: 'rotate(180deg)' }} />}
+              label={sortOrder === 'desc' ? '↓' : '↑'}
+              size="small"
+              sx={{ 
+                height: 22,
+                minWidth: 32,
+                fontSize: '0.75rem',
+                bgcolor: 'transparent',
+                border: '1px solid',
+                borderColor: 'divider'
+              }}
+            />
           </Box>
         </Box>
         
         {/* Table */}
-        <TableContainer sx={{ maxHeight: 800 }}>
-          <Table stickyHeader sx={{ minWidth: 1200 }}>
+        <TableContainer sx={{ maxHeight: 600 }}>
+          <Table stickyHeader sx={{ minWidth: 1000 }}>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ 
-                  fontWeight: 'bold', 
-                  background: alpha(theme.palette.primary.main, 0.05),
-                  minWidth: 300
+                  fontWeight: 600, 
+                  bgcolor: 'grey.50',
+                  minWidth: 300,
+                  py: 1.5
                 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <ImageIcon fontSize="small" />
-                    Post
-                  </Box>
+                  Post
                 </TableCell>
                 
                 <TableCell sx={{ 
-                  fontWeight: 'bold', 
-                  background: alpha(theme.palette.primary.main, 0.05),
-                  minWidth: 120
+                  fontWeight: 600, 
+                  bgcolor: 'grey.50',
+                  minWidth: 120,
+                  py: 1.5
                 }}>
                   <TableSortLabel
                     active={sortField === 'date'}
@@ -302,7 +307,7 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                     onClick={() => handleSort('date')}
                     sx={{
                       '& .MuiTableSortLabel-icon': {
-                        color: `${theme.palette.primary.main} !important`,
+                        opacity: sortField === 'date' ? 1 : 0.3,
                       },
                     }}
                   >
@@ -311,17 +316,19 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                 </TableCell>
                 
                 <TableCell sx={{ 
-                  fontWeight: 'bold', 
-                  background: alpha(theme.palette.primary.main, 0.05),
-                  minWidth: 100
+                  fontWeight: 600, 
+                  bgcolor: 'grey.50',
+                  minWidth: 100,
+                  py: 1.5
                 }}>
                   Tipo
                 </TableCell>
                 
                 <TableCell align="right" sx={{ 
-                  fontWeight: 'bold', 
-                  background: alpha(theme.palette.primary.main, 0.05),
-                  minWidth: 100
+                  fontWeight: 600, 
+                  bgcolor: 'grey.50',
+                  minWidth: 100,
+                  py: 1.5
                 }}>
                   <TableSortLabel
                     active={sortField === 'likes'}
@@ -330,21 +337,24 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                     sx={{
                       flexDirection: 'row-reverse',
                       '& .MuiTableSortLabel-icon': {
-                        color: `${theme.palette.error.main} !important`,
+                        opacity: sortField === 'likes' ? 1 : 0.3,
                       },
                     }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <FavoriteIcon fontSize="small" color="error" />
-                      Curtidas
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
+                      <FavoriteIcon fontSize="small" sx={{ color: '#E91E63', fontSize: 16 }} />
+                      <Typography component="span" variant="body2" fontWeight={600}>
+                        Curtidas
+                      </Typography>
                     </Box>
                   </TableSortLabel>
                 </TableCell>
                 
                 <TableCell align="right" sx={{ 
-                  fontWeight: 'bold', 
-                  background: alpha(theme.palette.primary.main, 0.05),
-                  minWidth: 120
+                  fontWeight: 600, 
+                  bgcolor: 'grey.50',
+                  minWidth: 120,
+                  py: 1.5
                 }}>
                   <TableSortLabel
                     active={sortField === 'comments'}
@@ -353,21 +363,24 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                     sx={{
                       flexDirection: 'row-reverse',
                       '& .MuiTableSortLabel-icon': {
-                        color: `${theme.palette.primary.main} !important`,
+                        opacity: sortField === 'comments' ? 1 : 0.3,
                       },
                     }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CommentIcon fontSize="small" color="primary" />
-                      Comentários
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
+                      <CommentIcon fontSize="small" sx={{ color: 'primary.main', fontSize: 16 }} />
+                      <Typography component="span" variant="body2" fontWeight={600}>
+                        Comentários
+                      </Typography>
                     </Box>
                   </TableSortLabel>
                 </TableCell>
                 
                 <TableCell align="right" sx={{ 
-                  fontWeight: 'bold', 
-                  background: alpha(theme.palette.primary.main, 0.05),
-                  minWidth: 100
+                  fontWeight: 600, 
+                  bgcolor: 'grey.50',
+                  minWidth: 100,
+                  py: 1.5
                 }}>
                   <TableSortLabel
                     active={sortField === 'reach'}
@@ -376,21 +389,24 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                     sx={{
                       flexDirection: 'row-reverse',
                       '& .MuiTableSortLabel-icon': {
-                        color: `${theme.palette.info.main} !important`,
+                        opacity: sortField === 'reach' ? 1 : 0.3,
                       },
                     }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <ReachIcon fontSize="small" color="info" />
-                      Alcance
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
+                      <ReachIcon fontSize="small" sx={{ color: 'info.main', fontSize: 16 }} />
+                      <Typography component="span" variant="body2" fontWeight={600}>
+                        Alcance
+                      </Typography>
                     </Box>
                   </TableSortLabel>
                 </TableCell>
                 
                 <TableCell align="right" sx={{ 
-                  fontWeight: 'bold', 
-                  background: alpha(theme.palette.primary.main, 0.05),
-                  minWidth: 130
+                  fontWeight: 600, 
+                  bgcolor: 'grey.50',
+                  minWidth: 130,
+                  py: 1.5
                 }}>
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
                     <TableSortLabel
@@ -400,13 +416,15 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                       sx={{
                         flexDirection: 'row-reverse',
                         '& .MuiTableSortLabel-icon': {
-                          color: `${theme.palette.success.main} !important`,
+                          opacity: sortField === 'engagement' ? 1 : 0.3,
                         },
                       }}
                     >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <TrendingUpIcon fontSize="small" color="success" />
-                        Total
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
+                        <TrendingUpIcon fontSize="small" sx={{ color: 'success.main', fontSize: 16 }} />
+                        <Typography component="span" variant="body2" fontWeight={600}>
+                          Engajamento
+                        </Typography>
                       </Box>
                     </TableSortLabel>
                     <TableSortLabel
@@ -415,21 +433,25 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                       onClick={() => handleSort('engagement_rate')}
                       sx={{
                         flexDirection: 'row-reverse',
-                        fontSize: '0.75rem',
+                        fontSize: '0.7rem',
                         '& .MuiTableSortLabel-icon': {
-                          color: `${theme.palette.success.main} !important`,
+                          opacity: sortField === 'engagement_rate' ? 1 : 0.3,
+                          fontSize: '0.875rem'
                         },
                       }}
                     >
-                      Taxa %
+                      <Typography component="span" variant="caption" fontWeight={500}>
+                        Taxa %
+                      </Typography>
                     </TableSortLabel>
                   </Box>
                 </TableCell>
                 
                 <TableCell align="center" sx={{ 
-                  fontWeight: 'bold', 
-                  background: alpha(theme.palette.primary.main, 0.05),
-                  minWidth: 120
+                  fontWeight: 600, 
+                  bgcolor: 'grey.50',
+                  minWidth: 100,
+                  py: 1.5
                 }}>
                   Ações
                 </TableCell>
@@ -448,156 +470,185 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                       key={post.id}
                       sx={{ 
                         '&:hover': { 
-                          backgroundColor: alpha(theme.palette.primary.main, 0.02),
-                          transform: 'translateY(-1px)',
-                          boxShadow: `0 4px 8px ${alpha(theme.palette.primary.main, 0.1)}`
+                          bgcolor: 'action.hover'
                         },
-                        transition: 'all 0.2s ease-in-out',
-                        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.05)}`
+                        transition: 'background-color 0.2s ease',
+                        borderBottom: '1px solid',
+                        borderColor: 'divider'
                       }}
                     >
                       {/* Post Preview */}
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Avatar 
-                            variant="rounded"
-                            src={post.thumbnail_url || post.media_url}
-                            alt={post.caption}
+                      <TableCell sx={{ py: 1.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Box
                             sx={{ 
-                              width: 60, 
-                              height: 60,
-                              border: `2px solid ${getMediaTypeColor(post)}`,
-                              boxShadow: `0 2px 8px ${alpha(getMediaTypeColor(post), 0.3)}`
+                              width: 50, 
+                              height: 50,
+                              borderRadius: 1,
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              bgcolor: 'grey.100',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              overflow: 'hidden',
+                              position: 'relative'
                             }}
                           >
-                            {getMediaTypeIcon(post)}
-                          </Avatar>
+                            {(post.thumbnail_url || post.media_url) ? (
+                              <Box
+                                component="img"
+                                src={post.thumbnail_url || post.media_url}
+                                alt={post.caption}
+                                sx={{ 
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover'
+                                }}
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                }}
+                              />
+                            ) : null}
+                            {(!post.thumbnail_url && !post.media_url) && (
+                              <Box sx={{ color: 'text.secondary' }}>
+                                {getMediaTypeIcon(post)}
+                              </Box>
+                            )}
+                          </Box>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography 
                               variant="body2" 
-                              fontWeight="medium"
+                              fontWeight={500}
                               sx={{ 
                                 display: '-webkit-box',
                                 WebkitLineClamp: 2,
                                 WebkitBoxOrient: 'vertical',
                                 overflow: 'hidden',
-                                lineHeight: 1.3,
-                                mb: 0.5
+                                lineHeight: 1.4,
+                                mb: 0.25
                               }}
                             >
-                              {post.caption && post.caption.length > 80 
-                                ? `${post.caption.substring(0, 80)}...` 
+                              {post.caption && post.caption.length > 60 
+                                ? `${post.caption.substring(0, 60)}...` 
                                 : post.caption || 'Sem legenda'}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              ID: {post.id.substring(0, 15)}...
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              {getMediaTypeIcon(post)}
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                                {getMediaTypeLabel(post)}
+                              </Typography>
+                            </Box>
                           </Box>
                         </Box>
                       </TableCell>
 
                       {/* Data */}
-                      <TableCell>
-                        <Typography variant="body2" fontWeight="medium">
+                      <TableCell sx={{ py: 1.5 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
                           {formatTimestamp(post.timestamp)}
                         </Typography>
                       </TableCell>
 
-                      {/* Tipo */}
-                      <TableCell>
+                      {/* Tipo - Removido, já está no preview */}
+                      <TableCell sx={{ py: 1.5 }}>
                         <Chip 
                           icon={getMediaTypeIcon(post)}
                           label={getMediaTypeLabel(post)}
                           size="small"
                           sx={{ 
-                            backgroundColor: alpha(getMediaTypeColor(post), 0.1),
+                            height: 22,
+                            fontSize: '0.7rem',
+                            fontWeight: 500,
+                            bgcolor: alpha(getMediaTypeColor(post), 0.1),
                             color: getMediaTypeColor(post),
-                            fontWeight: 'bold',
+                            border: '1px solid',
+                            borderColor: alpha(getMediaTypeColor(post), 0.3),
                             '& .MuiChip-icon': {
-                              color: getMediaTypeColor(post)
+                              color: getMediaTypeColor(post),
+                              fontSize: 14
                             }
                           }}
                         />
                       </TableCell>
 
                       {/* Curtidas */}
-                      <TableCell align="right">
+                      <TableCell align="right" sx={{ py: 1.5 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
-                          <FavoriteIcon fontSize="small" sx={{ color: '#E91E63' }} />
-                          <Typography variant="body2" fontWeight="bold" color="text.primary">
+                          <FavoriteIcon fontSize="small" sx={{ color: '#E91E63', fontSize: 16 }} />
+                          <Typography variant="body2" fontWeight={600} color="text.primary">
                             {formatNumber(post.like_count || 0)}
                           </Typography>
                         </Box>
                       </TableCell>
 
                       {/* Comentários */}
-                      <TableCell align="right">
+                      <TableCell align="right" sx={{ py: 1.5 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
-                          <CommentIcon fontSize="small" color="primary" />
-                          <Typography variant="body2" fontWeight="bold" color="text.primary">
+                          <CommentIcon fontSize="small" sx={{ color: 'primary.main', fontSize: 16 }} />
+                          <Typography variant="body2" fontWeight={600} color="text.primary">
                             {formatNumber(post.comments_count || 0)}
                           </Typography>
                         </Box>
                       </TableCell>
 
                       {/* Alcance */}
-                      <TableCell align="right">
+                      <TableCell align="right" sx={{ py: 1.5 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
-                          <ReachIcon fontSize="small" color="info" />
-                          <Typography variant="body2" fontWeight="bold" color="text.primary">
+                          <ReachIcon fontSize="small" sx={{ color: 'info.main', fontSize: 16 }} />
+                          <Typography variant="body2" fontWeight={600} color="text.primary">
                             {reach > 0 ? formatNumber(reach) : '-'}
                           </Typography>
                         </Box>
-                        {reach === 0 && (
-                          <Typography variant="caption" color="text.secondary">
-                            Estimado
-                          </Typography>
-                        )}
                       </TableCell>
 
                       {/* Engajamento */}
-                      <TableCell align="right">
+                      <TableCell align="right" sx={{ py: 1.5 }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <TrendingUpIcon fontSize="small" sx={{ color: getEngagementColor(engagementRate) }} />
-                            <Typography variant="body2" fontWeight="bold" color="text.primary">
+                            <TrendingUpIcon fontSize="small" sx={{ color: getEngagementColor(engagementRate), fontSize: 16 }} />
+                            <Typography variant="body2" fontWeight={600} color="text.primary">
                               {formatNumber(totalEngagement)}
                             </Typography>
                           </Box>
                           <Chip
-                            label={`${engagementRate}%`}
+                            label={`${engagementRate.toFixed(1)}%`}
                             size="small"
                             sx={{
-                              backgroundColor: alpha(getEngagementColor(engagementRate), 0.1),
+                              height: 20,
+                              fontSize: '0.7rem',
+                              fontWeight: 600,
+                              bgcolor: alpha(getEngagementColor(engagementRate), 0.1),
                               color: getEngagementColor(engagementRate),
-                              fontWeight: 'bold',
-                              fontSize: '0.75rem',
-                              height: 20
+                              border: '1px solid',
+                              borderColor: alpha(getEngagementColor(engagementRate), 0.3)
                             }}
                           />
                         </Box>
                       </TableCell>
 
                       {/* Ações */}
-                      <TableCell align="center">
+                      <TableCell align="center" sx={{ py: 1.5 }}>
                         <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
-                          <Tooltip title="Ver detalhes" arrow>
+                          <Tooltip title="Ver detalhes">
                             <IconButton 
                               size="small" 
                               onClick={() => onViewDetails(post)}
                               sx={{ 
-                                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                bgcolor: 'background.paper',
                                 '&:hover': { 
-                                  backgroundColor: alpha(theme.palette.primary.main, 0.2),
-                                  transform: 'scale(1.1)'
-                                },
-                                transition: 'all 0.2s ease-in-out'
+                                  bgcolor: 'action.hover',
+                                  borderColor: 'primary.main'
+                                }
                               }}
                             >
-                              <VisibilityIcon fontSize="small" color="primary" />
+                              <VisibilityIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Ver no Instagram" arrow>
+                          <Tooltip title="Ver no Instagram">
                             <IconButton 
                               size="small"
                               component="a"
@@ -605,15 +656,16 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                               target="_blank"
                               rel="noopener noreferrer"
                               sx={{ 
-                                backgroundColor: alpha(theme.palette.secondary.main, 0.1),
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                bgcolor: 'background.paper',
                                 '&:hover': { 
-                                  backgroundColor: alpha(theme.palette.secondary.main, 0.2),
-                                  transform: 'scale(1.1)'
-                                },
-                                transition: 'all 0.2s ease-in-out'
+                                  bgcolor: 'action.hover',
+                                  borderColor: '#E1306C'
+                                }
                               }}
                             >
-                              <LinkIcon fontSize="small" color="secondary" />
+                              <InstagramIcon fontSize="small" sx={{ color: '#E1306C' }} />
                             </IconButton>
                           </Tooltip>
                         </Box>
@@ -627,27 +679,31 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
 
         {/* Pagination */}
         <Box sx={{ 
-          p: 2, 
-          borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          background: alpha(theme.palette.background.paper, 0.8)
+          px: 2,
+          py: 1.5, 
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper'
         }}>
           <TablePagination
-            rowsPerPageOptions={[5, 10, 25, 50]}
+            rowsPerPageOptions={[10, 25, 50]}
             component="div"
             count={sortedPosts.length}
             rowsPerPage={rowsPerPage}
             page={page}
             onPageChange={handleChangePage}
             onRowsPerPageChange={handleChangeRowsPerPage}
-            labelRowsPerPage="Posts por página:"
+            labelRowsPerPage="Por página:"
             labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count !== -1 ? count : `mais de ${to}`}`}
             sx={{
               '& .MuiTablePagination-toolbar': {
                 paddingLeft: 0,
-                paddingRight: 0
+                paddingRight: 0,
+                minHeight: 44
               },
               '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
-                fontWeight: 'medium'
+                fontSize: '0.875rem',
+                fontWeight: 500
               }
             }}
           />

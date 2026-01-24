@@ -26,8 +26,7 @@ import {
   Add as AddIcon, 
   Delete as DeleteIcon, 
   Instagram as InstagramIcon,
-  Search as SearchIcon,
-  PhotoCamera as PhotoCameraIcon
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { clientService } from '../services/supabaseClient';
 import { Client } from '../types';
@@ -44,6 +43,8 @@ interface ClientManagerProps {
   onClientAdded?: (newClient: Omit<Client, 'id'>) => Promise<void>;
   onClientUpdated?: (updatedClient: Client) => void;
   onClientDeleted?: (clientId: string) => void;
+  // Prop para mostrar apenas o formulário de adicionar (sem lista)
+  addOnly?: boolean;
 }
 
 const ClientManager: React.FC<ClientManagerProps> = ({ 
@@ -53,7 +54,8 @@ const ClientManager: React.FC<ClientManagerProps> = ({
   selectedClientId,
   onClientAdded,
   onClientUpdated,
-  onClientDeleted
+  onClientDeleted,
+  addOnly = false
 }) => {
   const [name, setName] = useState<string>('');
   const [instagram, setInstagram] = useState<string>('');
@@ -105,6 +107,9 @@ const ClientManager: React.FC<ClientManagerProps> = ({
       setAppId('');
       setAccessToken('');
       setUserId('');
+
+      // Se addOnly, o componente pai deve fechar o modal
+      // Não precisamos fazer nada aqui, apenas limpar o formulário
 
     } catch (error) {
       console.error('Erro ao adicionar cliente:', error);
@@ -195,6 +200,54 @@ const ClientManager: React.FC<ClientManagerProps> = ({
     client.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     client.instagram.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Se addOnly for true, mostrar apenas o formulário de adicionar
+  if (addOnly) {
+    return (
+      <Box sx={{ p: 3 }}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TextField
+            fullWidth
+            label="Nome do Cliente"
+            variant="outlined"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          
+          <TextField
+            fullWidth
+            label="Usuário do Instagram"
+            variant="outlined"
+            value={instagram}
+            onChange={(e) => setInstagram(e.target.value)}
+            required
+            InputProps={{
+              startAdornment: <InputAdornment position="start">@</InputAdornment>,
+            }}
+          />
+          
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={handleAddClient}
+              disabled={loading || !name || !instagram}
+            >
+              {loading ? <CircularProgress size={24} /> : 'Adicionar Cliente'}
+            </Button>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: 0 }}>
@@ -385,27 +438,6 @@ const ClientManager: React.FC<ClientManagerProps> = ({
               />
             </Box>
             
-            <Box sx={{ flex: '1 1 100%' }}>
-              <TextField
-                fullWidth
-                label="URL do Logo"
-                variant="outlined"
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="https://exemplo.com/logo.png"
-                helperText="Opcional: URL para o logo do cliente"
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton>
-                        <PhotoCameraIcon />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Box>
-            
             <Box sx={{ flex: '1 1 100%', display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
               <Button
                 variant="contained"
@@ -420,7 +452,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
           </Box>
           
           <Typography variant="body2" color="text.secondary" sx={{ mt: 4 }}>
-            Após adicionar o cliente, você poderá conectar a conta do Instagram na aba "Lista de Clientes".
+            Após adicionar o cliente, você poderá conectar a conta do Instagram diretamente no card do cliente. O logo será obtido automaticamente quando a conta for conectada.
           </Typography>
         </Box>
       )}

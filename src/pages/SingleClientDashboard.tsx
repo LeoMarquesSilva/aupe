@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Container,
@@ -14,7 +14,12 @@ import {
   Grid,
   Typography,
   Chip,
-  LinearProgress
+  LinearProgress,
+  Tooltip,
+  ToggleButtonGroup,
+  ToggleButton,
+  alpha,
+  useTheme
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -45,7 +50,8 @@ import {
 } from '../services/instagramMetricsService';
 import { instagramCacheService, CachedData } from '../services/instagramCacheService';
 import { clientService } from '../services/supabaseClient';
-import { formatDistanceToNow } from 'date-fns';
+import { pdfExportService } from '../services/pdfExportService';
+import { formatDistanceToNow, subDays, isAfter, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 // Importar componentes
@@ -57,7 +63,8 @@ import {
   PostFilters,
   PostDetails,
   ClientSettings,
-  ScheduledPostsList
+  ScheduledPostsList,
+  PDFExportDialog
 } from '../components/dashboard';
 
 interface TabPanelProps {
@@ -89,6 +96,7 @@ function TabPanel(props: TabPanelProps) {
 const SingleClientDashboard: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
+  const theme = useTheme();
   const [tabValue, setTabValue] = useState(0);
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,6 +117,10 @@ const SingleClientDashboard: React.FC = () => {
     recent_posts: InstagramPost[];
   } | null>(null);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
+  const [insightsPermissionError, setInsightsPermissionError] = useState(false);
+  
+  // Filtro de período global
+  const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d');
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -124,6 +136,12 @@ const SingleClientDashboard: React.FC = () => {
   
   // Scheduled posts
   const [scheduledPosts, setScheduledPosts] = useState<any[]>([]);
+  
+  // Estatísticas de posts
+  const [postsStats, setPostsStats] = useState<{
+    published: number;
+    scheduled: number;
+  }>({ published: 0, scheduled: 0 });
 
   // Debug client data
   useEffect(() => {
@@ -174,15 +192,49 @@ const SingleClientDashboard: React.FC = () => {
     
     const fetchScheduledPosts = async () => {
       try {
-        const { data, error } = await supabase
+        // Buscar posts agendados
+        const { data: postsData, error: postsError } = await supabase
           .from('scheduled_posts')
           .select('*')
           .eq('client_id', clientId)
           .order('scheduled_date', { ascending: true });
           
-        if (error) throw error;
+        if (postsError) throw postsError;
         
-        setScheduledPosts(data || []);
+        // Calcular estatísticas
+        const published = (postsData || []).filter(p => 
+          p.status === 'published' || p.status === 'posted'
+        ).length;
+        const scheduled = (postsData || []).filter(p => 
+          p.status === 'pending' || p.status === 'sent_to_n8n'
+        ).length;
+        
+        setPostsStats({ published, scheduled });
+        
+        // Buscar informações dos usuários únicos
+        const userIds = [...new Set((postsData || []).map(p => p.user_id).filter(Boolean))];
+        let usersMap: Record<string, any> = {};
+        
+        if (userIds.length > 0) {
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, email, full_name')
+            .in('id', userIds);
+          
+          if (profilesData) {
+            profilesData.forEach(profile => {
+              usersMap[profile.id] = profile;
+            });
+          }
+        }
+        
+        // Combinar posts com informações dos usuários
+        const postsWithUsers = (postsData || []).map(post => ({
+          ...post,
+          profiles: post.user_id ? usersMap[post.user_id] : null
+        }));
+        
+        setScheduledPosts(postsWithUsers);
       } catch (err: any) {
         console.error('Erro ao buscar posts agendados:', err);
       }
@@ -220,9 +272,20 @@ const SingleClientDashboard: React.FC = () => {
       // Gerar dados do dashboard se temos posts
       if (result.posts.length > 0) {
         await generateDashboardData(result.posts);
+        
+        // Verificar se há erro de permissão: se temos posts mas nenhum tem insights
+        const hasAnyInsights = result.posts.some(post => post.insights?.reach || post.insights?.impressions);
+        
+        // Se temos posts mas nenhum tem insights, provavelmente é erro de permissão
+        if (!hasAnyInsights && result.posts.length > 0) {
+          setInsightsPermissionError(true);
+        } else {
+          setInsightsPermissionError(false);
+        }
       } else {
         // Limpar dashboard se não há posts
         setDashboardData(null);
+        setInsightsPermissionError(false);
       }
       
       console.log(`📊 Dashboard atualizado: ${result.posts.length} posts, fonte: ${result.isFromCache ? 'cache' : 'API'}`);
@@ -284,11 +347,15 @@ const SingleClientDashboard: React.FC = () => {
   };
   
   const handleCreatePost = () => {
-    navigate('/create-post');
+    navigate(`/create-post?clientId=${clientId}`);
   };
   
   const handleCreateStory = () => {
-    navigate('/create-story');
+    navigate(`/create-story?clientId=${clientId}`);
+  };
+
+  const handleCreateReels = () => {
+    navigate(`/create-reels?clientId=${clientId}`);
   };
   
   const handleViewCalendar = () => {
@@ -478,6 +545,44 @@ const SingleClientDashboard: React.FC = () => {
       setError('Não foi possível exportar os dados.');
     }
   };
+
+  const [pdfExportDialogOpen, setPdfExportDialogOpen] = useState(false);
+
+  const handleExportPDF = async (exportOptions: any) => {
+    if (!client || !dashboardData || !legacyMetrics) {
+      setError('Não há dados suficientes para gerar o relatório.');
+      return;
+    }
+
+    try {
+      const posts = cachedData?.posts || [];
+      
+      await pdfExportService.generatePDFReport({
+        client,
+        profile: cachedData?.profile || null,
+        posts,
+        metrics: {
+          totalPosts: legacyMetrics.totalPosts,
+          totalLikes: legacyMetrics.totalLikes,
+          totalComments: legacyMetrics.totalComments,
+          totalReach: legacyMetrics.totalReach || 0,
+          totalImpressions: legacyMetrics.totalImpressions || 0,
+          engagementRate: legacyMetrics.engagementRate,
+          periodComparisons: legacyMetrics.periodComparisons,
+          previousPeriodValues: legacyMetrics.previousPeriodValues,
+          engagementBreakdown: legacyMetrics.engagementBreakdown,
+          postsByType: legacyMetrics.postsByType,
+          mostEngagedPost: legacyMetrics.mostEngagedPost
+        },
+        period,
+        postsStats,
+        options: exportOptions
+      });
+    } catch (err) {
+      console.error('❌ Erro ao gerar PDF:', err);
+      setError('Não foi possível gerar o relatório PDF.');
+    }
+  };
   
   // Utility functions
   const formatTimestamp = (timestamp: string) => {
@@ -497,15 +602,23 @@ const SingleClientDashboard: React.FC = () => {
     });
   };
   
-  // Filter posts
+  // Filter posts com período global
   const posts = cachedData?.posts || [];
+  const cutoffDate = subDays(new Date(), period === '7d' ? 7 : period === '30d' ? 30 : 90);
+  
   const filteredPosts = posts.filter(post => {
+    // Filter by período global
+    const postDate = new Date(post.timestamp);
+    if (!isAfter(postDate, cutoffDate)) {
+      return false;
+    }
+    
     // Filter by search
     if (searchQuery && !post.caption?.toLowerCase().includes(searchQuery.toLowerCase())) {
       return false;
     }
     
-    // Filter by date
+    // Filter by date (filtros adicionais do dialog)
     if (filters.startDate && new Date(post.timestamp) < filters.startDate) {
       return false;
     }
@@ -556,35 +669,234 @@ const SingleClientDashboard: React.FC = () => {
   });
   
   // Criar métricas compatíveis com o componente MetricsOverview
-  const legacyMetrics = dashboardData ? {
-    totalPosts: dashboardData.summary.total_posts,
-    totalLikes: dashboardData.engagement_breakdown.likes,
-    totalComments: dashboardData.engagement_breakdown.comments,
-    engagementRate: dashboardData.summary.engagement_rate,
-    postsByType: Object.keys(dashboardData.by_media_type).reduce((acc, key) => {
-      acc[key] = dashboardData.by_media_type[key].count;
-      return acc;
-    }, {} as Record<string, number>),
-    metricsByMonth: dashboardData.timeline.map(item => ({
-      month: item.date.substring(0, 7), // YYYY-MM
-      posts: item.posts,
-      likes: Math.round(item.engagement * 0.8), // Estimativa
-      comments: Math.round(item.engagement * 0.2), // Estimativa
-      engagement: item.engagement
-    })),
-    mostEngagedPost: dashboardData.top_posts[0] || null,
-    totalImpressions: dashboardData.summary.total_impressions,
-    totalReach: dashboardData.summary.total_reach
-  } : {
-    totalPosts: 0,
-    totalLikes: 0,
-    totalComments: 0,
-    engagementRate: 0,
-    postsByType: {},
-    metricsByMonth: [],
-    mostEngagedPost: null,
-    totalImpressions: 0,
-    totalReach: 0
+  // Aplicar filtro de período nas métricas
+  const legacyMetrics = useMemo(() => {
+    if (!dashboardData) {
+      return {
+        totalPosts: 0,
+        totalLikes: 0,
+        totalComments: 0,
+        engagementRate: 0,
+        postsByType: {},
+        metricsByMonth: [],
+        mostEngagedPost: null,
+        totalImpressions: 0,
+        totalReach: 0
+      };
+    }
+
+    // Filtrar timeline por período
+    const cutoffDate = subDays(new Date(), period === '7d' ? 7 : period === '30d' ? 30 : 90);
+    const filteredTimeline = dashboardData.timeline.filter(item => {
+      const itemDate = parseISO(item.date + '-01');
+      return isAfter(itemDate, cutoffDate);
+    });
+
+    // Calcular totais do período filtrado
+    const totals = filteredTimeline.reduce((acc, item) => ({
+      posts: acc.posts + (item.posts || 0),
+      engagement: acc.engagement + (item.engagement || 0),
+      reach: acc.reach + (item.reach || 0),
+      impressions: acc.impressions + (item.impressions || 0),
+    }), { posts: 0, engagement: 0, reach: 0, impressions: 0 });
+
+    // Calcular proporção de likes/comments baseado no total do breakdown
+    const totalEngagement = dashboardData.engagement_breakdown.total;
+    const likesRatio = totalEngagement > 0 
+      ? dashboardData.engagement_breakdown.likes / totalEngagement 
+      : 0.8;
+    const commentsRatio = totalEngagement > 0 
+      ? dashboardData.engagement_breakdown.comments / totalEngagement 
+      : 0.2;
+
+    // Filtrar posts por período para calcular métricas
+    const filteredPostsForMetrics = posts.filter(post => {
+      const postDate = new Date(post.timestamp);
+      return isAfter(postDate, cutoffDate);
+    });
+
+    const filteredLikes = filteredPostsForMetrics.reduce((sum, post) => sum + (post.like_count || 0), 0);
+    const filteredComments = filteredPostsForMetrics.reduce((sum, post) => sum + (post.comments_count || 0), 0);
+    const filteredReach = filteredPostsForMetrics.reduce((sum, post) => sum + (post.insights?.reach || 0), 0);
+    
+    // Calcular impressões - tentar múltiplas fontes
+    const filteredImpressions = filteredPostsForMetrics.reduce((sum, post) => {
+      const impressions = post.insights?.impressions || post.impressions || 0;
+      return sum + impressions;
+    }, 0);
+    
+    // Calcular impressões da timeline filtrada (mais confiável)
+    const timelineImpressions = filteredTimeline.reduce((sum, item) => sum + (item.impressions || 0), 0);
+    
+    // Usar a melhor fonte disponível
+    let totalImpressions = filteredImpressions;
+    if (totalImpressions === 0 && timelineImpressions > 0) {
+      totalImpressions = timelineImpressions;
+    } else if (totalImpressions === 0 && dashboardData.summary.total_impressions > 0) {
+      // Se temos o total de impressões mas não nos posts filtrados, usar proporção
+      const totalPosts = posts.length;
+      const filteredPostsCount = filteredPostsForMetrics.length;
+      if (totalPosts > 0 && filteredPostsCount > 0) {
+        const proportion = filteredPostsCount / totalPosts;
+        totalImpressions = Math.round(dashboardData.summary.total_impressions * proportion);
+      } else {
+        totalImpressions = dashboardData.summary.total_impressions;
+      }
+    } else if (totalImpressions === 0) {
+      // Último fallback: usar o total do summary
+      totalImpressions = dashboardData.summary.total_impressions || 0;
+    }
+    
+    const filteredEngagementRate = filteredReach > 0 
+      ? ((filteredLikes + filteredComments) / filteredReach) * 100 
+      : 0;
+
+    // Calcular métricas do período anterior para comparação
+    const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
+    const previousPeriodEnd = cutoffDate; // Fim do período anterior = início do período atual
+    const previousPeriodStart = subDays(previousPeriodEnd, days); // Início do período anterior
+    
+    // Filtrar posts do período anterior
+    const previousPeriodPosts = posts.filter(post => {
+      const postDate = new Date(post.timestamp);
+      return postDate >= previousPeriodStart && postDate < previousPeriodEnd;
+    });
+    
+    // Calcular métricas do período anterior
+    const previousLikes = previousPeriodPosts.reduce((sum, post) => sum + (post.like_count || 0), 0);
+    const previousComments = previousPeriodPosts.reduce((sum, post) => sum + (post.comments_count || 0), 0);
+    const previousReach = previousPeriodPosts.reduce((sum, post) => sum + (post.insights?.reach || 0), 0);
+    const previousImpressions = previousPeriodPosts.reduce((sum, post) => {
+      const impressions = post.insights?.impressions || post.impressions || 0;
+      return sum + impressions;
+    }, 0);
+    const previousPosts = previousPeriodPosts.length;
+    const previousEngagementRate = previousReach > 0 
+      ? ((previousLikes + previousComments) / previousReach) * 100 
+      : 0;
+
+    // Calcular mudanças percentuais
+    const calculateChange = (current: number, previous: number): number => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return ((current - previous) / previous) * 100;
+    };
+
+    // Calcular breakdown de engajamento do período filtrado
+    const filteredEngagementBreakdown = filteredPostsForMetrics.reduce((breakdown, post) => {
+      const likes = post.like_count || 0;
+      const comments = post.comments_count || 0;
+      const saved = post.insights?.saved || 0;
+      const shares = post.insights?.shares || 0;
+      
+      return {
+        likes: breakdown.likes + likes,
+        comments: breakdown.comments + comments,
+        saved: breakdown.saved + saved,
+        shares: breakdown.shares + shares,
+        total: breakdown.total + likes + comments + saved + shares
+      };
+    }, { likes: 0, comments: 0, saved: 0, shares: 0, total: 0 });
+
+    return {
+      totalPosts: filteredPostsForMetrics.length,
+      totalLikes: filteredLikes,
+      totalComments: filteredComments,
+      engagementRate: filteredEngagementRate,
+      totalReach: filteredReach,
+      totalImpressions: totalImpressions,
+      postsByType: Object.keys(dashboardData.by_media_type).reduce((acc, key) => {
+        acc[key] = dashboardData.by_media_type[key].count;
+        return acc;
+      }, {} as Record<string, number>),
+      engagementBreakdown: filteredEngagementBreakdown,
+      metricsByMonth: filteredTimeline.map(item => ({
+        month: item.date.substring(0, 7), // YYYY-MM
+        posts: item.posts,
+        likes: Math.round(item.engagement * likesRatio),
+        comments: Math.round(item.engagement * commentsRatio),
+        engagement: item.engagement,
+        reach: item.reach || 0,
+        impressions: item.impressions || 0
+      })),
+      // Comparações com período anterior
+      periodComparisons: {
+        posts: calculateChange(filteredPostsForMetrics.length, previousPosts),
+        likes: calculateChange(filteredLikes, previousLikes),
+        comments: calculateChange(filteredComments, previousComments),
+        reach: calculateChange(filteredReach, previousReach),
+        impressions: calculateChange(totalImpressions, previousImpressions),
+        engagementRate: calculateChange(filteredEngagementRate, previousEngagementRate)
+      },
+      // Valores absolutos do período anterior
+      previousPeriodValues: {
+        posts: previousPosts,
+        likes: previousLikes,
+        comments: previousComments,
+        reach: previousReach,
+        impressions: previousImpressions,
+        engagementRate: previousEngagementRate
+      },
+      // Calcular post mais engajado do período filtrado
+      mostEngagedPost: (() => {
+        if (filteredPostsForMetrics.length === 0) return null;
+        
+        // Calcular engajamento para cada post (usar insights reais quando disponível)
+        const postsWithEngagement = filteredPostsForMetrics.map(post => {
+          const likes = post.like_count || 0;
+          const comments = post.comments_count || 0;
+          const saved = post.insights?.saved || 0;
+          const shares = post.insights?.shares || 0;
+          const reach = post.insights?.reach || 0;
+          
+          // Engajamento total
+          const totalEngagement = likes + comments + saved + shares;
+          
+          // Taxa de engajamento (se tiver reach)
+          const engagementRate = reach > 0 ? (totalEngagement / reach) * 100 : 0;
+          
+          return {
+            post,
+            totalEngagement,
+            engagementRate,
+            reach
+          };
+        });
+        
+        // Ordenar por taxa de engajamento (se tiver reach), senão por engajamento total
+        postsWithEngagement.sort((a, b) => {
+          if (a.reach > 0 && b.reach > 0) {
+            return b.engagementRate - a.engagementRate;
+          } else if (a.reach > 0) {
+            return -1; // Posts com reach vêm primeiro
+          } else if (b.reach > 0) {
+            return 1;
+          } else {
+            return b.totalEngagement - a.totalEngagement;
+          }
+        });
+        
+        return postsWithEngagement[0]?.post || null;
+      })()
+    };
+  }, [dashboardData, period, posts]);
+  
+  // Extrair comparações e valores anteriores para passar ao MetricsOverview
+  const periodComparisons = legacyMetrics.periodComparisons || {
+    posts: 0,
+    likes: 0,
+    comments: 0,
+    reach: 0,
+    impressions: 0,
+    engagementRate: 0
+  };
+  
+  const previousPeriodValues = legacyMetrics.previousPeriodValues || {
+    posts: 0,
+    likes: 0,
+    comments: 0,
+    reach: 0,
+    impressions: 0,
+    engagementRate: 0
   };
   
   if (loading) {
@@ -637,216 +949,416 @@ const SingleClientDashboard: React.FC = () => {
         profile={cachedData?.profile || null} 
         onCreatePost={handleCreatePost}
         onCreateStory={handleCreateStory}
+        onCreateReels={handleCreateReels}
         onViewCalendar={handleViewCalendar}
+        cacheStatus={cachedData?.cacheStatus || null}
+        isStale={cachedData?.isStale || false}
+        formatTimeAgo={formatTimeAgo}
+        onForceRefresh={handleForceRefresh}
+        syncInProgress={syncInProgress}
+        postsStats={postsStats}
+        onExportPDF={() => setPdfExportDialogOpen(true)}
       />
 
-      {/* Erro não crítico */}
+      {/* Erro não crítico - Simplificado */}
       {error && cachedData && (
-        <Box sx={{ mb: 2 }}>
-          <Alert 
-            severity="warning"
-            onClose={() => setError(null)}
-          >
+        <Box sx={{ 
+          mb: 2,
+          p: 1.5,
+          borderRadius: 1,
+          bgcolor: 'warning.light',
+          border: '1px solid',
+          borderColor: 'warning.main',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 2
+        }}>
+          <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ErrorIcon fontSize="small" sx={{ color: 'warning.main' }} />
             {error} (Usando dados em cache)
-          </Alert>
+          </Typography>
+          <IconButton 
+            size="small" 
+            onClick={() => setError(null)}
+            sx={{ p: 0.5 }}
+          >
+            <ClearIcon fontSize="small" />
+          </IconButton>
         </Box>
       )}
 
-      {/* Status do Cache */}
-      {hasInstagramAuth && cachedData && (
-        <Box sx={{ mb: 3 }}>
-          <Alert 
-            severity={cachedData.isStale ? "warning" : "success"}
-            action={
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button 
-                  color="inherit" 
-                  size="small" 
-                  startIcon={<RefreshIcon />}
-                  onClick={handleForceRefresh}
-                  disabled={syncInProgress}
-                >
-                  {syncInProgress ? 'Atualizando...' : 'Atualizar'}
-                </Button>
-                <Button 
-                  color="inherit" 
-                  size="small" 
-                  onClick={handleClearCache}
-                  disabled={syncInProgress}
-                >
-                  Limpar Cache
-                </Button>
-              </Box>
-            }
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {cachedData.cacheStatus.syncStatus === 'completed' ? (
-                  <CheckCircleIcon fontSize="small" />
-                ) : cachedData.cacheStatus.syncStatus === 'failed' ? (
-                  <ErrorIcon fontSize="small" />
-                ) : (
-                  <ScheduleIcon fontSize="small" />
-                )}
-                <Typography variant="body2">
-                  {cachedData.isStale 
-                    ? `Dados desatualizados (última sincronização: ${formatTimeAgo(cachedData.cacheStatus.lastFullSync.toISOString())})`
-                    : `Dados atualizados (${formatTimeAgo(cachedData.cacheStatus.lastFullSync.toISOString())})`
-                  }
-                </Typography>
-              </Box>
-              
-              <Chip 
-                size="small" 
-                label={`${cachedData.cacheStatus.postsCount} posts em cache`}
-                color={cachedData.isStale ? "warning" : "success"}
-                variant="outlined"
-              />
-              
-              {cachedData.cacheStatus.syncStatus === 'failed' && cachedData.cacheStatus.errorMessage && (
-                <Chip 
-                  size="small" 
-                  label={`Erro: ${cachedData.cacheStatus.errorMessage}`}
-                  color="error"
-                  variant="outlined"
-                />
-              )}
-            </Box>
-          </Alert>
-        </Box>
+      {/* Alerta de Permissão de Insights */}
+      {insightsPermissionError && hasInstagramAuth && (
+        <Alert 
+          severity="warning" 
+          sx={{ mb: 3 }}
+          action={
+            <Button 
+              color="inherit" 
+              size="small" 
+              onClick={handleConnectInstagram}
+              sx={{ fontWeight: 600 }}
+            >
+              Reconectar
+            </Button>
+          }
+        >
+          <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+            Token sem permissão para insights
+          </Typography>
+          <Typography variant="body2">
+            O token atual não tem a permissão 'instagram_manage_insights'. Reconecte a conta do Instagram para acessar impressões, reach e outras métricas detalhadas.
+          </Typography>
+        </Alert>
       )}
+
       
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={tabValue} onChange={handleTabChange} aria-label="dashboard tabs">
-          <Tab icon={<DashboardIcon />} label="Dashboard" id="tab-0" aria-controls="tabpanel-0" />
-          <Tab icon={<InstagramIcon />} label="Instagram" id="tab-1" aria-controls="tabpanel-1" />
-          <Tab icon={<CalendarIcon />} label="Agendamentos" id="tab-2" aria-controls="tabpanel-2" />
-          <Tab icon={<SettingsIcon />} label="Configurações" id="tab-3" aria-controls="tabpanel-3" />
+      <Box 
+        sx={{ 
+          mb: 4,
+          position: 'relative'
+        }}
+      >
+        <Tabs 
+          value={tabValue} 
+          onChange={handleTabChange} 
+          aria-label="dashboard tabs"
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            position: 'relative',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: '2px',
+              background: `linear-gradient(90deg, ${alpha('#000', 0.05)}, ${alpha('#000', 0.02)}, ${alpha('#000', 0.05)})`,
+            },
+            '& .MuiTabs-indicator': {
+              height: 3,
+              borderRadius: '3px 3px 0 0',
+              background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.primary.light || theme.palette.primary.main})`,
+              boxShadow: `0 -2px 8px ${alpha(theme.palette.primary.main, 0.3)}`,
+            },
+            '& .MuiTab-root': {
+              minHeight: 72,
+              textTransform: 'none',
+              fontWeight: 500,
+              fontSize: '0.9375rem',
+              px: 3,
+              py: 2,
+              color: 'text.secondary',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              position: 'relative',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                borderRadius: '12px 12px 0 0',
+                background: 'transparent',
+                transition: 'all 0.3s ease',
+                zIndex: 0
+              },
+              '&:hover': {
+                color: 'primary.main',
+                '&::before': {
+                  background: alpha(theme.palette.primary.main, 0.06)
+                },
+                transform: 'translateY(-2px)'
+              },
+              '&.Mui-selected': {
+                color: 'primary.main',
+                fontWeight: 700,
+                fontSize: '0.96875rem',
+                '&::before': {
+                  background: alpha(theme.palette.primary.main, 0.08)
+                },
+                '& .MuiSvgIcon-root': {
+                  transform: 'scale(1.1)',
+                  filter: `drop-shadow(0 2px 4px ${alpha(theme.palette.primary.main, 0.3)})`
+                }
+              },
+              '& .MuiSvgIcon-root': {
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                fontSize: '1.25rem',
+                mr: 1
+              }
+            }
+          }}
+        >
+          <Tab 
+            icon={<DashboardIcon />} 
+            iconPosition="start" 
+            label="Dashboard" 
+            id="tab-0" 
+            aria-controls="tabpanel-0"
+            sx={{
+              '&.Mui-selected': {
+                '& .MuiSvgIcon-root': {
+                  color: 'primary.main'
+                }
+              }
+            }}
+          />
+          <Tab 
+            icon={<CalendarIcon />} 
+            iconPosition="start" 
+            label="Agendamentos" 
+            id="tab-1" 
+            aria-controls="tabpanel-1"
+            sx={{
+              '&.Mui-selected': {
+                '& .MuiSvgIcon-root': {
+                  color: 'primary.main'
+                }
+              }
+            }}
+          />
+          <Tab 
+            icon={<SettingsIcon />} 
+            iconPosition="start" 
+            label="Configurações" 
+            id="tab-2" 
+            aria-controls="tabpanel-2"
+            sx={{
+              '&.Mui-selected': {
+                '& .MuiSvgIcon-root': {
+                  color: 'primary.main'
+                }
+              }
+            }}
+          />
         </Tabs>
       </Box>
 
       <TabPanel value={tabValue} index={0}>
         {!hasInstagramAuth ? (
-          <Alert 
-            severity="info" 
-            action={
-              <Button color="inherit" size="small" onClick={handleConnectInstagram}>
-                Conectar
-              </Button>
-            }
-          >
-            Conecte a conta do Instagram para visualizar o dashboard completo.
-          </Alert>
+          <Box sx={{ 
+            p: 3,
+            borderRadius: 2,
+            bgcolor: 'info.light',
+            border: '1px solid',
+            borderColor: 'info.main',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 2
+          }}>
+            <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <InstagramIcon sx={{ color: 'info.main' }} />
+              Conecte a conta do Instagram para visualizar o dashboard completo.
+            </Typography>
+            <Button 
+              variant="contained" 
+              size="small" 
+              onClick={handleConnectInstagram}
+              startIcon={<InstagramIcon />}
+            >
+              Conectar Instagram
+            </Button>
+          </Box>
         ) : loadingDashboard ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', my: 6, gap: 2 }}>
             <CircularProgress />
+            <Typography variant="body2" color="text.secondary">
+              Carregando métricas...
+            </Typography>
           </Box>
         ) : !dashboardData ? (
-          <Alert severity="info">
-            Não foram encontrados dados suficientes para gerar o dashboard.
-          </Alert>
-        ) : (
-          <MetricsOverview metrics={legacyMetrics} />
-        )}
-      </TabPanel>
-
-      <TabPanel value={tabValue} index={1}>
-        {!hasInstagramAuth ? (
-          <Alert 
-            severity="info" 
-            action={
-              <Button color="inherit" size="small" onClick={handleConnectInstagram}>
-                Conectar
-              </Button>
-            }
-          >
-            Conecte a conta do Instagram para visualizar os posts.
-          </Alert>
-        ) : posts.length === 0 ? (
-          <Alert 
-            severity="info"
-            action={
-              <Button color="inherit" size="small" onClick={handleForceRefresh}>
-                Tentar Novamente
-              </Button>
-            }
-          >
-            Não foram encontrados posts no Instagram deste cliente.
-          </Alert>
+          <Box sx={{ 
+            p: 3,
+            borderRadius: 2,
+            bgcolor: 'info.light',
+            border: '1px solid',
+            borderColor: 'info.main',
+            textAlign: 'center'
+          }}>
+            <Typography variant="body1" color="text.secondary">
+              Não foram encontrados dados suficientes para gerar o dashboard.
+            </Typography>
+          </Box>
         ) : (
           <>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-              <TextField
-                placeholder="Buscar por legenda..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                size="small"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
-                  endAdornment: searchQuery && (
-                    <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => setSearchQuery('')}>
-                        <ClearIcon fontSize="small" />
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
-                sx={{ flexGrow: 1, maxWidth: { xs: '100%', sm: 300 } }}
-              />
+            {/* Filtro de Período Global */}
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              mb: 3,
+              flexWrap: 'wrap',
+              gap: 2
+            }}>
+              <Typography variant="h6" fontWeight={600}>
+                Métricas de Performance
+              </Typography>
               
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button 
-                  variant="outlined" 
-                  startIcon={<FilterIcon />}
-                  onClick={handleOpenFilterDialog}
-                >
-                  Filtros
-                </Button>
-                
-                <Button 
-                  variant="outlined" 
-                  startIcon={<ExportIcon />}
-                  onClick={handleExportData}
-                  disabled={filteredPosts.length === 0}
-                >
-                  Exportar
-                </Button>
-              </Box>
+              <ToggleButtonGroup
+                value={period}
+                exclusive
+                onChange={(_, newPeriod) => {
+                  if (newPeriod) setPeriod(newPeriod);
+                }}
+                size="small"
+                sx={{
+                  '& .MuiToggleButton-root': {
+                    px: 2,
+                    py: 0.75,
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    '&.Mui-selected': {
+                      bgcolor: 'primary.main',
+                      color: 'white',
+                      borderColor: 'primary.main',
+                      '&:hover': {
+                        bgcolor: 'primary.dark',
+                      }
+                    },
+                    '&:not(.Mui-selected)': {
+                      bgcolor: 'background.paper',
+                      '&:hover': {
+                        bgcolor: 'action.hover'
+                      }
+                    }
+                  }
+                }}
+              >
+                <ToggleButton value="7d">7 dias</ToggleButton>
+                <ToggleButton value="30d">30 dias</ToggleButton>
+                <ToggleButton value="90d">90 dias</ToggleButton>
+              </ToggleButtonGroup>
             </Box>
-            
-            <Grid container spacing={3}>
+
+            <Grid container spacing={3} sx={{ mb: 4 }}>
               <Grid item xs={12}>
-                <MetricsOverview metrics={legacyMetrics} />
+                <MetricsOverview 
+                  metrics={legacyMetrics} 
+                  periodComparisons={periodComparisons}
+                  previousPeriodValues={previousPeriodValues}
+                />
               </Grid>
               
               {legacyMetrics.mostEngagedPost && (
-                <FeaturedPost 
-                  post={legacyMetrics.mostEngagedPost}
-                  onViewDetails={handleViewPostDetails}
-                  formatTimeAgo={formatTimeAgo}
-                />
+                <Grid item xs={12}>
+                  <FeaturedPost 
+                    post={legacyMetrics.mostEngagedPost}
+                    onViewDetails={handleViewPostDetails}
+                    formatTimeAgo={formatTimeAgo}
+                  />
+                </Grid>
               )}
-              
-              <Grid item xs={12}>
-                <PostsTable 
-                  posts={filteredPosts}
-                  onViewDetails={handleViewPostDetails}
-                  formatTimestamp={formatTimestamp}
-                />
-              </Grid>
             </Grid>
+
+            {/* Seção de Posts */}
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+                Posts do Instagram
+              </Typography>
+              
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 1.5, 
+                mb: 3,
+                flexWrap: 'wrap'
+              }}>
+                <TextField
+                  placeholder="Buscar por legenda..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  size="small"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchQuery && (
+                      <InputAdornment position="end">
+                        <IconButton 
+                          size="small" 
+                          onClick={() => setSearchQuery('')}
+                          sx={{ p: 0.5 }}
+                        >
+                          <ClearIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }}
+                  sx={{ 
+                    flexGrow: 1, 
+                    maxWidth: { xs: '100%', sm: 320 },
+                    '& .MuiOutlinedInput-root': {
+                      bgcolor: 'background.paper',
+                      '&:hover': {
+                        bgcolor: 'background.paper'
+                      }
+                    }
+                  }}
+                />
+                
+                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  <Tooltip title="Filtros">
+                    <IconButton 
+                      onClick={handleOpenFilterDialog}
+                      sx={{ 
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        bgcolor: 'background.paper',
+                        '&:hover': {
+                          bgcolor: 'action.hover',
+                          borderColor: 'primary.main'
+                        }
+                      }}
+                    >
+                      <FilterIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  
+                  <Tooltip title="Exportar dados">
+                    <IconButton 
+                      onClick={handleExportData}
+                      disabled={filteredPosts.length === 0}
+                      sx={{ 
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        bgcolor: 'background.paper',
+                        '&:hover': {
+                          bgcolor: 'action.hover',
+                          borderColor: 'primary.main'
+                        },
+                        '&.Mui-disabled': {
+                          borderColor: 'divider',
+                          opacity: 0.5
+                        }
+                      }}
+                    >
+                      <ExportIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </Box>
+              
+              <PostsTable 
+                posts={filteredPosts}
+                onViewDetails={handleViewPostDetails}
+                formatTimestamp={formatTimestamp}
+              />
+            </Box>
           </>
         )}
       </TabPanel>
 
-      <TabPanel value={tabValue} index={2}>
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>Posts Agendados</Typography>
-          <ScheduledPostsList 
+      <TabPanel value={tabValue} index={1}>
+        <ScheduledPostsList 
             posts={scheduledPosts}
             onEditPost={(post) => {
               navigate(`/clients/${clientId}/edit-post/${post.id}`);
@@ -868,10 +1380,9 @@ const SingleClientDashboard: React.FC = () => {
               }
             }}
           />
-        </Box>
       </TabPanel>
 
-      <TabPanel value={tabValue} index={3}>
+      <TabPanel value={tabValue} index={2}>
         <ClientSettings 
           client={client}
           hasInstagramAuth={hasInstagramAuth}
@@ -895,6 +1406,12 @@ const SingleClientDashboard: React.FC = () => {
         post={selectedPost}
         onClose={handleClosePostDetails}
         formatTimestamp={formatTimestamp}
+      />
+
+      <PDFExportDialog
+        open={pdfExportDialogOpen}
+        onClose={() => setPdfExportDialogOpen(false)}
+        onExport={handleExportPDF}
       />
     </Container>
   );
