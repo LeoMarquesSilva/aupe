@@ -56,6 +56,7 @@ import ClientManager from '../components/ClientManager';
 import StoryEditor from '../components/StoryEditor';
 import StoryPreview from '../components/StoryPreview';
 import DateTimePicker from '../components/DateTimePicker';
+import SubscriptionLimitsAlert from '../components/SubscriptionLimitsAlert';
 import { scheduleInstagramPost, uploadImagesToSupabaseStorage } from '../services/postService';
 
 const CreateStory: React.FC = () => {
@@ -664,6 +665,9 @@ const CreateStory: React.FC = () => {
                 </Card>
               )}
             </Paper>
+
+            {/* Alert de limites de subscription */}
+            <SubscriptionLimitsAlert type="post" />
 
             {/* Editor de Story */}
             <Paper 

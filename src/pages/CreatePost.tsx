@@ -46,6 +46,7 @@ import ClientManager from '../components/ClientManager';
 import ImageUploader from '../components/ImageUploader';
 import CaptionEditor from '../components/CaptionEditor';
 import DateTimePicker from '../components/DateTimePicker';
+import SubscriptionLimitsAlert from '../components/SubscriptionLimitsAlert';
 import { scheduleInstagramPost, uploadImagesToSupabaseStorage } from '../services/postService';
 
 const CreatePost: React.FC = () => {
@@ -504,6 +505,9 @@ const CreatePost: React.FC = () => {
             )}
           </Select>
         </FormControl>
+
+        {/* Alert de limites de subscription */}
+        <SubscriptionLimitsAlert type="post" />
 
         {selectedClient && (
           <Card 

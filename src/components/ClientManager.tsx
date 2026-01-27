@@ -32,6 +32,8 @@ import { clientService } from '../services/supabaseClient';
 import { Client } from '../types';
 import ConnectInstagram from './ConnectInstagram';
 import { InstagramAuthData } from '../services/instagramAuthService';
+import { subscriptionLimitsService } from '../services/subscriptionLimitsService';
+import SubscriptionLimitsAlert from './SubscriptionLimitsAlert';
 
 interface ClientManagerProps {
   clients: Client[];
@@ -80,6 +82,15 @@ const ClientManager: React.FC<ClientManagerProps> = ({
     setError(null);
 
     try {
+      // ✅ VALIDAÇÃO: Verificar limites de subscription
+      const limitCheck = await subscriptionLimitsService.canCreateClient();
+      
+      if (!limitCheck.allowed) {
+        setError(limitCheck.message || 'Não é possível adicionar mais contas Instagram. Faça upgrade do seu plano.');
+        setLoading(false);
+        return;
+      }
+
       const clientData = {
         name,
         instagram,
@@ -111,9 +122,14 @@ const ClientManager: React.FC<ClientManagerProps> = ({
       // Se addOnly, o componente pai deve fechar o modal
       // Não precisamos fazer nada aqui, apenas limpar o formulário
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao adicionar cliente:', error);
-      setError('Erro ao adicionar cliente');
+      // Se o erro for sobre limite, mostrar mensagem específica
+      if (error.message && error.message.includes('limite')) {
+        setError(error.message);
+      } else {
+        setError('Erro ao adicionar cliente. ' + (error.message || ''));
+      }
     } finally {
       setLoading(false);
     }
@@ -211,7 +227,10 @@ const ClientManager: React.FC<ClientManagerProps> = ({
           </Alert>
         )}
         
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {/* Alert de limites de subscription */}
+        <SubscriptionLimitsAlert type="client" />
+        
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
           <TextField
             fullWidth
             label="Nome do Cliente"

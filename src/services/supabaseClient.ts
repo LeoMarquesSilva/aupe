@@ -17,6 +17,11 @@ if (!supabaseUrl || !supabaseKey) {
 // Criar cliente Supabase mesmo sem variáveis (para evitar erro no build)
 export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder-key');
 
+// Em desenvolvimento: expor no console para testar RPCs (ex.: (await window.__supabase.rpc('get_my_organization_usage_counts')))
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  (window as any).__supabase = supabase;
+}
+
 // Interface para perfil de usuário
 export interface UserProfile {
   id: string;

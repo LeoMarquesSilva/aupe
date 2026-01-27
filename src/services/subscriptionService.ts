@@ -301,22 +301,69 @@ class SubscriptionService {
   }
 
   async getSubscriptionByOrganization(organizationId: string): Promise<Subscription | null> {
-    const { data, error } = await supabase
-      .from('subscriptions')
-      .select(`
-        *,
-        plan:subscription_plans(*)
-      `)
-      .eq('organization_id', organizationId)
-      .eq('status', 'active')
-      .single();
+    try {
+      // Buscar subscriptions ativas (pode haver múltiplas, pegar a mais recente)
+      const { data: subscriptions, error } = await supabase
+        .from('subscriptions')
+        .select(`
+          *,
+          plan:subscription_plans(*)
+        `)
+        .eq('organization_id', organizationId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
+      if (error) {
+        console.error('❌ Erro ao buscar subscription (com join):', error);
+        
+        // Fallback: tentar sem join se o join falhar
+        const { data: subscriptionsWithoutJoin, error: errorWithoutJoin } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('organization_id', organizationId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (errorWithoutJoin) {
+          console.error('❌ Erro ao buscar subscription (sem join):', errorWithoutJoin);
+          // Se for PGRST116 (no rows), retornar null (não é erro)
+          if (errorWithoutJoin.code === 'PGRST116') {
+            return null;
+          }
+          throw errorWithoutJoin;
+        }
+
+        if (subscriptionsWithoutJoin && subscriptionsWithoutJoin.length > 0) {
+          const subscription = subscriptionsWithoutJoin[0];
+          
+          // Buscar plano separadamente
+          const { data: planData } = await supabase
+            .from('subscription_plans')
+            .select('*')
+            .eq('id', subscription.plan_id)
+            .single();
+
+          return {
+            ...subscription,
+            plan: planData || undefined
+          } as Subscription;
+        }
+
+        return null;
+      }
+
+      // Retornar a primeira subscription (mais recente)
+      return subscriptions && subscriptions.length > 0 ? subscriptions[0] : null;
+    } catch (error: any) {
       console.error('❌ Erro ao buscar subscription:', error);
+      // Se for erro de "no rows", retornar null (não é erro crítico)
+      if (error.code === 'PGRST116' || error.message?.includes('No rows')) {
+        return null;
+      }
       throw error;
     }
-
-    return data || null;
   }
 
   async createSubscription(sub: Partial<Subscription>): Promise<Subscription> {

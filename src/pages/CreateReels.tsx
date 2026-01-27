@@ -50,6 +50,7 @@ import VideoUploader from '../components/VideoUploader';
 import ImageUploader from '../components/ImageUploader';
 import CaptionEditor from '../components/CaptionEditor';
 import DateTimePicker from '../components/DateTimePicker';
+import SubscriptionLimitsAlert from '../components/SubscriptionLimitsAlert';
 
 const CreateReels: React.FC = () => {
   const navigate = useNavigate();
@@ -627,6 +628,9 @@ const CreateReels: React.FC = () => {
             />
           )}
         </Box>
+
+        {/* Alert de limites de subscription */}
+        <SubscriptionLimitsAlert type="post" />
 
         {/* Upload de Vídeo */}
         <VideoUploader 

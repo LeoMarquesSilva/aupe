@@ -86,6 +86,14 @@ export const scheduleInstagramPost = async (
       throw new Error('Cliente não possui credenciais do Instagram configuradas. Conecte a conta do Instagram primeiro.');
     }
 
+    // ✅ VALIDAÇÃO: Verificar limites de subscription antes de processar
+    const { subscriptionLimitsService } = await import('./subscriptionLimitsService');
+    const limitCheck = await subscriptionLimitsService.canSchedulePost();
+    
+    if (!limitCheck.allowed) {
+      throw new Error(limitCheck.message || 'Não é possível agendar mais posts este mês. Faça upgrade do seu plano.');
+    }
+
     // ✅ UPLOAD DE IMAGENS PARA SUPABASE STORAGE
     let processedImages: string[] = [];
     let processedCoverImage: string | undefined;
