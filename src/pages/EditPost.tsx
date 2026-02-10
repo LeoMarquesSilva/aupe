@@ -313,6 +313,14 @@ const EditPost: React.FC = () => {
         updateData.immediate = true;
       }
 
+      // Ao reagendar para uma data futura, voltar status para 'pending' para o cron processar de novo
+      const wasAlreadySentOrFailed = post.status === 'sent_to_n8n' || post.status === 'failed';
+      if (wasAlreadySentOrFailed && scheduledDateTime > now) {
+        updateData.status = 'pending';
+        updateData.errorMessage = null;
+        updateData.retryCount = 0;
+      }
+
       // Atualizar post
       await postService.updateScheduledPost(post.id, updateData);
 

@@ -27,6 +27,7 @@ import InstagramCallback from './pages/InstagramCallback';
 import StoryCalendar from './pages/StoryCalendar';
 import EditStory from './pages/EditStory';
 import EditPost from './pages/EditPost';
+import HomePage from './pages/HomePage';
 import ClientDashboard from './pages/ClientDashboard';
 import SingleClientDashboard from './pages/SingleClientDashboard';
 import Settings from './pages/Settings';
@@ -155,10 +156,10 @@ const router = createBrowserRouter([
     element: <PublicLayout><SuperAdminLogin /></PublicLayout>,
   },
 
-  // Rotas protegidas - Dashboard
+  // Rotas protegidas - Home e Dashboard
   {
     path: "/",
-    element: <ProtectedPageLayout><ClientDashboard /></ProtectedPageLayout>,
+    element: <ProtectedPageLayout><HomePage /></ProtectedPageLayout>,
   },
   {
     path: "/clients",

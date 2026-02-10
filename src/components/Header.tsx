@@ -1,12 +1,12 @@
-import React from 'react';
-import { 
-  AppBar, 
-  Toolbar, 
-  Typography, 
-  Button, 
-  IconButton, 
-  Box, 
-  useTheme, 
+import React, { useEffect, useState } from 'react';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  IconButton,
+  Box,
+  useTheme,
   useMediaQuery,
   Menu,
   MenuItem,
@@ -14,43 +14,33 @@ import {
   ListItemText,
   Divider,
   Avatar,
-  Chip
+  Tooltip,
+  alpha,
 } from '@mui/material';
-import { 
-  Menu as MenuIcon, 
+import {
+  Menu as MenuIcon,
   CalendarMonth as CalendarIcon,
   Add as AddIcon,
   People as PeopleIcon,
   Home as HomeIcon,
   Settings as SettingsIcon,
-  AccountCircle as AccountIcon,
-  Dashboard as DashboardIcon,
+  NotificationsNone as NotificationsIcon,
   ExitToApp as LogoutIcon,
   AdminPanelSettings as AdminIcon,
-  VideoLibrary as ReelsIcon, // ✅ Nova importação
-  AddPhotoAlternate as PostIcon // ✅ Nova importação
+  Slideshow as ReelsIcon,
+  AddPhotoAlternate as PostIcon,
+  Collections as StoryIcon,
 } from '@mui/icons-material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { roleService } from '../services/roleService';
+import { subscriptionService } from '../services/subscriptionService';
+import { supabase } from '../services/supabaseClient';
 
-// URL da logo da agência
-const AGENCY_LOGO_URL = "/LOGO-AUPE.jpg";
+const AGENCY_LOGO_URL = '/LOGO-AUPE.jpg';
+const APP_NAME = 'AUPE';
 
-// Nome da agência
-const AGENCY_NAME = "AUPE";
-
-// Cores da identidade visual
-const COLORS = {
-  primary: '#510000',      // vinho escuro
-  secondary: '#3A1D1A',    // marrom café escuro
-  lightGray: '#D7CFCF',    // cinza claro rosado
-  neutralGray: '#CFCFCF',  // cinza claro neutro
-  softBlack: '#0E0E0E',    // preto suave
-  greenBlack: '#151B19',   // preto esverdeado
-  pureBlack: '#000000',    // preto puro
-  offWhite: '#EDEBE9',     // off-white
-};
+const HEADER_HEIGHT = 56;
 
 const Header: React.FC = () => {
   const theme = useTheme();
@@ -58,408 +48,334 @@ const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  
-  const [menuAnchorEl, setMenuAnchorEl] = React.useState<null | HTMLElement>(null);
-  const [userMenuAnchorEl, setUserMenuAnchorEl] = React.useState<null | HTMLElement>(null);
-  const [createMenuAnchorEl, setCreateMenuAnchorEl] = React.useState<null | HTMLElement>(null); // ✅ Novo estado
-  
-  // Estados para verificação de admin
-  const [isAdmin, setIsAdmin] = React.useState(false);
-  const [loadingRole, setLoadingRole] = React.useState(true);
 
-  // Verificar role do usuário quando o componente monta ou usuário muda
-  React.useEffect(() => {
-    const checkAdminStatus = async () => {
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [userMenuAnchorEl, setUserMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [createMenuAnchorEl, setCreateMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loadingRole, setLoadingRole] = useState(true);
+  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
       if (user) {
         setLoadingRole(true);
         try {
-          const adminStatus = await roleService.isCurrentUserAdmin();
-          setIsAdmin(adminStatus);
-        } catch (error) {
-          console.error('❌ Erro ao verificar status de admin:', error);
+          setIsAdmin(await roleService.isCurrentUserAdmin());
+        } catch {
           setIsAdmin(false);
         } finally {
           setLoadingRole(false);
         }
       } else {
-        setIsAdmin(false);
         setLoadingRole(false);
       }
     };
-    
-    checkAdminStatus();
+    checkAdmin();
   }, [user]);
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setMenuAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setMenuAnchorEl(null);
-  };
-
-  const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setUserMenuAnchorEl(event.currentTarget);
-  };
-
-  const handleUserMenuClose = () => {
-    setUserMenuAnchorEl(null);
-  };
-
-  // ✅ Novos handlers para menu de criação
-  const handleCreateMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setCreateMenuAnchorEl(event.currentTarget);
-  };
-
-  const handleCreateMenuClose = () => {
-    setCreateMenuAnchorEl(null);
-  };
+  useEffect(() => {
+    const loadWorkspace = async () => {
+      if (!user) return;
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('organization_id')
+          .eq('id', user.id)
+          .single();
+        const orgId = (profile as { organization_id?: string })?.organization_id;
+        if (orgId) {
+          const org = await subscriptionService.getOrganization(orgId);
+          setWorkspaceName(org?.name ?? null);
+        }
+      } catch {
+        setWorkspaceName(null);
+      }
+    };
+    loadWorkspace();
+  }, [user]);
 
   const handleLogout = async () => {
-    handleUserMenuClose();
+    setUserMenuAnchorEl(null);
     try {
-      console.log('🚪 Fazendo logout...');
       await signOut();
       navigate('/login');
-    } catch (error) {
-      console.error('❌ Erro ao fazer logout:', error);
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  const handleAdminSettings = () => {
-    navigate('/admin');
-    handleUserMenuClose();
-  };
+  const getUserInitials = (email: string) =>
+    email?.split('@')[0]?.substring(0, 2).toUpperCase() || 'U';
 
-  const getUserInitials = (email: string) => {
-    return email.split('@')[0].substring(0, 2).toUpperCase();
-  };
+  const linkSx = (active: boolean) => ({
+    color: active ? theme.palette.primary.main : theme.palette.text.primary,
+    fontFamily: '"Poppins", sans-serif',
+    fontWeight: active ? 600 : 400,
+    fontSize: '0.875rem',
+    textDecoration: 'none',
+    px: 2,
+    py: 1,
+    borderRadius: 2.5,
+    position: 'relative' as const,
+    backgroundColor: active ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
+    ...(active && {
+      '&::after': {
+        content: '""',
+        position: 'absolute',
+        left: '50%',
+        bottom: 6,
+        transform: 'translateX(-50%)',
+        width: 24,
+        height: 2,
+        borderRadius: 1,
+        backgroundColor: theme.palette.primary.main,
+      },
+    }),
+    transition: 'background-color 150ms ease, color 150ms ease',
+    '&:hover': {
+      backgroundColor: active
+        ? alpha(theme.palette.primary.main, 0.12)
+        : theme.palette.action.hover,
+    },
+  });
 
-  // Se não há usuário logado, não mostrar header
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return (
-    <AppBar 
-      position="static" 
-      elevation={3} 
-      sx={{ 
-        mb: 2, 
-        background: `linear-gradient(135deg, ${COLORS.primary} 0%, ${COLORS.secondary} 100%)`,
-        borderRadius: '0 0 16px 16px',
-        borderBottom: `3px solid ${COLORS.offWhite}`
-      }}
-    >
-      <Toolbar sx={{ py: 1 }}>
-        {isMobile && (
-          <IconButton 
-            edge="start" 
-            aria-label="menu"
-            onClick={handleMenuOpen}
-            sx={{ color: COLORS.offWhite }}
-          >
-            <MenuIcon />
-          </IconButton>
-        )}
-
-        <Box 
-          component={Link} 
-          to="/"
-          sx={{ 
-            display: 'flex', 
-            alignItems: 'center',
-            textDecoration: 'none',
-            color: COLORS.offWhite
+    <>
+      <AppBar
+        position="fixed"
+        elevation={0}
+        sx={{
+          height: HEADER_HEIGHT,
+          minHeight: HEADER_HEIGHT,
+          left: 12,
+          right: 12,
+          width: 'auto',
+          backgroundColor: theme.palette.background.paper,
+          borderBottom: 'none',
+          borderRadius: '0 0 20px 20px',
+          boxShadow: `0 4px 20px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.08)'}`,
+          transition: 'box-shadow 180ms ease',
+        }}
+      >
+        <Toolbar
+          sx={{
+            minHeight: `${HEADER_HEIGHT}px !important`,
+            height: HEADER_HEIGHT,
+            py: 0,
+            px: { xs: 1.5, sm: 2 },
           }}
         >
-          {/* Logo da agência em formato circular */}
-          <Avatar
-            src={AGENCY_LOGO_URL}
-            alt={AGENCY_NAME}
-            sx={{ 
-              width: 48, 
-              height: 48, 
-              mr: 2,
-              border: `2px solid ${COLORS.lightGray}`,
-              boxShadow: `0 4px 8px rgba(0,0,0,0.3)`,
-              display: { xs: 'none', sm: 'flex' }
-            }}
-          />
-
-          {/* Ícone e nome do app */}
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar sx={{ 
-              bgcolor: 'rgba(215,207,207,0.2)', 
-              mr: 1.5,
-              width: 40,
-              height: 40
-            }}>
-              <DashboardIcon sx={{ color: COLORS.offWhite }} />
-            </Avatar>
-            
-            <Box>
-              <Typography 
-                variant="h6" 
-                component="div" 
-                sx={{ 
-                  fontFamily: '"Argent CF", serif',
-                  fontWeight: 'normal',
-                  letterSpacing: '0.5px',
-                  textTransform: 'lowercase',
-                  color: COLORS.offWhite,
-                  textShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                }}
-              >
-                Gerenciamento de conteúdo
-              </Typography>
-              <Typography 
-                variant="caption" 
-                sx={{ 
-                  fontFamily: '"Poppins", sans-serif',
-                  fontWeight: 300,
-                  opacity: 0.9,
-                  color: COLORS.lightGray,
-                  display: { xs: 'none', md: 'block' }
-                }}
-              >
-                Planeje, crie e agende seu conteúdo
-              </Typography>
-            </Box>
-          </Box>
-        </Box>
-
-        <Box sx={{ flexGrow: 1 }} />
-
-        {/* Badge de Admin (apenas para administradores) */}
-        {!loadingRole && isAdmin && (
-          <Chip
-            icon={<AdminIcon />}
-            label="Admin"
-            size="small"
+          {/* ——— Esquerda: logo + workspace ——— */}
+          <Box
+            component={Link}
+            to="/"
             sx={{
-              backgroundColor: 'rgba(237, 235, 233, 0.2)',
-              color: COLORS.offWhite,
-              mr: 2,
-              '& .MuiChip-icon': {
-                color: COLORS.offWhite
-              },
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 500,
-              animation: 'pulse 2s infinite'
-            }}
-          />
-        )}
-
-        {/* Informações do usuário (apenas desktop) */}
-        {!isMobile && (
-          <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', mr: 2 }}>
-              <Typography 
-                variant="body2" 
-                sx={{ 
-                  color: COLORS.offWhite, 
-                  opacity: 0.9,
-                  fontFamily: '"Poppins", sans-serif',
-                  fontWeight: 400
-                }}
-              >
-                {user.email}
-              </Typography>
-              <Typography 
-                variant="caption" 
-                sx={{ 
-                  color: COLORS.lightGray,
-                  fontFamily: '"Poppins", sans-serif',
-                  fontWeight: 300
-                }}
-              >
-                {loadingRole ? 'Verificando...' : 'Online'}
-              </Typography>
-            </Box>
-          </Box>
-        )}
-
-        {!isMobile && (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Button 
-              component={Link} 
-              to="/" 
-              startIcon={<HomeIcon />}
-              sx={{ 
-                mx: 1, 
-                color: COLORS.offWhite,
-                fontFamily: '"Poppins", sans-serif',
-                fontWeight: location.pathname === '/' || location.pathname === '/clients' ? 500 : 400,
-                borderBottom: (location.pathname === '/' || location.pathname === '/clients') ? 
-                  `2px solid ${COLORS.lightGray}` : 'none',
-                borderRadius: '8px 8px 0 0',
-                '&:hover': {
-                  backgroundColor: 'rgba(215,207,207,0.1)'
-                }
-              }}
-            >
-              Clientes
-            </Button>
-
-            <Button 
-              component={Link} 
-              to="/calendar" 
-              startIcon={<CalendarIcon />}
-              sx={{ 
-                mx: 1, 
-                color: COLORS.offWhite,
-                fontFamily: '"Poppins", sans-serif',
-                fontWeight: location.pathname.includes('/calendar') ? 500 : 400,
-                borderBottom: location.pathname.includes('/calendar') ? 
-                  `2px solid ${COLORS.lightGray}` : 'none',
-                borderRadius: '8px 8px 0 0',
-                '&:hover': {
-                  backgroundColor: 'rgba(215,207,207,0.1)'
-                }
-              }}
-            >
-              Calendário
-            </Button>
-
-            {/* ✅ Botão de criar com dropdown */}
-            <Button 
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleCreateMenuOpen}
-              sx={{ 
-                ml: 2,
-                bgcolor: COLORS.offWhite,
-                color: COLORS.primary,
-                fontFamily: '"Poppins", sans-serif',
-                fontWeight: 500,
-                borderRadius: '20px',
-                px: 2,
-                '&:hover': {
-                  bgcolor: COLORS.lightGray,
-                }
-              }}
-            >
-              Criar
-            </Button>
-          </Box>
-        )}
-
-        <IconButton 
-          onClick={handleUserMenuOpen}
-          sx={{ 
-            ml: 2,
-            border: `2px solid ${COLORS.lightGray}`,
-            p: '4px'
-          }}
-        >
-          <Avatar 
-            sx={{ 
-              width: 36, 
-              height: 36, 
-              bgcolor: 'rgba(215,207,207,0.2)',
-              transition: 'all 0.3s ease',
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 'bold',
-              fontSize: '0.9rem',
-              '&:hover': {
-                transform: 'scale(1.05)'
-              }
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              textDecoration: 'none',
+              color: 'inherit',
+              mr: { xs: 1, md: 3 },
             }}
           >
-            {getUserInitials(user.email || 'U')}
-          </Avatar>
-        </IconButton>
-      </Toolbar>
+            <Avatar
+              src={AGENCY_LOGO_URL}
+              alt={APP_NAME}
+              sx={{
+                width: 36,
+                height: 36,
+                flexShrink: 0,
+                boxShadow: theme.shadows[1],
+              }}
+            />
+            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+              <Typography
+                variant="subtitle1"
+                sx={{
+                  fontFamily: '"Poppins", sans-serif',
+                  fontWeight: 600,
+                  color: theme.palette.text.primary,
+                  lineHeight: 1.2,
+                }}
+              >
+                {APP_NAME}
+              </Typography>
+              {workspaceName && (
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontFamily: '"Poppins", sans-serif',
+                    color: theme.palette.text.secondary,
+                    display: 'block',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {workspaceName}
+                </Typography>
+              )}
+            </Box>
+          </Box>
 
-      {/* ✅ Menu de criação (desktop) */}
+          {/* ——— Centro: navegação (desktop) ——— */}
+          {!isMobile && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+              <Box component={Link} to="/" sx={linkSx(location.pathname === '/')}>
+                Início
+              </Box>
+              <Box component={Link} to="/clients" sx={linkSx(location.pathname === '/clients' || location.pathname.startsWith('/client/'))}>
+                Clientes
+              </Box>
+              <Box component={Link} to="/calendar" sx={linkSx(location.pathname.includes('/calendar'))}>
+                Calendário
+              </Box>
+            </Box>
+          )}
+
+          <Box sx={{ flexGrow: 1 }} />
+
+          {/* ——— Direita: CTA + ícones + avatar ——— */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            {isAdmin && !loadingRole && (
+              <Tooltip title="Painel administrativo">
+                <IconButton
+                  size="small"
+                  component={Link}
+                  to="/admin"
+                  sx={{
+                    color: theme.palette.text.secondary,
+                    borderRadius: 2,
+                    '&:hover': { color: theme.palette.primary.main, backgroundColor: theme.palette.action.hover },
+                    transition: 'color 150ms ease, background-color 150ms ease',
+                  }}
+                >
+                  <AdminIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+
+            <Tooltip title="Agendar post, reel ou story">
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<AddIcon sx={{ fontSize: 18 }} />}
+                onClick={(e) => setCreateMenuAnchorEl(e.currentTarget)}
+                sx={{
+                  fontFamily: '"Poppins", sans-serif',
+                  fontWeight: 600,
+                  fontSize: '0.8125rem',
+                  textTransform: 'none',
+                  borderRadius: '24px',
+                  px: 2,
+                  py: 0.875,
+                  minHeight: 38,
+                  boxShadow: theme.shadows[2],
+                  transition: 'transform 120ms ease, box-shadow 120ms ease',
+                  '&:hover': {
+                    transform: 'translateY(-1px)',
+                    boxShadow: theme.shadows[4],
+                  },
+                }}
+              >
+                Agendar
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Notificações">
+              <IconButton
+                size="small"
+                aria-label="Notificações"
+                sx={{
+                  color: theme.palette.text.secondary,
+                  borderRadius: 2,
+                  '&:hover': { color: theme.palette.text.primary, backgroundColor: theme.palette.action.hover },
+                  transition: 'color 150ms ease, background-color 150ms ease',
+                }}
+              >
+                <NotificationsIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Conta e configurações">
+              <IconButton
+                size="small"
+                onClick={(e) => setUserMenuAnchorEl(e.currentTarget)}
+                sx={{
+                  p: 0.25,
+                  borderRadius: '50%',
+                  '&:hover': { backgroundColor: theme.palette.action.hover },
+                  transition: 'background-color 150ms ease, transform 150ms ease',
+                  '&:hover .MuiAvatar-root': { transform: 'scale(1.05)' },
+                }}
+              >
+                <Avatar
+                  sx={{
+                    width: 34,
+                    height: 34,
+                    fontSize: '0.75rem',
+                    fontFamily: '"Poppins", sans-serif',
+                    bgcolor: theme.palette.primary.main,
+                    color: theme.palette.primary.contrastText,
+                    transition: 'transform 150ms ease',
+                  }}
+                >
+                  {getUserInitials(user.email || 'U')}
+                </Avatar>
+              </IconButton>
+            </Tooltip>
+
+            {isMobile && (
+              <Tooltip title="Menu">
+                <IconButton
+                  size="small"
+                  aria-label="Abrir menu"
+                  onClick={(e) => setMenuAnchorEl(e.currentTarget)}
+                  sx={{
+                    color: theme.palette.text.primary,
+                    borderRadius: 2,
+                    '&:hover': { backgroundColor: theme.palette.action.hover },
+                  }}
+                >
+                  <MenuIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+        </Toolbar>
+      </AppBar>
+
+      {/* Espaço para conteúdo não ficar atrás do header fixo */}
+      <Box sx={{ height: HEADER_HEIGHT }} />
+
+      {/* Menu Criar (dropdown) */}
       <Menu
         anchorEl={createMenuAnchorEl}
         open={Boolean(createMenuAnchorEl)}
-        onClose={handleCreateMenuClose}
+        onClose={() => setCreateMenuAnchorEl(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         PaperProps={{
           sx: {
-            borderRadius: '12px',
-            boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
-            bgcolor: COLORS.offWhite,
-            minWidth: 200
-          }
+            mt: 1.5,
+            borderRadius: 2,
+            boxShadow: theme.shadows[4],
+            minWidth: 200,
+          },
         }}
       >
-        <MenuItem 
-          component={Link} 
-          to="/create-post"
-          onClick={handleCreateMenuClose}
-          sx={{ 
-            borderRadius: '8px', 
-            m: 0.5,
-            fontFamily: '"Poppins", sans-serif'
-          }}
-        >
-          <ListItemIcon>
-            <PostIcon fontSize="small" sx={{ color: COLORS.primary }} />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Criar Post" 
-            primaryTypographyProps={{ 
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 400
-            }} 
-          />
+        <MenuItem component={Link} to="/create-post" onClick={() => setCreateMenuAnchorEl(null)}>
+          <ListItemIcon><PostIcon fontSize="small" sx={{ color: theme.palette.primary.main }} /></ListItemIcon>
+          <ListItemText primary="Criar Post" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
         </MenuItem>
-
-        <MenuItem 
-          component={Link} 
-          to="/create-reels"
-          onClick={handleCreateMenuClose}
-          sx={{ 
-            borderRadius: '8px', 
-            m: 0.5,
-            fontFamily: '"Poppins", sans-serif'
-          }}
-        >
-          <ListItemIcon>
-            <ReelsIcon fontSize="small" sx={{ color: '#E91E63' }} />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Criar Reels" 
-            primaryTypographyProps={{ 
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 400
-            }} 
-          />
-          <Chip
-            label="Novo"
-            size="small"
-            sx={{
-              backgroundColor: '#E91E63',
-              color: 'white',
-              fontSize: '0.7rem',
-              height: '18px'
-            }}
-          />
+        <MenuItem component={Link} to="/create-reels" onClick={() => setCreateMenuAnchorEl(null)}>
+          <ListItemIcon><ReelsIcon fontSize="small" sx={{ color: theme.palette.primary.main }} /></ListItemIcon>
+          <ListItemText primary="Criar Reels" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
         </MenuItem>
-
-        <MenuItem 
-          component={Link} 
-          to="/create-story"
-          onClick={handleCreateMenuClose}
-          sx={{ 
-            borderRadius: '8px', 
-            m: 0.5,
-            fontFamily: '"Poppins", sans-serif'
-          }}
-        >
-          <ListItemIcon>
-            <AddIcon fontSize="small" sx={{ color: COLORS.primary }} />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Criar Story" 
-            primaryTypographyProps={{ 
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 400
-            }} 
-          />
+        <MenuItem component={Link} to="/create-story" onClick={() => setCreateMenuAnchorEl(null)}>
+          <ListItemIcon><StoryIcon fontSize="small" sx={{ color: theme.palette.primary.main }} /></ListItemIcon>
+          <ListItemText primary="Criar Story" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
         </MenuItem>
       </Menu>
 
@@ -467,323 +383,88 @@ const Header: React.FC = () => {
       <Menu
         anchorEl={menuAnchorEl}
         open={Boolean(menuAnchorEl)}
-        onClose={handleMenuClose}
-        PaperProps={{
-          sx: {
-            borderRadius: '12px',
-            boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
-            bgcolor: COLORS.offWhite
-          }
-        }}
+        onClose={() => setMenuAnchorEl(null)}
+        PaperProps={{ sx: { borderRadius: 2, minWidth: 220, mt: 1.5 } }}
       >
-        <MenuItem 
-          component={Link} 
-          to="/"
-          onClick={handleMenuClose}
-          sx={{ 
-            borderRadius: '8px', 
-            m: 0.5,
-            fontFamily: '"Poppins", sans-serif'
-          }}
-        >
-          <ListItemIcon>
-            <HomeIcon fontSize="small" sx={{ color: COLORS.primary }} />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Clientes" 
-            primaryTypographyProps={{ 
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 400
-            }} 
-          />
+        <MenuItem component={Link} to="/" onClick={() => setMenuAnchorEl(null)}>
+          <ListItemIcon><HomeIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Início" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
         </MenuItem>
-
-        <MenuItem 
-          component={Link} 
-          to="/calendar"
-          onClick={handleMenuClose}
-          sx={{ 
-            borderRadius: '8px', 
-            m: 0.5,
-            fontFamily: '"Poppins", sans-serif'
-          }}
-        >
-          <ListItemIcon>
-            <CalendarIcon fontSize="small" sx={{ color: COLORS.primary }} />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Calendário" 
-            primaryTypographyProps={{ 
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 400
-            }} 
-          />
+        <MenuItem component={Link} to="/clients" onClick={() => setMenuAnchorEl(null)}>
+          <ListItemIcon><PeopleIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Clientes" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
         </MenuItem>
-
-        <Divider sx={{ my: 1, bgcolor: COLORS.neutralGray }} />
-
-        <MenuItem 
-          component={Link} 
-          to="/create-post"
-          onClick={handleMenuClose}
-          sx={{ 
-            borderRadius: '8px', 
-            m: 0.5,
-            fontFamily: '"Poppins", sans-serif'
-          }}
-        >
-          <ListItemIcon>
-            <PostIcon fontSize="small" sx={{ color: COLORS.primary }} />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Criar Post" 
-            primaryTypographyProps={{ 
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 400
-            }} 
-          />
+        <MenuItem component={Link} to="/calendar" onClick={() => setMenuAnchorEl(null)}>
+          <ListItemIcon><CalendarIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Calendário" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
         </MenuItem>
-
-        {/* ✅ Nova opção para Reels no menu mobile */}
-        <MenuItem 
-          component={Link} 
-          to="/create-reels"
-          onClick={handleMenuClose}
-          sx={{ 
-            borderRadius: '8px', 
-            m: 0.5,
-            fontFamily: '"Poppins", sans-serif'
-          }}
-        >
-          <ListItemIcon>
-            <ReelsIcon fontSize="small" sx={{ color: '#E91E63' }} />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Criar Reels" 
-            primaryTypographyProps={{ 
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 400
-            }} 
-          />
-          <Chip
-            label="Novo"
-            size="small"
-            sx={{
-              backgroundColor: '#E91E63',
-              color: 'white',
-              fontSize: '0.7rem',
-              height: '18px'
-            }}
-          />
+        <Divider sx={{ my: 1 }} />
+        <MenuItem component={Link} to="/create-post" onClick={() => setMenuAnchorEl(null)}>
+          <ListItemIcon><PostIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Criar Post" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
         </MenuItem>
-
-        <MenuItem 
-          component={Link} 
-          to="/create-story"
-          onClick={handleMenuClose}
-          sx={{ 
-            borderRadius: '8px', 
-            m: 0.5,
-            fontFamily: '"Poppins", sans-serif'
-          }}
-        >
-          <ListItemIcon>
-            <AddIcon fontSize="small" sx={{ color: COLORS.primary }} />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Criar Story" 
-            primaryTypographyProps={{ 
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 400
-            }} 
-          />
+        <MenuItem component={Link} to="/create-reels" onClick={() => setMenuAnchorEl(null)}>
+          <ListItemIcon><ReelsIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Criar Reels" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
         </MenuItem>
-
-        {/* Menu de Admin no mobile (apenas para administradores) */}
-        {!loadingRole && isAdmin && (
+        <MenuItem component={Link} to="/create-story" onClick={() => setMenuAnchorEl(null)}>
+          <ListItemIcon><StoryIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Criar Story" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
+        </MenuItem>
+        {isAdmin && (
           <>
-            <Divider sx={{ my: 1, bgcolor: COLORS.neutralGray }} />
-            <MenuItem 
-              component={Link} 
-              to="/admin"
-              onClick={handleMenuClose}
-              sx={{ 
-                borderRadius: '8px', 
-                m: 0.5,
-                fontFamily: '"Poppins", sans-serif',
-                bgcolor: 'rgba(81, 0, 0, 0.05)'
-              }}
-            >
-              <ListItemIcon>
-                <AdminIcon fontSize="small" sx={{ color: COLORS.primary }} />
-              </ListItemIcon>
-              <ListItemText 
-                primary="Painel Admin" 
-                primaryTypographyProps={{ 
-                  fontFamily: '"Poppins", sans-serif',
-                  fontWeight: 500,
-                  color: COLORS.primary
-                }} 
-              />
-              <Chip
-                label="Admin"
-                size="small"
-                sx={{
-                  backgroundColor: COLORS.primary,
-                  color: COLORS.offWhite,
-                  fontSize: '0.7rem',
-                  height: '20px'
-                }}
-              />
+            <Divider sx={{ my: 1 }} />
+            <MenuItem component={Link} to="/admin" onClick={() => setMenuAnchorEl(null)}>
+              <ListItemIcon><AdminIcon fontSize="small" /></ListItemIcon>
+              <ListItemText primary="Painel Admin" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
             </MenuItem>
           </>
         )}
       </Menu>
 
-      {/* Menu do usuário */}
+      {/* Menu usuário */}
       <Menu
         anchorEl={userMenuAnchorEl}
         open={Boolean(userMenuAnchorEl)}
-        onClose={handleUserMenuClose}
-        PaperProps={{
-          sx: {
-            borderRadius: '12px',
-            boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
-            bgcolor: COLORS.offWhite,
-            minWidth: 200
-          }
-        }}
+        onClose={() => setUserMenuAnchorEl(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        PaperProps={{ sx: { borderRadius: 2, minWidth: 220, mt: 1.5 } }}
       >
-        {/* Informações do usuário */}
-        <Box sx={{ px: 2, py: 1, borderBottom: `1px solid ${COLORS.neutralGray}` }}>
-          <Typography 
-            variant="body2" 
-            sx={{ 
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 500,
-              color: COLORS.primary
-            }}
-          >
+        <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+          <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 500 }}>
             {user.email}
           </Typography>
-          <Typography 
-            variant="caption" 
-            sx={{ 
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 300,
-              color: COLORS.secondary
+          {isAdmin && (
+            <Typography variant="caption" color="primary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+              Admin
+            </Typography>
+          )}
+        </Box>
+        <MenuItem component={Link} to="/settings" onClick={() => setUserMenuAnchorEl(null)}>
+          <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Configurações" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
+        </MenuItem>
+        {isAdmin && (
+          <MenuItem
+            onClick={() => {
+              setUserMenuAnchorEl(null);
+              navigate('/admin');
             }}
           >
-            {loadingRole ? 'Verificando...' : 'Logado'}
-            {!loadingRole && isAdmin && (
-              <Chip
-                label="Admin"
-                size="small"
-                sx={{
-                  ml: 1,
-                  backgroundColor: COLORS.primary,
-                  color: COLORS.offWhite,
-                  fontSize: '0.7rem',
-                  height: '18px'
-                }}
-              />
-            )}
-          </Typography>
-        </Box>
-
-        <MenuItem 
-          component={Link}
-          to="/settings"
-          onClick={handleUserMenuClose}
-          sx={{ 
-            borderRadius: '8px', 
-            m: 0.5,
-            fontFamily: '"Poppins", sans-serif'
-          }}
-        >
-          <ListItemIcon>
-            <SettingsIcon fontSize="small" sx={{ color: COLORS.primary }} />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Configurações" 
-            primaryTypographyProps={{ 
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 400
-            }} 
-          />
-        </MenuItem>
-
-        {/* Menu de Admin (apenas para administradores) */}
-        {!loadingRole && isAdmin && (
-          <>
-            <Divider sx={{ my: 1, bgcolor: COLORS.neutralGray }} />
-            <MenuItem 
-              onClick={handleAdminSettings}
-              sx={{ 
-                borderRadius: '8px', 
-                m: 0.5,
-                fontFamily: '"Poppins", sans-serif',
-                bgcolor: 'rgba(81, 0, 0, 0.05)',
-                '&:hover': {
-                  bgcolor: 'rgba(81, 0, 0, 0.1)'
-                }
-              }}
-            >
-              <ListItemIcon>
-                <AdminIcon fontSize="small" sx={{ color: COLORS.primary }} />
-              </ListItemIcon>
-              <ListItemText 
-                primary="Painel Admin" 
-                primaryTypographyProps={{ 
-                  fontFamily: '"Poppins", sans-serif',
-                  fontWeight: 500,
-                  color: COLORS.primary
-                }} 
-              />
-              <Chip
-                label="Admin"
-                size="small"
-                sx={{
-                  backgroundColor: COLORS.primary,
-                  color: COLORS.offWhite,
-                  fontSize: '0.7rem',
-                  height: '20px'
-                }}
-              />
-            </MenuItem>
-          </>
+            <ListItemIcon><AdminIcon fontSize="small" /></ListItemIcon>
+            <ListItemText primary="Painel Admin" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
+          </MenuItem>
         )}
-
-        <Divider sx={{ my: 1, bgcolor: COLORS.neutralGray }} />
-
-        <MenuItem 
-          onClick={handleLogout}
-          sx={{ 
-            borderRadius: '8px', 
-            m: 0.5, 
-            color: COLORS.primary,
-            fontFamily: '"Poppins", sans-serif',
-            fontWeight: 500,
-            '&:hover': {
-              bgcolor: 'rgba(81, 0, 0, 0.1)'
-            }
-          }}
-        >
-          <ListItemIcon>
-            <LogoutIcon fontSize="small" sx={{ color: COLORS.primary }} />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Sair" 
-            primaryTypographyProps={{ 
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 500,
-              color: COLORS.primary
-            }} 
-          />
+        <Divider sx={{ my: 1 }} />
+        <MenuItem onClick={handleLogout}>
+          <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Sair" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
         </MenuItem>
       </Menu>
-    </AppBar>
+    </>
   );
 };
 
 export default Header;
+export { HEADER_HEIGHT };
