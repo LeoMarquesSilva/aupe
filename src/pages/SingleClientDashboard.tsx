@@ -56,6 +56,7 @@ import { ptBR } from 'date-fns/locale';
 
 // Importar componentes
 import ClientHeader from '../components/ClientHeader';
+import ShareLinkDialog from '../components/ShareLinkDialog';
 import {
   MetricsOverview,
   FeaturedPost,
@@ -547,6 +548,7 @@ const SingleClientDashboard: React.FC = () => {
   };
 
   const [pdfExportDialogOpen, setPdfExportDialogOpen] = useState(false);
+  const [shareLinkDialogOpen, setShareLinkDialogOpen] = useState(false);
 
   const handleExportPDF = async (exportOptions: any) => {
     if (!client || !dashboardData || !legacyMetrics) {
@@ -958,6 +960,7 @@ const SingleClientDashboard: React.FC = () => {
         syncInProgress={syncInProgress}
         postsStats={postsStats}
         onExportPDF={() => setPdfExportDialogOpen(true)}
+        onShareLink={() => setShareLinkDialogOpen(true)}
       />
 
       {/* Erro não crítico - Simplificado */}
@@ -1413,6 +1416,15 @@ const SingleClientDashboard: React.FC = () => {
         onClose={() => setPdfExportDialogOpen(false)}
         onExport={handleExportPDF}
       />
+
+      {clientId && client && (
+        <ShareLinkDialog
+          open={shareLinkDialogOpen}
+          onClose={() => setShareLinkDialogOpen(false)}
+          clientId={clientId}
+          clientName={client.name}
+        />
+      )}
     </Container>
   );
 };

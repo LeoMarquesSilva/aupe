@@ -22,7 +22,8 @@ import {
   CheckCircleOutline as CheckCircleOutlineIcon,
   ErrorOutline as ErrorOutlineIcon,
   Refresh as RefreshIcon,
-  PictureAsPdf as PdfIcon
+  PictureAsPdf as PdfIcon,
+  Share as ShareIcon
 } from '@mui/icons-material';
 import { Client } from '../types';
 import { InstagramProfile } from '../services/instagramMetricsService';
@@ -47,6 +48,7 @@ interface ClientHeaderProps {
     scheduled: number;
   };
   onExportPDF?: () => void;
+  onShareLink?: () => void;
 }
 
 const ClientHeader: React.FC<ClientHeaderProps> = ({
@@ -62,7 +64,8 @@ const ClientHeader: React.FC<ClientHeaderProps> = ({
   onForceRefresh,
   syncInProgress = false,
   postsStats,
-  onExportPDF
+  onExportPDF,
+  onShareLink
 }) => {
   const theme = useTheme();
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
@@ -506,6 +509,35 @@ const ClientHeader: React.FC<ClientHeaderProps> = ({
           >
             Calendário
           </Button>
+          {onShareLink && (
+            <Button
+              variant="outlined"
+              startIcon={<ShareIcon />}
+              onClick={onShareLink}
+              sx={{
+                px: 3,
+                py: 1.25,
+                borderRadius: 2,
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                textTransform: 'none',
+                borderWidth: 2,
+                borderColor: alpha(theme.palette.primary.main, 0.5),
+                color: theme.palette.primary.main,
+                bgcolor: alpha(theme.palette.primary.main, 0.05),
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  borderWidth: 2,
+                  borderColor: theme.palette.primary.main,
+                  bgcolor: alpha(theme.palette.primary.main, 0.12),
+                  transform: 'translateY(-2px)',
+                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`
+                }
+              }}
+            >
+              Compartilhar
+            </Button>
+          )}
           {onExportPDF && (
             <Button
               variant="outlined"

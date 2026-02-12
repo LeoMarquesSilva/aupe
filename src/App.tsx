@@ -37,6 +37,7 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import Checkout from './pages/Checkout';
 import CheckoutSuccess from './pages/CheckoutSuccess';
 import CheckoutCancel from './pages/CheckoutCancel';
+import ClientDashboardView from './pages/ClientDashboardView';
 
 // Layout compartilhado para todas as páginas protegidas
 const PageLayout = ({ children }: { children: React.ReactNode }) => (
@@ -154,6 +155,10 @@ const router = createBrowserRouter([
   {
     path: "/super-admin/login",
     element: <PublicLayout><SuperAdminLogin /></PublicLayout>,
+  },
+  {
+    path: "/view/:token",
+    element: <PublicLayout><ClientDashboardView /></PublicLayout>,
   },
 
   // Rotas protegidas - Home e Dashboard
