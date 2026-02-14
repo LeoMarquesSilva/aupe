@@ -70,7 +70,7 @@ serve(async (req) => {
 
     const { data: linkRow, error: linkError } = await supabase
       .from('client_share_links')
-      .select('id, client_id, expires_at')
+      .select('id, client_id, expires_at, access_count')
       .eq('token', token)
       .gt('expires_at', now)
       .single();
@@ -116,6 +116,14 @@ serve(async (req) => {
           postsCount: 0,
           syncStatus: 'completed' as const,
         };
+
+    // Contar este acesso (incremento assíncrono, não bloqueia a resposta)
+    supabase
+      .from('client_share_links')
+      .update({ access_count: (linkRow.access_count ?? 0) + 1 })
+      .eq('id', linkRow.id)
+      .then(() => {})
+      .catch((err) => console.error('access_count increment error:', err));
 
     return new Response(
       JSON.stringify({

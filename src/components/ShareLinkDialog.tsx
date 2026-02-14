@@ -61,6 +61,7 @@ const ShareLinkDialog: React.FC<ShareLinkDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [createdLink, setCreatedLink] = useState<CreateShareLinkResult | null>(null);
   const [copied, setCopied] = useState(false);
+  const [linkLabel, setLinkLabel] = useState('');
 
   const loadLinks = async () => {
     if (!clientId) return;
@@ -81,6 +82,7 @@ const ShareLinkDialog: React.FC<ShareLinkDialogProps> = ({
       loadLinks();
       setCreatedLink(null);
       setError(null);
+      setLinkLabel('');
     }
   }, [open, clientId]);
 
@@ -88,9 +90,11 @@ const ShareLinkDialog: React.FC<ShareLinkDialogProps> = ({
     setCreating(true);
     setError(null);
     setCreatedLink(null);
+    const labelToUse = linkLabel.trim() || undefined;
     try {
-      const result = await createShareLink(clientId, days);
+      const result = await createShareLink(clientId, days, labelToUse);
       setCreatedLink(result);
+      setLinkLabel('');
       await loadLinks();
     } catch (e: any) {
       setError(e?.message || 'Erro ao criar link.');
@@ -135,6 +139,17 @@ const ShareLinkDialog: React.FC<ShareLinkDialogProps> = ({
         <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
           Novo link
         </Typography>
+        <TextField
+          label="Rótulo (opcional)"
+          placeholder="Ex: Enviado para Maria, Relatório janeiro..."
+          value={linkLabel}
+          onChange={(e) => setLinkLabel(e.target.value)}
+          size="small"
+          fullWidth
+          sx={{ mb: 2 }}
+          inputProps={{ maxLength: 100 }}
+          helperText="Identifique o link para encontrar depois na lista"
+        />
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 3 }}>
           {EXPIRY_OPTIONS.map((opt) => (
             <Button
@@ -211,7 +226,7 @@ const ShareLinkDialog: React.FC<ShareLinkDialogProps> = ({
               >
                 <ListItemText
                   primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                       <Typography variant="body2">
                         Expira em {format(new Date(link.expiresAt), 'dd/MM/yyyy', { locale: ptBR })}
                       </Typography>
@@ -220,6 +235,9 @@ const ShareLinkDialog: React.FC<ShareLinkDialogProps> = ({
                           • {link.label}
                         </Typography>
                       )}
+                      <Typography variant="caption" color="text.secondary">
+                        • {link.accessCount} {link.accessCount === 1 ? 'visualização' : 'visualizações'}
+                      </Typography>
                     </Box>
                   }
                   secondary={

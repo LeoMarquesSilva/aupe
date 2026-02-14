@@ -30,6 +30,7 @@ import {
   Slideshow as ReelsIcon,
   AddPhotoAlternate as PostIcon,
   Collections as StoryIcon,
+  Link as LinkIcon,
 } from '@mui/icons-material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -231,6 +232,9 @@ const Header: React.FC = () => {
               <Box component={Link} to="/calendar" sx={linkSx(location.pathname.includes('/calendar'))}>
                 Calendário
               </Box>
+              <Box component={Link} to="/share-links" sx={linkSx(location.pathname === '/share-links')}>
+                Links compartilhados
+              </Box>
             </Box>
           )}
 
@@ -397,6 +401,10 @@ const Header: React.FC = () => {
         <MenuItem component={Link} to="/calendar" onClick={() => setMenuAnchorEl(null)}>
           <ListItemIcon><CalendarIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="Calendário" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
+        </MenuItem>
+        <MenuItem component={Link} to="/share-links" onClick={() => setMenuAnchorEl(null)}>
+          <ListItemIcon><LinkIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Links compartilhados" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
         </MenuItem>
         <Divider sx={{ my: 1 }} />
         <MenuItem component={Link} to="/create-post" onClick={() => setMenuAnchorEl(null)}>

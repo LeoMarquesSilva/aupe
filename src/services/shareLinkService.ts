@@ -10,6 +10,7 @@ export interface ClientShareLink {
   label: string | null;
   createdAt: string;
   createdBy: string | null;
+  accessCount: number;
 }
 
 export interface CreateShareLinkResult {
@@ -81,7 +82,7 @@ export async function listShareLinks(clientId: string): Promise<ClientShareLink[
 
   const { data, error } = await supabase
     .from('client_share_links')
-    .select('id, client_id, token, expires_at, label, created_at, created_by')
+    .select('id, client_id, token, expires_at, label, created_at, created_by, access_count')
     .eq('client_id', clientId)
     .gt('expires_at', now)
     .order('created_at', { ascending: false });
@@ -96,7 +97,95 @@ export async function listShareLinks(clientId: string): Promise<ClientShareLink[
     label: row.label,
     createdAt: row.created_at,
     createdBy: row.created_by,
+    accessCount: row.access_count ?? 0,
   }));
+}
+
+export interface ActiveShareLinkWithClient {
+  id: string;
+  clientId: string;
+  clientName: string;
+  clientInstagram: string | null;
+  clientPhotoUrl: string | null;
+  token: string;
+  expiresAt: string;
+  label: string | null;
+  createdAt: string;
+  createdBy: string | null;
+  createdByLabel: string;
+  accessCount: number;
+}
+
+/**
+ * Lista todos os links compartilháveis ativos da organização (para a página de gestão).
+ */
+export async function listAllActiveShareLinks(): Promise<ActiveShareLinkWithClient[]> {
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from('client_share_links')
+    .select('id, client_id, token, expires_at, label, created_at, created_by, access_count, clients(name, instagram, profile_picture, logo_url)')
+    .gt('expires_at', now)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  const rows = (data || []) as Array<{
+    id: string;
+    client_id: string;
+    token: string;
+    expires_at: string;
+    label: string | null;
+    created_at: string;
+    created_by: string | null;
+    access_count: number | null;
+    clients:
+      | { name: string; instagram: string | null; profile_picture: string | null; logo_url: string | null }
+      | { name: string; instagram: string | null; profile_picture: string | null; logo_url: string | null }[]
+      | null;
+  }>;
+
+  const creatorIds = [...new Set(rows.map((r) => r.created_by).filter(Boolean))] as string[];
+  let creatorMap: Record<string, { full_name: string | null; email: string }> = {};
+  if (creatorIds.length > 0) {
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', creatorIds);
+    if (profilesData) {
+      creatorMap = profilesData.reduce(
+        (acc, p) => {
+          acc[p.id] = { full_name: p.full_name ?? null, email: p.email ?? '' };
+          return acc;
+        },
+        {} as Record<string, { full_name: string | null; email: string }>
+      );
+    }
+  }
+
+  return rows.map((row) => {
+    const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
+    const creator = row.created_by ? creatorMap[row.created_by] : null;
+    const createdByLabel = creator
+      ? (creator.full_name || creator.email || 'Usuário')
+      : '—';
+    const clientPhotoUrl =
+      client?.profile_picture || client?.logo_url || null;
+    return {
+      id: row.id,
+      clientId: row.client_id,
+      clientName: client?.name ?? 'Cliente',
+      clientInstagram: client?.instagram ?? null,
+      clientPhotoUrl: clientPhotoUrl || null,
+      token: row.token,
+      expiresAt: row.expires_at,
+      label: row.label,
+      createdAt: row.created_at,
+      createdBy: row.created_by,
+      createdByLabel,
+      accessCount: row.access_count ?? 0,
+    };
+  });
 }
 
 /**

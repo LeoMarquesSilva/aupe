@@ -38,6 +38,7 @@ import Checkout from './pages/Checkout';
 import CheckoutSuccess from './pages/CheckoutSuccess';
 import CheckoutCancel from './pages/CheckoutCancel';
 import ClientDashboardView from './pages/ClientDashboardView';
+import ShareLinksPage from './pages/ShareLinksPage';
 
 // Layout compartilhado para todas as páginas protegidas
 const PageLayout = ({ children }: { children: React.ReactNode }) => (
@@ -179,6 +180,10 @@ const router = createBrowserRouter([
   {
     path: "/calendar",
     element: <ProtectedPageLayout><StoryCalendar /></ProtectedPageLayout>,
+  },
+  {
+    path: "/share-links",
+    element: <ProtectedPageLayout><ShareLinksPage /></ProtectedPageLayout>,
   },
   {
     path: "/calendar/:clientId",
