@@ -7,7 +7,6 @@ import {
   Typography, 
   Button, 
   Paper, 
-  Snackbar, 
   Alert, 
   Divider, 
   FormControl,
@@ -47,6 +46,8 @@ import ImageUploader from '../components/ImageUploader';
 import CaptionEditor from '../components/CaptionEditor';
 import DateTimePicker from '../components/DateTimePicker';
 import SubscriptionLimitsAlert from '../components/SubscriptionLimitsAlert';
+import AppSnackbar from '../components/AppSnackbar';
+import { getUserFriendlyMessage } from '../utils/errorMessages';
 import { scheduleInstagramPost, uploadImagesToSupabaseStorage } from '../services/postService';
 
 const CreatePost: React.FC = () => {
@@ -216,7 +217,7 @@ const CreatePost: React.FC = () => {
         return;
       }
 
-      showNotification('Enviando imagens para Supabase Storage...', 'info');
+      showNotification('Enviando imagens...', 'info');
       
       console.log(`📦 Preparando upload de ${images.length} imagens para Supabase Storage`);
       
@@ -224,7 +225,7 @@ const CreatePost: React.FC = () => {
       const imageUrls = await uploadImagesToSupabaseStorage(images);
       
       if (imageUrls.length === 0) {
-        showNotification('Falha ao fazer upload das imagens', 'error');
+        showNotification('Não foi possível enviar as imagens. Tente novamente ou use outras imagens.', 'error');
         return;
       }
       
@@ -250,10 +251,10 @@ const CreatePost: React.FC = () => {
       await scheduleInstagramPost(postData, selectedClient);
 
       resetForm();
-      showNotification(`${postType === 'carousel' ? 'Carrossel' : 'Postagem'} agendado com sucesso! Imagens salvas no Supabase Storage.`, 'success');
+      showNotification(`${postType === 'carousel' ? 'Carrossel' : 'Postagem'} agendada com sucesso! Será publicada na data e hora escolhidas.`, 'success');
     } catch (error) {
       console.error('Erro ao agendar postagem:', error);
-      showNotification(`Erro ao agendar postagem: ${(error as Error).message}`, 'error');
+      showNotification(getUserFriendlyMessage(error, 'agendar postagem'), 'error');
     } finally {
       setLoading(false);
     }
@@ -271,7 +272,7 @@ const CreatePost: React.FC = () => {
         return;
       }
 
-      showNotification('Enviando imagens para Supabase Storage...', 'info');
+      showNotification('Enviando imagens...', 'info');
       
       console.log(`Preparando upload de ${images.length} imagens para Supabase Storage`);
       
@@ -279,7 +280,7 @@ const CreatePost: React.FC = () => {
       const imageUrls = await uploadImagesToSupabaseStorage(images);
       
       if (imageUrls.length === 0) {
-        showNotification('Falha ao fazer upload das imagens', 'error');
+        showNotification('Não foi possível enviar as imagens. Tente novamente ou use outras imagens.', 'error');
         return;
       }
       
@@ -303,10 +304,10 @@ const CreatePost: React.FC = () => {
       await scheduleInstagramPost(postData, selectedClient);
 
       resetForm();
-      showNotification(`${postType === 'carousel' ? 'Carrossel' : 'Postagem'} enviado com sucesso! Imagens salvas no Supabase Storage.`, 'success');
+      showNotification(`${postType === 'carousel' ? 'Carrossel' : 'Postagem'} enviada com sucesso!`, 'success');
     } catch (error) {
       console.error('Erro ao enviar postagem:', error);
-      showNotification(`Erro ao enviar postagem: ${(error as Error).message}`, 'error');
+      showNotification(getUserFriendlyMessage(error, 'enviar postagem'), 'error');
     } finally {
       setPostNowLoading(false);
     }
@@ -857,21 +858,13 @@ const CreatePost: React.FC = () => {
         </Fab>
       )}
 
-      <Snackbar
+      <AppSnackbar
         open={notification.open}
-        autoHideDuration={6000}
+        message={notification.message}
+        severity={notification.severity}
         onClose={handleCloseNotification}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert 
-          onClose={handleCloseNotification} 
-          severity={notification.severity}
-          variant="filled"
-          sx={{ width: '100%' }}
-        >
-          {notification.message}
-        </Alert>
-      </Snackbar>
+        autoHideDuration={6000}
+      />
     </Container>
   );
 };

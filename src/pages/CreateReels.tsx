@@ -7,7 +7,6 @@ import {
   Typography, 
   Button, 
   Paper, 
-  Snackbar, 
   Alert, 
   Divider, 
   FormControl,
@@ -51,6 +50,8 @@ import ImageUploader from '../components/ImageUploader';
 import CaptionEditor from '../components/CaptionEditor';
 import DateTimePicker from '../components/DateTimePicker';
 import SubscriptionLimitsAlert from '../components/SubscriptionLimitsAlert';
+import AppSnackbar from '../components/AppSnackbar';
+import { getUserFriendlyMessage } from '../utils/errorMessages';
 
 const CreateReels: React.FC = () => {
   const navigate = useNavigate();
@@ -218,7 +219,7 @@ const CreateReels: React.FC = () => {
     try {
       const selectedClient = getSelectedClient();
       if (!selectedClient || !video) {
-        showNotification('Dados inválidos', 'error');
+        showNotification('Verifique o vídeo e a legenda antes de continuar.', 'error');
         return;
       }
 
@@ -247,10 +248,10 @@ const CreateReels: React.FC = () => {
       }, selectedClient);
 
       resetForm();
-      showNotification('Reel agendado com sucesso!', 'success');
+      showNotification('Reel agendado com sucesso! Será publicado na data e hora escolhidas.', 'success');
     } catch (error) {
       console.error('Erro ao agendar Reel:', error);
-      showNotification(`Erro ao agendar Reel: ${(error as Error).message}`, 'error');
+      showNotification(getUserFriendlyMessage(error, 'agendar Reel'), 'error');
     } finally {
       setLoading(false);
     }
@@ -264,7 +265,7 @@ const CreateReels: React.FC = () => {
     try {
       const selectedClient = getSelectedClient();
       if (!selectedClient || !video) {
-        showNotification('Dados inválidos', 'error');
+        showNotification('Verifique o vídeo e a legenda antes de continuar.', 'error');
         return;
       }
 
@@ -295,7 +296,7 @@ const CreateReels: React.FC = () => {
       showNotification('Reel enviado com sucesso!', 'success');
     } catch (error) {
       console.error('Erro ao enviar Reel:', error);
-      showNotification(`Erro ao enviar Reel: ${(error as Error).message}`, 'error');
+      showNotification(getUserFriendlyMessage(error, 'enviar Reel'), 'error');
     } finally {
       setPostNowLoading(false);
     }
@@ -833,21 +834,13 @@ const CreateReels: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <Snackbar
+      <AppSnackbar
         open={notification.open}
-        autoHideDuration={6000}
+        message={notification.message}
+        severity={notification.severity}
         onClose={handleCloseNotification}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert 
-          onClose={handleCloseNotification} 
-          severity={notification.severity}
-          variant="filled"
-          sx={{ width: '100%' }}
-        >
-          {notification.message}
-        </Alert>
-      </Snackbar>
+        autoHideDuration={6000}
+      />
     </Container>
   );
 };

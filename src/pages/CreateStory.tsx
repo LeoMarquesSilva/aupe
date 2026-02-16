@@ -7,7 +7,6 @@ import {
   Typography, 
   Button, 
   Paper, 
-  Snackbar, 
   Alert, 
   Divider, 
   FormControl,
@@ -57,6 +56,8 @@ import StoryEditor from '../components/StoryEditor';
 import StoryPreview from '../components/StoryPreview';
 import DateTimePicker from '../components/DateTimePicker';
 import SubscriptionLimitsAlert from '../components/SubscriptionLimitsAlert';
+import AppSnackbar from '../components/AppSnackbar';
+import { getUserFriendlyMessage } from '../utils/errorMessages';
 import { scheduleInstagramPost, uploadImagesToSupabaseStorage } from '../services/postService';
 
 const CreateStory: React.FC = () => {
@@ -261,7 +262,7 @@ const CreateStory: React.FC = () => {
         return;
       }
 
-      showNotification('Enviando imagens para Supabase Storage...', 'info');
+      showNotification('Enviando imagens...', 'info');
       
       const images = extractStoryImages(story!);
       const caption = extractStoryCaption(story!);
@@ -273,7 +274,7 @@ const CreateStory: React.FC = () => {
       const imageUrls = await uploadImagesToSupabaseStorage(postImages);
       
       if (imageUrls.length === 0) {
-        showNotification('Falha ao fazer upload das imagens', 'error');
+        showNotification('Não foi possível enviar as imagens. Tente novamente ou use outras imagens.', 'error');
         return;
       }
       
@@ -297,10 +298,10 @@ const CreateStory: React.FC = () => {
       await scheduleInstagramPost(postData, selectedClient);
 
       resetForm();
-      showNotification('Story agendado com sucesso! Imagens salvas no Supabase Storage.', 'success');
+      showNotification('Story agendado com sucesso! Será publicado na data e hora escolhidas.', 'success');
     } catch (error) {
       console.error('Erro ao agendar story:', error);
-      showNotification(`Erro ao agendar story: ${(error as Error).message}`, 'error');
+      showNotification(getUserFriendlyMessage(error, 'agendar story'), 'error');
     } finally {
       setLoading(false);
     }
@@ -318,7 +319,7 @@ const CreateStory: React.FC = () => {
         return;
       }
 
-      showNotification('Enviando imagens para Supabase Storage...', 'info');
+      showNotification('Enviando imagens...', 'info');
       
       const images = extractStoryImages(story!);
       const caption = extractStoryCaption(story!);
@@ -330,7 +331,7 @@ const CreateStory: React.FC = () => {
       const imageUrls = await uploadImagesToSupabaseStorage(postImages);
       
       if (imageUrls.length === 0) {
-        showNotification('Falha ao fazer upload das imagens', 'error');
+        showNotification('Não foi possível enviar as imagens. Tente novamente ou use outras imagens.', 'error');
         return;
       }
       
@@ -352,10 +353,10 @@ const CreateStory: React.FC = () => {
       await scheduleInstagramPost(postData, selectedClient);
 
       resetForm();
-      showNotification('Story enviado com sucesso! Imagens salvas no Supabase Storage.', 'success');
+      showNotification('Story enviado com sucesso!', 'success');
     } catch (error) {
       console.error('Erro ao enviar story:', error);
-      showNotification(`Erro ao enviar story: ${(error as Error).message}`, 'error');
+      showNotification(getUserFriendlyMessage(error, 'enviar story'), 'error');
     } finally {
       setPostNowLoading(false);
     }
@@ -1021,21 +1022,13 @@ const CreateStory: React.FC = () => {
     </Fab>
   )}
 
-  <Snackbar
+  <AppSnackbar
     open={notification.open}
-    autoHideDuration={6000}
+    message={notification.message}
+    severity={notification.severity}
     onClose={handleCloseNotification}
-    anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-  >
-    <Alert 
-      onClose={handleCloseNotification} 
-      severity={notification.severity}
-      variant="filled"
-      sx={{ width: '100%' }}
-    >
-      {notification.message}
-    </Alert>
-  </Snackbar>
+    autoHideDuration={6000}
+  />
 </Container>
 ); 
 

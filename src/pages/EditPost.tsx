@@ -7,7 +7,6 @@ import {
   Typography, 
   Button, 
   Paper, 
-  Snackbar, 
   Alert, 
   Divider, 
   Avatar,
@@ -40,6 +39,8 @@ import ImageUploader from '../components/ImageUploader';
 import VideoUploader from '../components/VideoUploader';
 import CaptionEditor from '../components/CaptionEditor';
 import DateTimePicker from '../components/DateTimePicker';
+import AppSnackbar from '../components/AppSnackbar';
+import { getUserFriendlyMessage } from '../utils/errorMessages';
 import { uploadImagesToSupabaseStorage } from '../services/postService';
 import { supabaseVideoStorageService } from '../services/supabaseVideoStorageService';
 
@@ -640,21 +641,13 @@ const EditPost: React.FC = () => {
         </Box>
       </Paper>
 
-      <Snackbar
+      <AppSnackbar
         open={notification.open}
-        autoHideDuration={6000}
+        message={notification.message}
+        severity={notification.severity}
         onClose={handleCloseNotification}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert 
-          onClose={handleCloseNotification} 
-          severity={notification.severity}
-          variant="filled"
-          sx={{ width: '100%' }}
-        >
-          {notification.message}
-        </Alert>
-      </Snackbar>
+        autoHideDuration={6000}
+      />
     </Container>
   );
 };
