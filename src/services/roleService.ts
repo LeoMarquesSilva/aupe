@@ -281,16 +281,23 @@ class RoleService {
     try {
       console.log('🔄 Criando usuário (com restauração de sessão):', userData.email);
 
-      // 1. Salvar sessão atual
+      // 1. Salvar sessão atual e buscar organization_id do admin
       savedSession = await this.saveCurrentSession();
       console.log('💾 Sessão atual salva');
+
+      let adminOrgId: string | null = null;
+      if (savedSession?.user) {
+        const adminProfile = await this.getUserProfileById(savedSession.user.id);
+        adminOrgId = adminProfile?.organization_id || null;
+        console.log('🏢 Organization ID do admin:', adminOrgId);
+      }
 
       // 2. Criar usuário usando signUp (vai fazer login automático temporariamente)
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: userData.email,
         password: userData.password,
         options: {
-          emailRedirectTo: undefined // Não enviar email de confirmação
+          emailRedirectTo: undefined
         }
       });
 
@@ -308,24 +315,24 @@ class RoleService {
       // 3. Aguardar um pouco
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // 4. Criar perfil via RPC
+      // 4. Criar perfil via RPC (agora com organization_id)
       const { data, error } = await supabase.rpc('create_user_profile', {
         user_id: authData.user.id,
         user_email: userData.email,
         user_full_name: userData.full_name,
-        user_role: userData.role
+        user_role: userData.role,
+        user_organization_id: adminOrgId
       });
 
       if (error) {
         console.error('❌ Erro ao criar perfil via RPC:', error);
-        // Se RPC falhar, tentar criação manual
-        const success = await this.createProfileManually(authData.user.id, userData);
+        const success = await this.createProfileManually(authData.user.id, userData, adminOrgId);
         if (!success) {
           throw new Error('Falha ao criar perfil do usuário');
         }
       }
 
-      console.log('✅ Perfil criado com sucesso');
+      console.log('✅ Perfil criado com sucesso (org:', adminOrgId, ')');
 
       // 5. IMPORTANTE: Restaurar sessão original ANTES de retornar
       if (savedSession) {
@@ -339,7 +346,6 @@ class RoleService {
     } catch (error) {
       console.error('❌ Erro ao criar usuário:', error);
       
-      // Tentar restaurar sessão mesmo em caso de erro
       if (savedSession) {
         try {
           await this.restoreSession(savedSession);
@@ -356,11 +362,11 @@ class RoleService {
   /**
    * Criar perfil manualmente (fallback)
    */
-  private async createProfileManually(userId: string, userData: CreateUserData): Promise<boolean> {
+  private async createProfileManually(userId: string, userData: CreateUserData, organizationId?: string | null): Promise<boolean> {
     try {
       console.log('🔄 Criando perfil manualmente para:', userData.email);
 
-      const profileData = {
+      const profileData: Record<string, any> = {
         id: userId,
         email: userData.email,
         full_name: userData.full_name,
@@ -368,6 +374,10 @@ class RoleService {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
+
+      if (organizationId) {
+        profileData.organization_id = organizationId;
+      }
 
       // Tentar profiles primeiro
       let { error } = await supabase
