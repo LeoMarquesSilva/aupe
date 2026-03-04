@@ -466,16 +466,16 @@ const ClientHeader: React.FC<ClientHeaderProps> = ({
                 fontSize: '0.875rem',
                 textTransform: 'none',
                 borderWidth: 2,
-                borderColor: alpha('#E91E63', 0.3),
-                color: '#E91E63',
-                bgcolor: alpha('#E91E63', 0.05),
+                borderColor: alpha('#7c3aed', 0.3),
+                color: '#7c3aed',
+                bgcolor: alpha('#7c3aed', 0.05),
                 transition: 'all 0.3s ease',
                 '&:hover': {
                   borderWidth: 2,
-                  borderColor: '#E91E63',
-                  bgcolor: alpha('#E91E63', 0.1),
+                  borderColor: '#7c3aed',
+                  bgcolor: alpha('#7c3aed', 0.1),
                   transform: 'translateY(-2px)',
-                  boxShadow: `0 4px 12px ${alpha('#E91E63', 0.2)}`
+                  boxShadow: `0 4px 12px ${alpha('#7c3aed', 0.2)}`
                 }
               }}
             >

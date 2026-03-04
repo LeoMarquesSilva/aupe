@@ -11,7 +11,8 @@ import {
   Button,
   useTheme,
   useMediaQuery,
-  Divider
+  Divider,
+  alpha
 } from '@mui/material';
 import {
   ThumbUp as LikeIcon,
@@ -26,6 +27,13 @@ import {
 } from '@mui/icons-material';
 import { InstagramPost } from '../../services/instagramMetricsService';
 
+const MEDIA_COLORS: Record<string, string> = {
+  REELS:          '#7c3aed',
+  VIDEO:          '#d97706',
+  IMAGE:          '#0891b2',
+  CAROUSEL_ALBUM: '#6366f1',
+};
+
 interface FeaturedPostProps {
   post: InstagramPost;
   onViewDetails: (post: InstagramPost) => void;
@@ -36,96 +44,91 @@ const FeaturedPost: React.FC<FeaturedPostProps> = ({ post, onViewDetails, format
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
+  const resolveColor = (type: string, productType?: string) => {
+    if (productType === 'REELS') return MEDIA_COLORS.REELS;
+    return MEDIA_COLORS[type] || MEDIA_COLORS.IMAGE;
+  };
+
   const getMediaTypeIcon = (type: string, productType?: string) => {
-    if (productType === 'REELS') return <VideoIcon sx={{ color: '#E91E63' }} />;
-    
+    const color = resolveColor(type, productType);
+    if (productType === 'REELS') return <VideoIcon sx={{ color }} />;
     switch (type) {
-      case 'IMAGE':
-        return <ImageIcon sx={{ color: '#2196F3' }} />;
-      case 'VIDEO':
-        return <VideoIcon sx={{ color: '#FF9800' }} />;
-      case 'CAROUSEL_ALBUM':
-        return <CarouselIcon sx={{ color: '#9C27B0' }} />;
-      default:
-        return <ImageIcon sx={{ color: '#2196F3' }} />;
+      case 'IMAGE': return <ImageIcon sx={{ color }} />;
+      case 'VIDEO': return <VideoIcon sx={{ color }} />;
+      case 'CAROUSEL_ALBUM': return <CarouselIcon sx={{ color }} />;
+      default: return <ImageIcon sx={{ color }} />;
     }
   };
 
   const getMediaTypeLabel = (type: string, productType?: string) => {
     if (productType === 'REELS') return 'Reels';
-    
     switch (type) {
-      case 'IMAGE':
-        return 'Foto';
-      case 'VIDEO':
-        return 'Vídeo';
-      case 'CAROUSEL_ALBUM':
-        return 'Carrossel';
-      default:
-        return type;
+      case 'IMAGE': return 'Foto';
+      case 'VIDEO': return 'Vídeo';
+      case 'CAROUSEL_ALBUM': return 'Carrossel';
+      default: return type;
     }
   };
 
-  const getMediaTypeColor = (type: string, productType?: string) => {
-    if (productType === 'REELS') return '#E91E63';
-    
-    switch (type) {
-      case 'IMAGE':
-        return '#2196F3';
-      case 'VIDEO':
-        return '#FF9800';
-      case 'CAROUSEL_ALBUM':
-        return '#9C27B0';
-      default:
-        return '#2196F3';
-    }
-  };
+  const mediaColor = resolveColor(post.media_type, post.media_product_type);
 
-  // Calcular métricas reais
   const likes = post.like_count || 0;
   const comments = post.comments_count || 0;
   const saved = post.insights?.saved || 0;
   const shares = post.insights?.shares || 0;
   const reach = post.insights?.reach || 0;
   const impressions = post.insights?.impressions || 0;
-  
-  // Engajamento total (métricas reais)
   const totalEngagement = likes + comments + saved + shares;
-  
-  // Taxa de engajamento (se tiver reach)
   const engagementRate = reach > 0 ? (totalEngagement / reach) * 100 : 0;
+
+  const statItems = [
+    { icon: <LikeIcon sx={{ color: '#d97706', fontSize: 18 }} />, value: likes, label: 'Curtidas', bg: '#fffbeb' },
+    { icon: <CommentIcon sx={{ color: '#7c3aed', fontSize: 18 }} />, value: comments, label: 'Comentários', bg: '#f5f3ff' },
+    ...(reach > 0 ? [{ icon: <ReachIcon sx={{ color: '#0891b2', fontSize: 18 }} />, value: reach, label: 'Alcance', bg: '#ecfeff' }] : []),
+    ...(impressions > 0 ? [{ icon: <VisibilityIcon sx={{ color: '#6366f1', fontSize: 18 }} />, value: impressions, label: 'Impressões', bg: '#eef2ff' }] : []),
+  ];
 
   return (
     <Grid item xs={12}>
       <Paper 
         elevation={0} 
         sx={{ 
-          borderRadius: 2,
+          borderRadius: 3,
           overflow: 'hidden',
           bgcolor: 'background.paper',
           border: '1px solid',
           borderColor: 'divider',
-          transition: 'all 0.2s ease',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           '&:hover': {
-            borderColor: getMediaTypeColor(post.media_type, post.media_product_type),
-            boxShadow: `0 4px 12px ${getMediaTypeColor(post.media_type, post.media_product_type)}20`
+            borderColor: alpha(mediaColor, 0.4),
+            boxShadow: `0 8px 25px -5px ${alpha(mediaColor, 0.12)}`
           }
         }}
       >
-        {/* Header Minimalista */}
         <Box sx={{ 
-          p: 2.5, 
+          px: 2.5, 
+          py: 2,
           borderBottom: '1px solid',
           borderColor: 'divider',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: 2
+          gap: 1.5
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <TrendingUpIcon sx={{ color: theme.palette.success.main, fontSize: 20 }} />
-            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            <Box sx={{ 
+              width: 32, 
+              height: 32, 
+              borderRadius: 2, 
+              bgcolor: '#ecfdf5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <TrendingUpIcon sx={{ color: '#059669', fontSize: 18 }} />
+            </Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
               Post Mais Engajado
             </Typography>
             <Chip 
@@ -133,17 +136,18 @@ const FeaturedPost: React.FC<FeaturedPostProps> = ({ post, onViewDetails, format
               label={getMediaTypeLabel(post.media_type, post.media_product_type)}
               size="small"
               sx={{ 
-                fontWeight: 500,
-                fontSize: '0.75rem',
-                height: 24,
-                bgcolor: `${getMediaTypeColor(post.media_type, post.media_product_type)}10`,
-                color: getMediaTypeColor(post.media_type, post.media_product_type),
-                border: `1px solid ${getMediaTypeColor(post.media_type, post.media_product_type)}30`
+                fontWeight: 600,
+                fontSize: '0.72rem',
+                height: 26,
+                bgcolor: alpha(mediaColor, 0.08),
+                color: mediaColor,
+                border: `1px solid ${alpha(mediaColor, 0.2)}`,
+                '& .MuiChip-icon': { ml: 0.5 }
               }}
             />
           </Box>
           
-          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
+          <Typography variant="body2" color="text.disabled" sx={{ fontSize: '0.8rem' }}>
             {formatTimeAgo(post.timestamp)}
           </Typography>
         </Box>
@@ -152,15 +156,15 @@ const FeaturedPost: React.FC<FeaturedPostProps> = ({ post, onViewDetails, format
           display: 'flex', 
           flexDirection: isMobile ? 'column' : 'row',
           boxShadow: 'none',
-          backgroundColor: 'transparent'
+          backgroundColor: 'transparent',
+          borderRadius: 0
         }}>
-          {/* Imagem */}
           <Box sx={{ position: 'relative', flexShrink: 0 }}>
             <CardMedia
               component="img"
               sx={{ 
-                width: isMobile ? '100%' : 240,
-                height: isMobile ? 240 : 240,
+                width: isMobile ? '100%' : 260,
+                height: isMobile ? 260 : 260,
                 objectFit: 'cover',
                 bgcolor: 'grey.100'
               }}
@@ -168,29 +172,29 @@ const FeaturedPost: React.FC<FeaturedPostProps> = ({ post, onViewDetails, format
               alt={post.caption || 'Post do Instagram'}
             />
             
-            {/* Badge de Engajamento Minimalista */}
             {engagementRate > 0 && (
               <Box sx={{
                 position: 'absolute',
-                top: 8,
-                right: 8,
-                bgcolor: 'success.main',
-                borderRadius: 1.5,
-                px: 1,
-                py: 0.5
+                top: 10,
+                right: 10,
+                background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                borderRadius: 2,
+                px: 1.25,
+                py: 0.5,
+                boxShadow: '0 2px 8px rgba(5, 150, 105, 0.4)'
               }}>
                 <Typography variant="caption" sx={{ 
                   color: 'white', 
                   fontWeight: 700,
-                  fontSize: '0.6875rem'
+                  fontSize: '0.72rem',
+                  letterSpacing: '0.02em'
                 }}>
-                  {engagementRate.toFixed(1)}%
+                  {engagementRate.toFixed(1)}% eng.
                 </Typography>
               </Box>
             )}
           </Box>
 
-          {/* Conteúdo */}
           <CardContent sx={{ 
             flex: '1 0 auto', 
             p: 2.5,
@@ -198,127 +202,65 @@ const FeaturedPost: React.FC<FeaturedPostProps> = ({ post, onViewDetails, format
             flexDirection: 'column',
             justifyContent: 'space-between'
           }}>
-            {/* Caption */}
             <Box sx={{ mb: 2 }}>
               <Typography variant="body2" sx={{ 
-                lineHeight: 1.6,
+                lineHeight: 1.65,
                 color: 'text.secondary',
                 fontSize: '0.875rem'
               }}>
-                {post.caption && post.caption.length > 120 
-                  ? `${post.caption.substring(0, 120)}...` 
+                {post.caption && post.caption.length > 140 
+                  ? `${post.caption.substring(0, 140)}...` 
                   : post.caption || 'Sem legenda'}
               </Typography>
             </Box>
 
-            {/* Métricas Minimalistas */}
-            <Box sx={{ mb: 2 }}>
+            <Box sx={{ mb: 2.5 }}>
               <Grid container spacing={1.5}>
-                <Grid item xs={6} sm={3}>
-                  <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 1,
-                    p: 1,
-                    borderRadius: 1,
-                    bgcolor: 'grey.50'
-                  }}>
-                    <LikeIcon sx={{ color: 'error.main', fontSize: 18 }} />
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-                        {likes.toLocaleString()}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem' }}>
-                        Curtidas
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Grid>
-
-                <Grid item xs={6} sm={3}>
-                  <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 1,
-                    p: 1,
-                    borderRadius: 1,
-                    bgcolor: 'grey.50'
-                  }}>
-                    <CommentIcon sx={{ color: 'info.main', fontSize: 18 }} />
-                    <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-                        {comments.toLocaleString()}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem' }}>
-                        Comentários
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Grid>
-
-                {reach > 0 && (
-                  <Grid item xs={6} sm={3}>
+                {statItems.map((item, idx) => (
+                  <Grid item xs={6} sm={3} key={idx}>
                     <Box sx={{ 
                       display: 'flex', 
                       alignItems: 'center', 
                       gap: 1,
-                      p: 1,
-                      borderRadius: 1,
-                      bgcolor: 'grey.50'
+                      p: 1.25,
+                      borderRadius: 2,
+                      bgcolor: item.bg,
+                      transition: 'transform 0.2s ease',
+                      '&:hover': { transform: 'translateY(-1px)' }
                     }}>
-                      <ReachIcon sx={{ color: 'warning.main', fontSize: 18 }} />
+                      {item.icon}
                       <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-                          {reach.toLocaleString()}
+                        <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2, fontSize: '0.9rem' }}>
+                          {item.value.toLocaleString('pt-BR')}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem' }}>
-                          Alcance
+                        <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.68rem' }}>
+                          {item.label}
                         </Typography>
                       </Box>
                     </Box>
                   </Grid>
-                )}
-
-                {impressions > 0 && (
-                  <Grid item xs={6} sm={3}>
-                    <Box sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 1,
-                      p: 1,
-                      borderRadius: 1,
-                      bgcolor: 'grey.50'
-                    }}>
-                      <VisibilityIcon sx={{ color: 'primary.main', fontSize: 18 }} />
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-                          {impressions.toLocaleString()}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6875rem' }}>
-                          Impressões
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Grid>
-                )}
+                ))}
               </Grid>
             </Box>
 
-            <Divider sx={{ my: 1.5 }} />
+            <Divider sx={{ mb: 2 }} />
 
-            {/* Ações Minimalistas */}
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
               <Button 
-                variant="outlined"
+                variant="contained"
                 size="small"
+                disableElevation
                 onClick={() => onViewDetails(post)}
                 sx={{ 
-                  borderRadius: 1.5,
+                  borderRadius: 2,
                   textTransform: 'none',
-                  fontWeight: 500,
-                  fontSize: '0.8125rem',
-                  px: 2,
-                  py: 0.75
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  px: 2.5,
+                  py: 0.75,
+                  bgcolor: theme.palette.text.primary,
+                  color: 'background.paper',
+                  '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.85) }
                 }}
               >
                 Ver Detalhes
@@ -330,17 +272,23 @@ const FeaturedPost: React.FC<FeaturedPostProps> = ({ post, onViewDetails, format
                 href={post.permalink}
                 target="_blank"
                 rel="noopener noreferrer"
-                startIcon={<LaunchIcon sx={{ fontSize: 16 }} />}
+                startIcon={<LaunchIcon sx={{ fontSize: '14px !important' }} />}
                 sx={{ 
-                  borderRadius: 1.5,
+                  borderRadius: 2,
                   textTransform: 'none',
-                  fontWeight: 500,
-                  fontSize: '0.8125rem',
-                  px: 2,
-                  py: 0.75
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  px: 2.5,
+                  py: 0.75,
+                  borderColor: 'divider',
+                  color: 'text.secondary',
+                  '&:hover': { 
+                    borderColor: 'text.primary',
+                    bgcolor: alpha(theme.palette.text.primary, 0.04)
+                  }
                 }}
               >
-                Instagram
+                Abrir no Instagram
               </Button>
             </Box>
           </CardContent>

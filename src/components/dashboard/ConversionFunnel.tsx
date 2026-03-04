@@ -1,6 +1,13 @@
 import React from 'react';
-import { Card, CardContent, Typography, Box, Chip } from '@mui/material';
-import { TrendingDown, Visibility, People, ThumbUp, Bookmark, Share } from '@mui/icons-material';
+import { Paper, Typography, Box, Chip, alpha, useTheme } from '@mui/material';
+import {
+  RemoveRedEye as ImpressionsIcon,
+  People as ReachIcon,
+  TouchApp as EngagementIcon,
+  BookmarkBorder as SaveIcon,
+  Share as ShareIcon,
+  ArrowDownward as ArrowDownIcon
+} from '@mui/icons-material';
 
 interface ConversionFunnelProps {
   data: {
@@ -12,157 +19,172 @@ interface ConversionFunnelProps {
   };
 }
 
-const ConversionFunnel: React.FC<ConversionFunnelProps> = ({ data }) => {
-  const steps = [
-    {
-      name: 'Impressões',
-      value: data.impressions,
-      icon: <Visibility />,
-      color: '#2e7d32',
-      description: 'Total de visualizações'
-    },
-    {
-      name: 'Alcance',
-      value: data.reach,
-      icon: <People />,
-      color: '#1976d2',
-      description: 'Pessoas únicas alcançadas'
-    },
-    {
-      name: 'Engajamento',
-      value: data.engagement,
-      icon: <ThumbUp />,
-      color: '#ed6c02',
-      description: 'Curtidas + Comentários'
-    },
-    {
-      name: 'Salvamentos',
-      value: data.saves,
-      icon: <Bookmark />,
-      color: '#689f38',
-      description: 'Conteúdo salvo'
-    },
-    {
-      name: 'Compartilhamentos',
-      value: data.shares,
-      icon: <Share />,
-      color: '#5e35b1',
-      description: 'Conteúdo compartilhado'
-    }
-  ].filter(step => step.value > 0);
+const STEPS_CONFIG = [
+  { key: 'impressions', name: 'Impressões', icon: <ImpressionsIcon />, color: '#2563eb', desc: 'Total de visualizações' },
+  { key: 'reach', name: 'Alcance', icon: <ReachIcon />, color: '#7c3aed', desc: 'Pessoas únicas alcançadas' },
+  { key: 'engagement', name: 'Engajamento', icon: <EngagementIcon />, color: '#d97706', desc: 'Curtidas + Comentários + Salvamentos + Compartilhamentos' },
+  { key: 'saves', name: 'Salvamentos', icon: <SaveIcon />, color: '#059669', desc: 'Conteúdo salvo' },
+  { key: 'shares', name: 'Compartilhamentos', icon: <ShareIcon />, color: '#0891b2', desc: 'Conteúdo compartilhado' },
+] as const;
 
-  const maxValue = Math.max(...steps.map(step => step.value));
+const ConversionFunnel: React.FC<ConversionFunnelProps> = ({ data }) => {
+  const theme = useTheme();
+
+  const steps = STEPS_CONFIG
+    .map(cfg => ({ ...cfg, value: data[cfg.key] }))
+    .filter(step => step.value > 0);
+
+  if (steps.length === 0) return null;
+
+  const maxValue = steps[0].value;
+
+  const rates = {
+    reach: data.impressions > 0 ? (data.reach / data.impressions) * 100 : 0,
+    engagement: data.reach > 0 ? (data.engagement / data.reach) * 100 : 0,
+    saves: data.reach > 0 ? (data.saves / data.reach) * 100 : 0,
+    shares: data.reach > 0 ? (data.shares / data.reach) * 100 : 0,
+  };
 
   return (
-    <Card elevation={2}>
-      <CardContent>
-        <Typography variant="h6" gutterBottom fontWeight="bold">
-          🎯 Funil de Conversão
+    <Paper
+      elevation={0}
+      sx={{
+        borderRadius: 3,
+        border: '1px solid',
+        borderColor: 'divider',
+        overflow: 'hidden',
+      }}
+    >
+      <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2.5, pb: 1.5 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.25 }}>
+          Funil de Conversão
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Taxa de conversão (indicador de conteúdo valioso)
+        <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.72rem' }}>
+          Da impressão ao engajamento - taxa de conversão do conteúdo
         </Typography>
-        
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {steps.map((step, index) => {
-            const percentage = (step.value / maxValue) * 100;
-            const conversionRate = index > 0 ? ((step.value / steps[0].value) * 100) : 100;
-            
-            return (
-              <Box key={step.name}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{ color: step.color }}>
-                      {step.icon}
-                    </Box>
-                    <Typography variant="body1" fontWeight="bold">
+      </Box>
+
+      <Box sx={{ px: { xs: 2, md: 2.5 }, pb: 2.5 }}>
+        {steps.map((step, index) => {
+          const barWidth = maxValue > 0 ? (step.value / maxValue) * 100 : 0;
+          const conversionFromTop = index > 0 ? (step.value / steps[0].value) * 100 : 100;
+          const dropFromPrev = index > 0 ? ((1 - step.value / steps[index - 1].value) * 100) : 0;
+
+          return (
+            <React.Fragment key={step.key}>
+              {index > 0 && (
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  py: 0.5,
+                  gap: 0.75,
+                }}>
+                  <ArrowDownIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
+                  <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.62rem', fontWeight: 600 }}>
+                    -{dropFromPrev.toFixed(1)}%
+                  </Typography>
+                </Box>
+              )}
+
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                py: 1,
+              }}>
+                <Box sx={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 2,
+                  bgcolor: alpha(step.color, 0.08),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: step.color,
+                  flexShrink: 0,
+                  '& .MuiSvgIcon-root': { fontSize: 18 }
+                }}>
+                  {step.icon}
+                </Box>
+
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.82rem' }}>
                       {step.name}
                     </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: step.color, fontSize: '0.9rem' }}>
+                        {step.value.toLocaleString('pt-BR')}
+                      </Typography>
+                      {index > 0 && (
+                        <Typography variant="caption" sx={{
+                          fontWeight: 600,
+                          fontSize: '0.65rem',
+                          color: conversionFromTop >= 50 ? '#059669' : conversionFromTop >= 10 ? '#d97706' : '#dc2626',
+                        }}>
+                          {conversionFromTop.toFixed(1)}%
+                        </Typography>
+                      )}
+                    </Box>
                   </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="h6" fontWeight="bold" color={step.color}>
-                      {step.value.toLocaleString('pt-BR')}
-                    </Typography>
-                    <Chip 
-                      label={`${conversionRate.toFixed(1)}%`}
-                      size="small"
-                      color={conversionRate > 50 ? 'success' : conversionRate > 20 ? 'warning' : 'error'}
-                      variant="outlined"
-                    />
-                  </Box>
-                </Box>
-                
-                {/* Barra de progresso do funil */}
-                <Box 
-                  sx={{ 
-                    width: '100%', 
-                    height: 40,
-                    background: `linear-gradient(90deg, ${step.color}20 0%, ${step.color}10 100%)`,
-                    borderRadius: 2,
-                    position: 'relative',
-                    overflow: 'hidden',
-                    border: `1px solid ${step.color}30`
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: `${percentage}%`,
-                      height: '100%',
-                      background: `linear-gradient(90deg, ${step.color} 0%, ${step.color}80 100%)`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                      fontWeight: 'bold',
-                      fontSize: '0.9rem',
-                      transition: 'width 0.8s ease-in-out'
-                    }}
-                  >
-                    {step.description}
-                  </Box>
-                </Box>
-                
-                {/* Seta de conversão */}
-                {index < steps.length - 1 && (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', my: 1 }}>
-                    <TrendingDown sx={{ color: 'text.secondary', transform: 'rotate(0deg)' }} />
-                  </Box>
-                )}
-              </Box>
-            );
-          })}
-        </Box>
 
-        {/* Resumo das taxas */}
-        <Box sx={{ mt: 3, p: 2, backgroundColor: 'grey.50', borderRadius: 2 }}>
-          <Typography variant="subtitle2" gutterBottom>
-            📊 Resumo das Taxas de Conversão:
-          </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            <Chip 
-              label={`Alcance: ${data.impressions > 0 ? ((data.reach / data.impressions) * 100).toFixed(1) : '0'}%`}
-              size="small" 
-              color="info"
-            />
-            <Chip 
-              label={`Engajamento: ${data.reach > 0 ? ((data.engagement / data.reach) * 100).toFixed(1) : '0'}%`}
-              size="small" 
-              color="warning"
-            />
-            <Chip 
-              label={`Salvamento: ${data.reach > 0 ? ((data.saves / data.reach) * 100).toFixed(1) : '0'}%`}
-              size="small" 
-              color="success"
-            />
-            <Chip 
-              label={`Compartilhamento: ${data.reach > 0 ? ((data.shares / data.reach) * 100).toFixed(1) : '0'}%`}
-              size="small" 
-              color="secondary"
-            />
-          </Box>
-        </Box>
-      </CardContent>
-    </Card>
+                  <Box sx={{
+                    width: '100%',
+                    height: 6,
+                    borderRadius: 3,
+                    bgcolor: alpha(step.color, 0.08),
+                    overflow: 'hidden',
+                  }}>
+                    <Box sx={{
+                      width: `${barWidth}%`,
+                      height: '100%',
+                      borderRadius: 3,
+                      bgcolor: step.color,
+                      transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+                    }} />
+                  </Box>
+                </Box>
+              </Box>
+            </React.Fragment>
+          );
+        })}
+      </Box>
+
+      {/* Summary */}
+      <Box sx={{
+        px: { xs: 2, md: 2.5 },
+        py: 1.5,
+        borderTop: '1px solid',
+        borderColor: 'divider',
+        bgcolor: alpha(theme.palette.text.primary, 0.015),
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 0.75,
+      }}>
+        {[
+          { label: `Alcance ${rates.reach.toFixed(1)}%`, ok: rates.reach >= 50 },
+          { label: `Engajamento ${rates.engagement.toFixed(1)}%`, ok: rates.engagement >= 3 },
+          { label: `Salvamento ${rates.saves.toFixed(1)}%`, ok: rates.saves >= 1 },
+          { label: `Compartilhamento ${rates.shares.toFixed(1)}%`, ok: rates.shares >= 0.5 },
+        ].map(r => (
+          <Chip
+            key={r.label}
+            label={r.label}
+            size="small"
+            sx={{
+              height: 24,
+              fontSize: '0.68rem',
+              fontWeight: 600,
+              bgcolor: alpha(r.ok ? '#059669' : '#d97706', 0.08),
+              color: r.ok ? '#059669' : '#d97706',
+              border: '1px solid',
+              borderColor: alpha(r.ok ? '#059669' : '#d97706', 0.2),
+            }}
+          />
+        ))}
+      </Box>
+    </Paper>
   );
 };
 

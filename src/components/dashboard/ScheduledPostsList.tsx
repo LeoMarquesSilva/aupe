@@ -13,7 +13,8 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   Avatar,
-  Divider
+  Divider,
+  Snackbar
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -40,6 +41,7 @@ interface ScheduledPost {
   post_type?: 'post' | 'carousel' | 'reels' | 'stories';
   video?: string;
   user_id?: string;
+  organization_id?: string;
   profiles?: {
     id: string;
     email: string;
@@ -52,14 +54,17 @@ interface ScheduledPostsListProps {
   posts: ScheduledPost[];
   onEditPost: (post: ScheduledPost) => void;
   onDeletePost: (postId: string) => void;
+  onRefreshPosts?: () => void | Promise<void>;
 }
 
 const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
   posts,
   onEditPost,
-  onDeletePost
+  onDeletePost,
+  onRefreshPosts
 }) => {
   const [filter, setFilter] = useState<'all' | 'scheduled' | 'published'>('all');
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' | 'warning' }>({ open: false, message: '', severity: 'info' });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -275,7 +280,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
                         fontWeight: 500
                       }}
                     />
-                    <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <Tooltip title="Editar">
                         <IconButton 
                           size="small" 
@@ -365,6 +370,14 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
           );
         })}
       </Grid>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={5000}
+        onClose={() => setSnackbar(s => ({ ...s, open: false }))}
+        message={snackbar.message}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
     </Box>
   );
 };

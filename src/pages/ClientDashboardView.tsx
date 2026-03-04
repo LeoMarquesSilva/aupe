@@ -6,8 +6,6 @@ import {
   Typography,
   CircularProgress,
   Alert,
-  ToggleButtonGroup,
-  ToggleButton,
   Grid,
   Paper,
   Avatar,
@@ -19,11 +17,12 @@ import {
   Chip
 } from '@mui/material';
 import { Instagram as InstagramIcon } from '@mui/icons-material';
-import { formatDistanceToNow, format, subDays, isAfter, parseISO } from 'date-fns';
+import { formatDistanceToNow, format, subDays, isAfter, parseISO, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { fetchDashboardByToken } from '../services/shareLinkService';
 import { instagramMetricsService, InstagramPost } from '../services/instagramMetricsService';
-import { MetricsOverview, FeaturedPost, PostsTable, PostDetails } from '../components/dashboard';
+import { MetricsOverview, FeaturedPost, PostsTable, PostDetails, PeriodSelector, ConversionFunnel } from '../components/dashboard';
+import type { PeriodConfig } from '../components/dashboard';
 
 const AGENCY_LOGO_URL = '/LOGO-AUPE.jpg';
 const APP_NAME = 'AUPE';
@@ -41,6 +40,12 @@ const ClientDashboardView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<Awaited<ReturnType<typeof fetchDashboardByToken>> | null>(null);
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d');
+  const [periodConfig, setPeriodConfig] = useState<PeriodConfig>({
+    mode: 'month',
+    quickPeriod: '30d',
+    selectedMonth: new Date(),
+    comparisonMonth: subMonths(new Date(), 1)
+  });
   const [selectedPost, setSelectedPost] = useState<InstagramPost | null>(null);
   const [postDetailsOpen, setPostDetailsOpen] = useState(false);
 
@@ -73,9 +78,42 @@ const ClientDashboardView: React.FC = () => {
   }, [decodedToken]);
 
   const posts = (data?.posts as InstagramPost[] | undefined) || [];
-  const cutoffDate = subDays(new Date(), period === '7d' ? 7 : period === '30d' ? 30 : 90);
+
+  const { periodStart, periodEnd, prevPeriodStart, prevPeriodEnd, prevPeriodLabel } = useMemo(() => {
+    if (periodConfig.mode === 'month') {
+      const monthStart = startOfMonth(periodConfig.selectedMonth);
+      const monthEnd = endOfMonth(periodConfig.selectedMonth);
+      const compMonth = periodConfig.comparisonMonth;
+      return {
+        periodStart: monthStart,
+        periodEnd: monthEnd,
+        prevPeriodStart: startOfMonth(compMonth),
+        prevPeriodEnd: endOfMonth(compMonth),
+        periodLabel: format(monthStart, "MMMM 'de' yyyy", { locale: ptBR }),
+        prevPeriodLabel: format(compMonth, "MMMM 'de' yyyy", { locale: ptBR })
+      };
+    }
+    const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
+    const end = new Date();
+    const start = subDays(end, days);
+    return {
+      periodStart: start,
+      periodEnd: end,
+      prevPeriodStart: subDays(start, days),
+      prevPeriodEnd: start,
+      periodLabel: `Últimos ${days} dias`,
+      prevPeriodLabel: `${days} dias anteriores`
+    };
+  }, [periodConfig, period]);
+
   const filteredPosts = posts
-    .filter((post) => isAfter(new Date(post.timestamp), cutoffDate))
+    .filter((post) => {
+      const postDate = new Date(post.timestamp);
+      if (periodConfig.mode === 'month') {
+        return postDate >= periodStart && postDate <= periodEnd;
+      }
+      return isAfter(postDate, periodStart);
+    })
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   const dashboardData = useMemo(() => {
@@ -111,21 +149,17 @@ const ClientDashboardView: React.FC = () => {
         engagementBreakdown: { likes: 0, comments: 0, saved: 0, shares: 0, total: 0 },
       };
     }
-    const cutoffDate = subDays(new Date(), period === '7d' ? 7 : period === '30d' ? 30 : 90);
     const filteredTimeline = dashboardData.timeline.filter((item) => {
       const itemDate = parseISO(item.date + '-01');
-      return isAfter(itemDate, cutoffDate);
+      return itemDate >= periodStart && itemDate <= periodEnd;
     });
-    const totals = filteredTimeline.reduce(
-      (acc, item) => ({
-        posts: acc.posts + (item.posts || 0),
-        engagement: acc.engagement + (item.engagement || 0),
-        reach: acc.reach + (item.reach || 0),
-        impressions: acc.impressions + (item.impressions || 0),
-      }),
-      { posts: 0, engagement: 0, reach: 0, impressions: 0 }
-    );
-    const filteredPostsForMetrics = posts.filter((post) => isAfter(new Date(post.timestamp), cutoffDate));
+    const filteredPostsForMetrics = posts.filter((post) => {
+      const postDate = new Date(post.timestamp);
+      if (periodConfig.mode === 'month') {
+        return postDate >= periodStart && postDate <= periodEnd;
+      }
+      return isAfter(postDate, periodStart);
+    });
     const totalLikes = filteredPostsForMetrics.reduce((s, p) => s + (p.like_count || 0), 0);
     const totalComments = filteredPostsForMetrics.reduce((s, p) => s + (p.comments_count || 0), 0);
     const totalReach = filteredPostsForMetrics.reduce((s, p) => s + (p.insights?.reach || 0), 0);
@@ -163,13 +197,9 @@ const ClientDashboardView: React.FC = () => {
       impressions: item.impressions || 0,
     }));
 
-    // Período anterior para comparação (mesmo tamanho do período atual, imediatamente antes)
-    const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
-    const previousPeriodEnd = cutoffDate;
-    const previousPeriodStart = subDays(previousPeriodEnd, days);
     const previousPeriodPosts = posts.filter((post) => {
       const postDate = new Date(post.timestamp);
-      return postDate >= previousPeriodStart && postDate < previousPeriodEnd;
+      return postDate >= prevPeriodStart && postDate <= prevPeriodEnd;
     });
     const previousLikes = previousPeriodPosts.reduce((s, p) => s + (p.like_count || 0), 0);
     const previousComments = previousPeriodPosts.reduce((s, p) => s + (p.comments_count || 0), 0);
@@ -213,7 +243,7 @@ const ClientDashboardView: React.FC = () => {
       },
       engagementBreakdown,
     };
-  }, [dashboardData, period, posts]);
+  }, [dashboardData, period, posts, periodConfig, periodStart, periodEnd, prevPeriodStart, prevPeriodEnd]);
 
   const formatTimeAgo = (timestamp: string) =>
     formatDistanceToNow(new Date(timestamp), { addSuffix: true, locale: ptBR });
@@ -339,173 +369,104 @@ const ClientDashboardView: React.FC = () => {
         </Toolbar>
       </AppBar>
 
-      {/* Paper do cliente — mesmo padrão do ClientHeader */}
+      {/* Header do cliente */}
       <Container maxWidth="lg" sx={{ mt: 2 }}>
         <Paper
           elevation={0}
           sx={{
-            p: { xs: 2.5, md: 3.5 },
-            mb: 4,
+            mb: 3,
             borderRadius: 3,
-            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.primary.main, 0.03)} 100%)`,
-            border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-            position: 'relative',
+            bgcolor: 'background.paper',
+            border: '1px solid',
+            borderColor: 'divider',
             overflow: 'hidden',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: '4px',
-              background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary?.main || theme.palette.primary.light})`,
-            },
           }}
         >
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: isTablet ? 'column' : 'row',
-              alignItems: isTablet ? 'flex-start' : 'center',
-              justifyContent: 'space-between',
-              gap: 3,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, flex: 1, minWidth: 0 }}>
+          {/* Perfil */}
+          <Box sx={{ 
+            p: { xs: 2, md: 2.5 },
+            display: 'flex',
+            alignItems: isTablet ? 'flex-start' : 'center',
+            flexDirection: isTablet ? 'column' : 'row',
+            gap: 2,
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0 }}>
               <Avatar
                 src={clientPhotoUrl}
                 alt={client.name}
                 imgProps={{ referrerPolicy: 'no-referrer', crossOrigin: 'anonymous' }}
                 sx={{
-                  width: { xs: 56, md: 72 },
-                  height: { xs: 56, md: 72 },
-                  border: `3px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.15)}`,
+                  width: { xs: 48, md: 56 },
+                  height: { xs: 48, md: 56 },
+                  border: '2px solid',
+                  borderColor: 'divider',
                   bgcolor: theme.palette.primary.main,
-                  fontSize: { xs: '1.5rem', md: '2rem' },
-                  fontWeight: 600,
+                  fontSize: { xs: '1.25rem', md: '1.5rem' },
+                  fontWeight: 700,
                 }}
               >
                 {client.name.charAt(0).toUpperCase()}
               </Avatar>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Typography
-                  variant="h4"
+                  variant="h6"
                   component="h1"
-                  sx={{
-                    fontWeight: 700,
-                    fontSize: { xs: '1.5rem', md: '1.75rem' },
-                    mb: 0.5,
-                    background: `linear-gradient(135deg, ${theme.palette.text.primary}, ${theme.palette.primary.main})`,
-                    backgroundClip: 'text',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    lineHeight: 1.2,
-                  }}
+                  sx={{ fontWeight: 700, fontSize: { xs: '1.1rem', md: '1.25rem' }, lineHeight: 1.2, mb: 0.5 }}
                 >
                   {client.name}
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.75,
-                      px: 1.5,
-                      py: 0.5,
-                      borderRadius: 2,
-                      bgcolor: alpha(theme.palette.primary.main, 0.08),
-                      border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                    }}
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.82rem' }}
                   >
-                    <InstagramIcon sx={{ fontSize: 18, color: theme.palette.primary.main }} />
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        fontWeight: 600,
-                        color: theme.palette.text.primary,
-                        fontSize: '0.875rem',
-                      }}
-                    >
-                      @{client.instagram}
-                    </Typography>
-                  </Box>
+                    @{client.instagram}
+                  </Typography>
                   {profile?.followers_count != null && (
                     <Chip
-                      icon={<InstagramIcon sx={{ fontSize: 16 }} />}
                       label={`${profile.followers_count.toLocaleString('pt-BR')} seguidores`}
                       size="small"
                       sx={{
-                        height: 28,
+                        height: 22,
+                        fontSize: '0.68rem',
                         fontWeight: 600,
-                        bgcolor: alpha(theme.palette.success.main, 0.1),
-                        color: theme.palette.success.dark,
-                        border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
-                        '& .MuiChip-icon': { color: theme.palette.success.main },
+                        bgcolor: alpha('#059669', 0.08),
+                        color: '#059669',
                       }}
                     />
                   )}
-                  <Chip
-                    label={
-                      data.cacheStatus?.lastFullSync
-                        ? `Dados em cache · Atualizado em ${format(parseISO(data.cacheStatus.lastFullSync), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`
-                        : 'Dados em cache'
-                    }
-                    size="small"
-                    sx={{
-                      height: 24,
-                      fontSize: '0.7rem',
-                      fontWeight: 500,
-                      bgcolor: alpha(theme.palette.text.secondary, 0.08),
-                      color: theme.palette.text.secondary,
-                    }}
-                  />
                 </Box>
               </Box>
             </Box>
-            <Box sx={{ flexShrink: 0 }}>
-              <Typography
-                variant="caption"
-                sx={{
-                  display: 'block',
-                  mb: 0.75,
-                  fontWeight: 600,
-                  color: theme.palette.text.secondary,
-                }}
-              >
-                Período
+            {data.cacheStatus?.lastFullSync && (
+              <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.65rem', whiteSpace: 'nowrap' }}>
+                Atualizado em {format(parseISO(data.cacheStatus.lastFullSync), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
               </Typography>
-              <ToggleButtonGroup
-                value={period}
-                exclusive
-                onChange={(_, v) => v && setPeriod(v)}
-                size="small"
-                sx={{
-                  '& .MuiToggleButton-root': {
-                    px: 2,
-                    py: 0.75,
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    '&.Mui-selected': {
-                      bgcolor: 'primary.main',
-                      color: 'white',
-                      borderColor: 'primary.main',
-                      '&:hover': { bgcolor: 'primary.dark' },
-                    },
-                    '&:not(.Mui-selected)': {
-                      bgcolor: 'background.paper',
-                      '&:hover': { bgcolor: 'action.hover' },
-                    },
-                  },
-                }}
-              >
-                <ToggleButton value="7d">7 dias</ToggleButton>
-                <ToggleButton value="30d">30 dias</ToggleButton>
-                <ToggleButton value="90d">90 dias</ToggleButton>
-              </ToggleButtonGroup>
-            </Box>
+            )}
+          </Box>
+
+          {/* Seletor de período */}
+          <Box sx={{ 
+            px: { xs: 2, md: 2.5 },
+            py: 1.5,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            bgcolor: alpha(theme.palette.text.primary, 0.015),
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            flexWrap: 'wrap'
+          }}>
+            <PeriodSelector
+              config={periodConfig}
+              onChange={(newConfig) => {
+                setPeriodConfig(newConfig);
+                if (newConfig.mode === 'quick') {
+                  setPeriod(newConfig.quickPeriod);
+                }
+              }}
+              compact
+            />
           </Box>
         </Paper>
       </Container>
@@ -517,9 +478,11 @@ const ClientDashboardView: React.FC = () => {
           </Alert>
         ) : (
           <Box component="span" sx={{ display: 'block' }}>
-            <Typography variant="h6" fontWeight={600} sx={{ mb: 3 }}>
-              Métricas de performance
-            </Typography>
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2 }}>
+                Métricas de Performance
+              </Typography>
+            </Box>
 
             <Grid container spacing={3} sx={{ mb: 4 }}>
               <Grid item xs={12}>
@@ -527,10 +490,11 @@ const ClientDashboardView: React.FC = () => {
                   metrics={legacyMetrics}
                   periodComparisons={legacyMetrics.periodComparisons}
                   previousPeriodValues={legacyMetrics.previousPeriodValues}
+                  comparisonLabel={periodConfig.mode === 'month' ? `vs ${prevPeriodLabel}` : undefined}
                 />
               </Grid>
-              {legacyMetrics.mostEngagedPost ? (
-                <Grid item xs={12}>
+              {legacyMetrics.mostEngagedPost && (
+                <Grid item xs={12} md={legacyMetrics.engagementBreakdown?.total > 0 ? 7 : 12}>
                   <FeaturedPost
                     post={legacyMetrics.mostEngagedPost}
                     onViewDetails={(post) => {
@@ -540,7 +504,20 @@ const ClientDashboardView: React.FC = () => {
                     formatTimeAgo={formatTimeAgo}
                   />
                 </Grid>
-              ) : null}
+              )}
+              {legacyMetrics.engagementBreakdown?.total > 0 && (
+                <Grid item xs={12} md={legacyMetrics.mostEngagedPost ? 5 : 12}>
+                  <ConversionFunnel
+                    data={{
+                      impressions: legacyMetrics.totalImpressions || 0,
+                      reach: legacyMetrics.totalReach || 0,
+                      engagement: legacyMetrics.engagementBreakdown.total || 0,
+                      saves: legacyMetrics.engagementBreakdown.saved || 0,
+                      shares: legacyMetrics.engagementBreakdown.shares || 0,
+                    }}
+                  />
+                </Grid>
+              )}
             </Grid>
 
             <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>

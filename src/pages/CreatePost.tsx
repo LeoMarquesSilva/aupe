@@ -352,8 +352,8 @@ const CreatePost: React.FC = () => {
               textTransform: 'none',
               px: 3,
               py: 1,
-              color: '#E91E63',
-              borderColor: '#E91E63',
+              color: '#7c3aed',
+              borderColor: '#7c3aed',
               '&:hover': {
                 backgroundColor: 'rgba(233, 30, 99, 0.04)',
                 borderColor: '#C2185B'
@@ -366,7 +366,7 @@ const CreatePost: React.FC = () => {
               size="small"
               sx={{
                 ml: 1,
-                backgroundColor: '#E91E63',
+                backgroundColor: '#7c3aed',
                 color: 'white',
                 fontSize: '0.7rem',
                 height: '18px'

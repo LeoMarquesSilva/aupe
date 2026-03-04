@@ -83,7 +83,7 @@ const TopPerformingPosts: React.FC<TopPerformingPostsProps> = ({
 
   const getMediaTypeIcon = (type: string) => {
     switch (type.toLowerCase()) {
-      case 'reels': return <ReelsIcon sx={{ color: '#e91e63' }} />;
+      case 'reels': return <ReelsIcon sx={{ color: '#7c3aed' }} />;
       case 'vídeo': return <VideoIcon sx={{ color: '#ff9800' }} />;
       case 'carrossel': return <CarouselIcon sx={{ color: '#4caf50' }} />;
       default: return <ImageIcon sx={{ color: '#1976d2' }} />;

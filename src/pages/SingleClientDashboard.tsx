@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Container,
@@ -16,8 +16,6 @@ import {
   Chip,
   LinearProgress,
   Tooltip,
-  ToggleButtonGroup,
-  ToggleButton,
   alpha,
   useTheme
 } from '@mui/material';
@@ -51,7 +49,7 @@ import {
 import { instagramCacheService, CachedData } from '../services/instagramCacheService';
 import { clientService } from '../services/supabaseClient';
 import { pdfExportService } from '../services/pdfExportService';
-import { formatDistanceToNow, subDays, isAfter, parseISO } from 'date-fns';
+import { formatDistanceToNow, subDays, isAfter, parseISO, startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 // Importar componentes
@@ -65,8 +63,11 @@ import {
   PostDetails,
   ClientSettings,
   ScheduledPostsList,
-  PDFExportDialog
+  PDFExportDialog,
+  PeriodSelector,
+  ConversionFunnel
 } from '../components/dashboard';
+import type { PeriodConfig } from '../components/dashboard';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -122,6 +123,12 @@ const SingleClientDashboard: React.FC = () => {
   
   // Filtro de período global
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d');
+  const [periodConfig, setPeriodConfig] = useState<PeriodConfig>({
+    mode: 'month',
+    quickPeriod: '30d',
+    selectedMonth: new Date(),
+    comparisonMonth: subMonths(new Date(), 1)
+  });
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -157,12 +164,58 @@ const SingleClientDashboard: React.FC = () => {
     }
   }, [client]);
 
+  const fetchScheduledPosts = useCallback(async () => {
+    if (!clientId) return;
+    try {
+      const { data: postsData, error: postsError } = await supabase
+        .from('scheduled_posts')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('scheduled_date', { ascending: true });
+        
+      if (postsError) throw postsError;
+      
+      const published = (postsData || []).filter(p => 
+        p.status === 'published' || p.status === 'posted'
+      ).length;
+      const scheduled = (postsData || []).filter(p => 
+        p.status === 'pending' || p.status === 'sent_to_n8n'
+      ).length;
+      
+      setPostsStats({ published, scheduled });
+      
+      const userIds = [...new Set((postsData || []).map(p => p.user_id).filter(Boolean))];
+      let usersMap: Record<string, any> = {};
+      
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, email, full_name')
+          .in('id', userIds);
+        
+        if (profilesData) {
+          profilesData.forEach((profile: any) => {
+            usersMap[profile.id] = profile;
+          });
+        }
+      }
+      
+      const postsWithUsers = (postsData || []).map((post: any) => ({
+        ...post,
+        profiles: post.user_id ? usersMap[post.user_id] : null
+      }));
+      
+      setScheduledPosts(postsWithUsers);
+    } catch (err: any) {
+      console.error('Erro ao buscar posts agendados:', err);
+    }
+  }, [clientId]);
+
   useEffect(() => {
     if (!clientId) return;
     
     const fetchClient = async () => {
       try {
-        // Usar o clientService ao invés de consulta direta
         const clients = await clientService.getClients();
         const clientData = clients.find(c => c.id === clientId);
         
@@ -176,7 +229,6 @@ const SingleClientDashboard: React.FC = () => {
         
         setClient(clientData);
         
-        // Verificar se o cliente tem autenticação do Instagram
         if (clientData.accessToken && clientData.instagramAccountId) {
           console.log('Cliente autenticado, carregando dados do Instagram...');
           await loadInstagramDataWithCache(clientData.id);
@@ -191,59 +243,9 @@ const SingleClientDashboard: React.FC = () => {
       }
     };
     
-    const fetchScheduledPosts = async () => {
-      try {
-        // Buscar posts agendados
-        const { data: postsData, error: postsError } = await supabase
-          .from('scheduled_posts')
-          .select('*')
-          .eq('client_id', clientId)
-          .order('scheduled_date', { ascending: true });
-          
-        if (postsError) throw postsError;
-        
-        // Calcular estatísticas
-        const published = (postsData || []).filter(p => 
-          p.status === 'published' || p.status === 'posted'
-        ).length;
-        const scheduled = (postsData || []).filter(p => 
-          p.status === 'pending' || p.status === 'sent_to_n8n'
-        ).length;
-        
-        setPostsStats({ published, scheduled });
-        
-        // Buscar informações dos usuários únicos
-        const userIds = [...new Set((postsData || []).map(p => p.user_id).filter(Boolean))];
-        let usersMap: Record<string, any> = {};
-        
-        if (userIds.length > 0) {
-          const { data: profilesData } = await supabase
-            .from('profiles')
-            .select('id, email, full_name')
-            .in('id', userIds);
-          
-          if (profilesData) {
-            profilesData.forEach(profile => {
-              usersMap[profile.id] = profile;
-            });
-          }
-        }
-        
-        // Combinar posts com informações dos usuários
-        const postsWithUsers = (postsData || []).map(post => ({
-          ...post,
-          profiles: post.user_id ? usersMap[post.user_id] : null
-        }));
-        
-        setScheduledPosts(postsWithUsers);
-      } catch (err: any) {
-        console.error('Erro ao buscar posts agendados:', err);
-      }
-    };
-    
     fetchClient();
     fetchScheduledPosts();
-  }, [clientId]);
+  }, [clientId, fetchScheduledPosts]);
 
   /**
    * Carrega dados do Instagram usando o sistema de cache - VERSÃO CORRIGIDA
@@ -606,13 +608,44 @@ const SingleClientDashboard: React.FC = () => {
   
   // Filter posts com período global
   const posts = cachedData?.posts || [];
-  const cutoffDate = subDays(new Date(), period === '7d' ? 7 : period === '30d' ? 30 : 90);
+  
+  const { periodStart, periodEnd, prevPeriodStart, prevPeriodEnd, prevPeriodLabel } = useMemo(() => {
+    if (periodConfig.mode === 'month') {
+      const monthStart = startOfMonth(periodConfig.selectedMonth);
+      const monthEnd = endOfMonth(periodConfig.selectedMonth);
+      const compMonth = periodConfig.comparisonMonth;
+      return {
+        periodStart: monthStart,
+        periodEnd: monthEnd,
+        prevPeriodStart: startOfMonth(compMonth),
+        prevPeriodEnd: endOfMonth(compMonth),
+        periodLabel: format(monthStart, "MMMM 'de' yyyy", { locale: ptBR }),
+        prevPeriodLabel: format(compMonth, "MMMM 'de' yyyy", { locale: ptBR })
+      };
+    }
+    const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
+    const end = new Date();
+    const start = subDays(end, days);
+    const prevEnd = start;
+    const prevStart = subDays(prevEnd, days);
+    return {
+      periodStart: start,
+      periodEnd: end,
+      prevPeriodStart: prevStart,
+      prevPeriodEnd: prevEnd,
+      periodLabel: `Últimos ${days} dias`,
+      prevPeriodLabel: `${days} dias anteriores`
+    };
+  }, [periodConfig, period]);
+
+  const cutoffDate = periodStart;
   
   const filteredPosts = posts.filter(post => {
-    // Filter by período global
     const postDate = new Date(post.timestamp);
-    if (!isAfter(postDate, cutoffDate)) {
-      return false;
+    if (periodConfig.mode === 'month') {
+      if (postDate < periodStart || postDate > periodEnd) return false;
+    } else {
+      if (!isAfter(postDate, cutoffDate)) return false;
     }
     
     // Filter by search
@@ -714,6 +747,9 @@ const SingleClientDashboard: React.FC = () => {
     // Filtrar posts por período para calcular métricas
     const filteredPostsForMetrics = posts.filter(post => {
       const postDate = new Date(post.timestamp);
+      if (periodConfig.mode === 'month') {
+        return postDate >= periodStart && postDate <= periodEnd;
+      }
       return isAfter(postDate, cutoffDate);
     });
 
@@ -753,15 +789,10 @@ const SingleClientDashboard: React.FC = () => {
       ? ((filteredLikes + filteredComments) / filteredReach) * 100 
       : 0;
 
-    // Calcular métricas do período anterior para comparação
-    const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
-    const previousPeriodEnd = cutoffDate; // Fim do período anterior = início do período atual
-    const previousPeriodStart = subDays(previousPeriodEnd, days); // Início do período anterior
-    
-    // Filtrar posts do período anterior
+    // Filtrar posts do período anterior (usa variáveis calculadas acima)
     const previousPeriodPosts = posts.filter(post => {
       const postDate = new Date(post.timestamp);
-      return postDate >= previousPeriodStart && postDate < previousPeriodEnd;
+      return postDate >= prevPeriodStart && postDate <= prevPeriodEnd;
     });
     
     // Calcular métricas do período anterior
@@ -880,7 +911,7 @@ const SingleClientDashboard: React.FC = () => {
         return postsWithEngagement[0]?.post || null;
       })()
     };
-  }, [dashboardData, period, posts]);
+  }, [dashboardData, period, posts, periodConfig, periodStart, periodEnd, prevPeriodStart, prevPeriodEnd]);
   
   // Extrair comparações e valores anteriores para passar ao MetricsOverview
   const periodComparisons = legacyMetrics.periodComparisons || {
@@ -1189,7 +1220,7 @@ const SingleClientDashboard: React.FC = () => {
           </Box>
         ) : (
           <>
-            {/* Filtro de Período Global */}
+            {/* Header com Período */}
             <Box sx={{ 
               display: 'flex', 
               justifyContent: 'space-between', 
@@ -1198,59 +1229,33 @@ const SingleClientDashboard: React.FC = () => {
               flexWrap: 'wrap',
               gap: 2
             }}>
-              <Typography variant="h6" fontWeight={600}>
+              <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2 }}>
                 Métricas de Performance
               </Typography>
               
-              <ToggleButtonGroup
-                value={period}
-                exclusive
-                onChange={(_, newPeriod) => {
-                  if (newPeriod) setPeriod(newPeriod);
-                }}
-                size="small"
-                sx={{
-                  '& .MuiToggleButton-root': {
-                    px: 2,
-                    py: 0.75,
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    '&.Mui-selected': {
-                      bgcolor: 'primary.main',
-                      color: 'white',
-                      borderColor: 'primary.main',
-                      '&:hover': {
-                        bgcolor: 'primary.dark',
-                      }
-                    },
-                    '&:not(.Mui-selected)': {
-                      bgcolor: 'background.paper',
-                      '&:hover': {
-                        bgcolor: 'action.hover'
-                      }
-                    }
+              <PeriodSelector
+                config={periodConfig}
+                onChange={(newConfig) => {
+                  setPeriodConfig(newConfig);
+                  if (newConfig.mode === 'quick') {
+                    setPeriod(newConfig.quickPeriod);
                   }
                 }}
-              >
-                <ToggleButton value="7d">7 dias</ToggleButton>
-                <ToggleButton value="30d">30 dias</ToggleButton>
-                <ToggleButton value="90d">90 dias</ToggleButton>
-              </ToggleButtonGroup>
+              />
             </Box>
 
+            <Box sx={{ mb: 4 }}>
+              <MetricsOverview 
+                metrics={legacyMetrics} 
+                periodComparisons={periodComparisons}
+                previousPeriodValues={previousPeriodValues}
+                comparisonLabel={periodConfig.mode === 'month' ? `vs ${prevPeriodLabel}` : undefined}
+              />
+            </Box>
+            
             <Grid container spacing={3} sx={{ mb: 4 }}>
-              <Grid item xs={12}>
-                <MetricsOverview 
-                  metrics={legacyMetrics} 
-                  periodComparisons={periodComparisons}
-                  previousPeriodValues={previousPeriodValues}
-                />
-              </Grid>
-              
               {legacyMetrics.mostEngagedPost && (
-                <Grid item xs={12}>
+                <Grid item xs={12} md={legacyMetrics.engagementBreakdown?.total > 0 ? 7 : 12}>
                   <FeaturedPost 
                     post={legacyMetrics.mostEngagedPost}
                     onViewDetails={handleViewPostDetails}
@@ -1258,13 +1263,47 @@ const SingleClientDashboard: React.FC = () => {
                   />
                 </Grid>
               )}
+              {legacyMetrics.engagementBreakdown?.total > 0 && (
+                <Grid item xs={12} md={legacyMetrics.mostEngagedPost ? 5 : 12}>
+                  <ConversionFunnel
+                    data={{
+                      impressions: legacyMetrics.totalImpressions || 0,
+                      reach: legacyMetrics.totalReach || 0,
+                      engagement: legacyMetrics.engagementBreakdown.total || 0,
+                      saves: legacyMetrics.engagementBreakdown.saved || 0,
+                      shares: legacyMetrics.engagementBreakdown.shares || 0,
+                    }}
+                  />
+                </Grid>
+              )}
             </Grid>
 
             {/* Seção de Posts */}
             <Box sx={{ mb: 2 }}>
-              <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
-                Posts do Instagram
-              </Typography>
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 1.5, 
+                mb: 2,
+                pb: 1.5,
+                borderBottom: '1px solid',
+                borderColor: 'divider'
+              }}>
+                <InstagramIcon sx={{ color: 'text.secondary', fontSize: 22 }} />
+                <Typography variant="h6" fontWeight={700}>
+                  Posts do Instagram
+                </Typography>
+                <Chip 
+                  label={`${filteredPosts.length} posts`} 
+                  size="small"
+                  sx={{ 
+                    height: 22, 
+                    fontSize: '0.7rem', 
+                    fontWeight: 600,
+                    bgcolor: 'action.hover'
+                  }} 
+                />
+              </Box>
               
               <Box sx={{ 
                 display: 'flex', 
@@ -1363,6 +1402,7 @@ const SingleClientDashboard: React.FC = () => {
       <TabPanel value={tabValue} index={1}>
         <ScheduledPostsList 
             posts={scheduledPosts}
+            onRefreshPosts={fetchScheduledPosts}
             onEditPost={(post) => {
               navigate(`/clients/${clientId}/edit-post/${post.id}`);
             }}

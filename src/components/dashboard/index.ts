@@ -9,3 +9,5 @@ export { default as QuickFilters } from './QuickFilters';
 export { default as ConversionFunnel } from './ConversionFunnel';
 export { default as TopPerformingPosts } from './TopPerformingPosts';
 export { default as PDFExportDialog } from './PDFExportDialog';
+export { default as PeriodSelector } from './PeriodSelector';
+export type { PeriodConfig, PeriodMode, QuickPeriod } from './PeriodSelector';

@@ -68,52 +68,37 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
 
   const getMediaTypeIcon = (post: InstagramPost) => {
     if (post.media_product_type === 'REELS') {
-      return <ReelsIcon sx={{ color: '#E91E63' }} />;
+      return <ReelsIcon sx={{ color: '#7c3aed' }} />;
     }
-    
     switch (post.media_type) {
       case 'IMAGE':
-        return <ImageIcon sx={{ color: '#2196F3' }} />;
+        return <ImageIcon sx={{ color: '#0891b2' }} />;
       case 'VIDEO':
-        return <VideoIcon sx={{ color: '#FF9800' }} />;
+        return <VideoIcon sx={{ color: '#d97706' }} />;
       case 'CAROUSEL_ALBUM':
-        return <CarouselIcon sx={{ color: '#9C27B0' }} />;
+        return <CarouselIcon sx={{ color: '#6366f1' }} />;
       default:
-        return <ImageIcon sx={{ color: '#2196F3' }} />;
+        return <ImageIcon sx={{ color: '#0891b2' }} />;
     }
   };
 
   const getMediaTypeLabel = (post: InstagramPost) => {
-    if (post.media_product_type === 'REELS') {
-      return 'Reels';
-    }
-    
+    if (post.media_product_type === 'REELS') return 'Reels';
     switch (post.media_type) {
-      case 'IMAGE':
-        return 'Imagem';
-      case 'VIDEO':
-        return 'Vídeo';
-      case 'CAROUSEL_ALBUM':
-        return 'Carrossel';
-      default:
-        return post.media_type;
+      case 'IMAGE': return 'Imagem';
+      case 'VIDEO': return 'Vídeo';
+      case 'CAROUSEL_ALBUM': return 'Carrossel';
+      default: return post.media_type;
     }
   };
 
   const getMediaTypeColor = (post: InstagramPost) => {
-    if (post.media_product_type === 'REELS') {
-      return '#E91E63';
-    }
-    
+    if (post.media_product_type === 'REELS') return '#7c3aed';
     switch (post.media_type) {
-      case 'IMAGE':
-        return '#2196F3';
-      case 'VIDEO':
-        return '#FF9800';
-      case 'CAROUSEL_ALBUM':
-        return '#9C27B0';
-      default:
-        return '#2196F3';
+      case 'IMAGE': return '#0891b2';
+      case 'VIDEO': return '#d97706';
+      case 'CAROUSEL_ALBUM': return '#6366f1';
+      default: return '#0891b2';
     }
   };
 
@@ -149,10 +134,10 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
   };
 
   const getEngagementColor = (rate: number): string => {
-    if (rate >= 6) return '#4CAF50'; // Verde - Excelente
-    if (rate >= 3) return '#FF9800'; // Laranja - Bom
-    if (rate >= 1) return '#FFC107'; // Amarelo - Regular
-    return '#F44336'; // Vermelho - Baixo
+    if (rate >= 6) return '#059669';
+    if (rate >= 3) return '#d97706';
+    if (rate >= 1) return '#ca8a04';
+    return '#dc2626';
   };
 
   // Função para ordenar os posts
@@ -225,7 +210,6 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
           gap: 2
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <InstagramIcon sx={{ color: '#E1306C', fontSize: 20 }} />
             <Typography variant="h6" fontWeight={600}>
               Posts do Instagram
             </Typography>
@@ -236,8 +220,8 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                 height: 22,
                 fontSize: '0.75rem',
                 fontWeight: 600,
-                bgcolor: 'primary.main',
-                color: 'white'
+                bgcolor: alpha(theme.palette.text.primary, 0.08),
+                color: 'text.primary'
               }}
             />
           </Box>
@@ -342,7 +326,7 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
-                      <FavoriteIcon fontSize="small" sx={{ color: '#E91E63', fontSize: 16 }} />
+                      <FavoriteIcon fontSize="small" sx={{ color: '#d97706', fontSize: 16 }} />
                       <Typography component="span" variant="body2" fontWeight={600}>
                         Curtidas
                       </Typography>
@@ -576,7 +560,7 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                       {/* Curtidas */}
                       <TableCell align="right" sx={{ py: 1.5 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
-                          <FavoriteIcon fontSize="small" sx={{ color: '#E91E63', fontSize: 16 }} />
+                          <FavoriteIcon fontSize="small" sx={{ color: '#d97706', fontSize: 16 }} />
                           <Typography variant="body2" fontWeight={600} color="text.primary">
                             {formatNumber(post.like_count || 0)}
                           </Typography>
@@ -661,11 +645,11 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                                 bgcolor: 'background.paper',
                                 '&:hover': { 
                                   bgcolor: 'action.hover',
-                                  borderColor: '#E1306C'
+                                  borderColor: 'text.secondary'
                                 }
                               }}
                             >
-                              <InstagramIcon fontSize="small" sx={{ color: '#E1306C' }} />
+                              <InstagramIcon fontSize="small" sx={{ color: 'text.secondary' }} />
                             </IconButton>
                           </Tooltip>
                         </Box>

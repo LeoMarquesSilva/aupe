@@ -607,7 +607,7 @@ const CreateReels: React.FC = () => {
           pb: 2, 
           borderBottom: '1px solid rgba(0,0,0,0.08)' 
         }}>
-          <ReelsIcon sx={{ mr: 1.5, color: '#E91E63' }} />
+          <ReelsIcon sx={{ mr: 1.5, color: '#7c3aed' }} />
           <Typography variant="h5" sx={{ fontWeight: 'medium' }}>
             Novo Reel
           </Typography>
@@ -655,7 +655,7 @@ const CreateReels: React.FC = () => {
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <ReelsIcon sx={{ color: '#E91E63' }} />
+                <ReelsIcon sx={{ color: '#7c3aed' }} />
                 <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                   <strong>Reel:</strong> Será criado um Reel com duração de {Math.round(video.duration)}s
                   {video.publicUrl && (
@@ -759,8 +759,8 @@ const CreateReels: React.FC = () => {
               px: 4, 
               py: 1.5, 
               borderRadius: 2,
-              borderColor: '#E91E63',
-              color: '#E91E63',
+              borderColor: '#7c3aed',
+              color: '#7c3aed',
               '&:hover': {
                 backgroundColor: 'rgba(233, 30, 99, 0.04)',
                 borderColor: '#C2185B'
@@ -783,7 +783,7 @@ const CreateReels: React.FC = () => {
               px: 4, 
               py: 1.5, 
               borderRadius: 2,
-              backgroundColor: '#E91E63',
+              backgroundColor: '#7c3aed',
               color: '#ffffff',
               '&:hover': {
                 backgroundColor: '#C2185B'
