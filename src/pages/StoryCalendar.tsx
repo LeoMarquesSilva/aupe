@@ -750,6 +750,73 @@ const StoryCalendar: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Status de aprovação (conteúdo do painel de aprovação) */}
+        {(() => {
+          const raw = selectedContent as unknown as Record<string, unknown>;
+          const approvalStatus = (selectedContent.approvalStatus ?? raw.approval_status) as string | undefined;
+          const forApprovalOnly = (selectedContent.forApprovalOnly ?? raw.for_approval_only) as boolean | undefined;
+          const requiresApproval = (selectedContent.requiresApproval ?? raw.requires_approval) as boolean | undefined;
+          const approvalFeedback = (selectedContent.approvalFeedback ?? raw.approval_feedback) as string | null | undefined;
+          const isRoteiro = selectedContent.postType === 'roteiro';
+
+          if (!requiresApproval && !approvalStatus && !approvalFeedback) return null;
+
+          const getApprovalStatusLabel = (): string => {
+            switch (approvalStatus) {
+              case 'pending': return 'Aguardando aprovação do cliente';
+              case 'approved': return 'Aprovado pelo cliente';
+              case 'rejected': return 'Ajustes solicitados';
+              default: return approvalStatus ?? '—';
+            }
+          };
+
+          const getPostingInfo = (): { label: string; severity: 'success' | 'info' | 'warning' } => {
+            if (approvalStatus === 'pending') {
+              return { label: 'Aguardando aprovação para definir publicação', severity: 'info' };
+            }
+            if (approvalStatus === 'rejected') {
+              return { label: 'Não será postado até os ajustes serem feitos e reenviados para aprovação', severity: 'warning' };
+            }
+            if (approvalStatus === 'approved') {
+              if (isRoteiro || forApprovalOnly) {
+                return { label: 'Aprovado apenas para uso interno — não será postado automaticamente', severity: 'info' };
+              }
+              return { label: 'Será postado automaticamente no horário agendado', severity: 'success' };
+            }
+            return { label: '—', severity: 'info' };
+          };
+
+          const postingInfo = getPostingInfo();
+
+          return (
+            <Alert
+              severity={postingInfo.severity}
+              sx={{ mb: 3 }}
+              icon={approvalStatus === 'approved' && !forApprovalOnly && !isRoteiro ? <CheckCircleIcon /> : undefined}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+                Fluxo de aprovação
+              </Typography>
+              <Typography variant="body2" sx={{ mb: 0.5 }}>
+                Status: {getApprovalStatusLabel()}
+              </Typography>
+              <Typography variant="body2">
+                Publicação: {postingInfo.label}
+              </Typography>
+              {approvalStatus === 'rejected' && approvalFeedback && (
+                <Box sx={{ mt: 1.5, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                    Feedback do cliente:
+                  </Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {approvalFeedback}
+                  </Typography>
+                </Box>
+              )}
+            </Alert>
+          );
+        })()}
+
         {/* Conteúdo visual otimizado */}
         <Box sx={{ mb: 3 }}>
           {selectedContent.postType === 'stories' ? (
@@ -1100,21 +1167,27 @@ const StoryCalendar: React.FC = () => {
                                 fontSize: '0.75rem',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'space-between'
+                                justifyContent: 'space-between',
+                                cursor: 'pointer',
+                                '&:hover': { opacity: 0.9 }
+                              }}
+                              onClick={() => {
+                                setSelectedContent(content);
+                                setPreviewOpen(true);
+                                setMenuAnchorEl(null);
                               }}
                             >
-                              <Box sx={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', overflow: 'hidden', flex: 1, minWidth: 0 }}>
                                 <Tooltip title={client?.name || 'Cliente'}>
                                   <SmartImage
                                         src={getClientLogo(client)}
-                                        clientId={client?.id} // ✅ ADICIONAR clientId
+                                        clientId={client?.id}
                                         alt={client?.name || 'Cliente'}
                                         width={16}
                                         height={16}
                                         borderRadius="50%"
                                         fallbackText={client?.name?.charAt(0) || 'C'}
                                         sx={{ mr: 0.5 }}
-                                      
                                   />
                                 </Tooltip>
                                 <Typography 
@@ -1139,7 +1212,10 @@ const StoryCalendar: React.FC = () => {
                               <IconButton 
                                 size="small" 
                                 sx={{ color: 'inherit', p: 0.25 }}
-                                onClick={(e) => handleMenuOpen(e, content)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMenuOpen(e, content);
+                                }}
                               >
                                 <MoreVertIcon fontSize="small" />
                               </IconButton>
@@ -1354,8 +1430,17 @@ const StoryCalendar: React.FC = () => {
                       <React.Fragment key={content.id}>
                         {index > 0 && <Divider component="li" />}
                         <ListItem
+                          sx={{ cursor: 'pointer' }}
+                          onClick={() => {
+                            setSelectedContent(content);
+                            setPreviewOpen(true);
+                            setMenuAnchorEl(null);
+                          }}
                           secondaryAction={
-                            <IconButton edge="end" onClick={(e) => handleMenuOpen(e, content)}>
+                            <IconButton edge="end" onClick={(e) => {
+                              e.stopPropagation();
+                              handleMenuOpen(e, content);
+                            }}>
                               <MoreVertIcon />
                             </IconButton>
                           }
