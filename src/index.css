@@ -9,8 +9,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #EDEBE9; /* off-white da marca */
-  color: #0E0E0E; /* preto suave da marca */
+  background-color: #f8fafc;
+  color: #0f172a;
 }
 
 code {
@@ -18,16 +18,23 @@ code {
     monospace;
 }
 
-/* Variáveis de cores da marca */
+/* Variáveis da paleta minimalista (Supabase/Vercel) */
 :root {
-  --primary: #510000; /* vinho escuro */
-  --secondary: #3A1D1A; /* marrom café escuro */
-  --light-gray: #D7CFCF; /* cinza claro rosado */
-  --neutral-gray: #CFCFCF; /* cinza claro neutro */
-  --soft-black: #0E0E0E; /* preto suave */
-  --green-black: #151B19; /* preto esverdeado */
-  --pure-black: #000000; /* preto puro */
-  --off-white: #EDEBE9; /* off-white */
+  --primary: #0f766e;
+  --primary-light: #14b8a6;
+  --primary-dark: #0d9488;
+  --secondary: #64748b;
+  --background-default: #f8fafc;
+  --background-paper: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --border: #e2e8f0;
+  --border-muted: #f1f5f9;
+  --off-white: #fafafa;
+  /* Legado para scrollbar e utilitários que referenciam nomes antigos */
+  --light-gray: #e2e8f0;
+  --neutral-gray: #cbd5e1;
+  --soft-black: #0f172a;
 }
 
 /* Transições suaves */
@@ -46,7 +53,7 @@ a, button, .MuiButtonBase-root {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--light-gray);
+  background: var(--border);
   border-radius: 4px;
 }
 
@@ -61,7 +68,7 @@ a, button, .MuiButtonBase-root {
 
 .hover-effect:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(58, 29, 26, 0.08);
+  box-shadow: 0 6px 12px rgba(15, 118, 110, 0.08);
 }
 
 /* Animações */
@@ -92,16 +99,16 @@ a, button, .MuiButtonBase-root {
 
 /* Cards modernos */
 .modern-card {
-  background-color: white;
+  background-color: var(--background-paper);
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--light-gray);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--border);
   padding: 24px;
   transition: all 0.2s ease-in-out;
 }
 
 .modern-card:hover {
-  box-shadow: 0 8px 16px rgba(58, 29, 26, 0.1);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
 }
 
 /* Botões personalizados */
@@ -118,8 +125,8 @@ a, button, .MuiButtonBase-root {
 }
 
 .btn-primary:hover {
-  background-color: #6b1a1a;
-  box-shadow: 0 4px 8px rgba(81, 0, 0, 0.2);
+  background-color: var(--primary-dark);
+  box-shadow: 0 4px 8px rgba(15, 118, 110, 0.2);
 }
 
 .btn-secondary {
@@ -135,8 +142,8 @@ a, button, .MuiButtonBase-root {
 }
 
 .btn-secondary:hover {
-  background-color: rgba(81, 0, 0, 0.05);
-  box-shadow: 0 4px 8px rgba(81, 0, 0, 0.1);
+  background-color: rgba(15, 118, 110, 0.05);
+  box-shadow: 0 4px 8px rgba(15, 118, 110, 0.1);
 }
 
 /* Elementos de texto */
@@ -152,7 +159,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .text-secondary {
-  color: var(--secondary);
+  color: var(--text-secondary);
 }
 
 .text-light {

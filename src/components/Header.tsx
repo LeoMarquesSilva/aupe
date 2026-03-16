@@ -31,6 +31,7 @@ import {
   AddPhotoAlternate as PostIcon,
   Collections as StoryIcon,
   Link as LinkIcon,
+  ThumbUp as ThumbUpIcon,
 } from '@mui/icons-material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -235,6 +236,9 @@ const Header: React.FC = () => {
               <Box component={Link} to="/share-links" sx={linkSx(location.pathname === '/share-links')}>
                 Links compartilhados
               </Box>
+              <Box component={Link} to="/approvals" sx={linkSx(location.pathname === '/approvals')}>
+                Aprovação
+              </Box>
             </Box>
           )}
 
@@ -405,6 +409,10 @@ const Header: React.FC = () => {
         <MenuItem component={Link} to="/share-links" onClick={() => setMenuAnchorEl(null)}>
           <ListItemIcon><LinkIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="Links compartilhados" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
+        </MenuItem>
+        <MenuItem component={Link} to="/approvals" onClick={() => setMenuAnchorEl(null)}>
+          <ListItemIcon><ThumbUpIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Aprovação" primaryTypographyProps={{ fontFamily: '"Poppins", sans-serif' }} />
         </MenuItem>
         <Divider sx={{ my: 1 }} />
         <MenuItem component={Link} to="/create-post" onClick={() => setMenuAnchorEl(null)}>

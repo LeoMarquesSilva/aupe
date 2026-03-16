@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, CircularProgress, Alert, Button } from '@mui/material';
+import { Box, Typography, CircularProgress, Alert, Button, useTheme } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import InstagramAccountSelector from '../components/InstagramAccountSelector';
 import { clientService } from '../services/supabaseClient';
 
 const InstagramCallback: React.FC = () => {
+  const theme = useTheme();
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
@@ -235,7 +236,7 @@ const InstagramCallback: React.FC = () => {
     >
       {loading && (
         <>
-          <CircularProgress size={60} sx={{ mb: 3, color: '#E1306C' }} />
+          <CircularProgress size={60} sx={{ mb: 3, color: theme.palette.primary.main }} />
           <Typography variant="h6" sx={{ mb: 1 }}>
             Processando autenticação do Instagram...
           </Typography>
@@ -259,8 +260,8 @@ const InstagramCallback: React.FC = () => {
               variant="contained" 
               onClick={handleRetry}
               sx={{ 
-                bgcolor: '#E1306C', 
-                '&:hover': { bgcolor: '#C13584' } 
+                bgcolor: theme.palette.primary.main, 
+                '&:hover': { bgcolor: theme.palette.primary.dark } 
               }}
             >
               Tentar Novamente

@@ -55,6 +55,7 @@ import { ptBR } from 'date-fns/locale';
 // Importar componentes
 import ClientHeader from '../components/ClientHeader';
 import ShareLinkDialog from '../components/ShareLinkDialog';
+import ApprovalRequestDialog from '../components/ApprovalRequestDialog';
 import {
   MetricsOverview,
   FeaturedPost,
@@ -551,6 +552,8 @@ const SingleClientDashboard: React.FC = () => {
 
   const [pdfExportDialogOpen, setPdfExportDialogOpen] = useState(false);
   const [shareLinkDialogOpen, setShareLinkDialogOpen] = useState(false);
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [approvalDialogPostIds, setApprovalDialogPostIds] = useState<string[]>([]);
 
   const handleExportPDF = async (exportOptions: any) => {
     if (!client || !dashboardData || !legacyMetrics) {
@@ -1406,6 +1409,10 @@ const SingleClientDashboard: React.FC = () => {
             onEditPost={(post) => {
               navigate(`/clients/${clientId}/edit-post/${post.id}`);
             }}
+            onSendForApproval={(postIds) => {
+              setApprovalDialogPostIds(postIds);
+              setApprovalDialogOpen(true);
+            }}
             onDeletePost={async (postId) => {
               try {
                 const { error } = await supabase
@@ -1463,6 +1470,19 @@ const SingleClientDashboard: React.FC = () => {
           onClose={() => setShareLinkDialogOpen(false)}
           clientId={clientId}
           clientName={client.name}
+        />
+      )}
+
+      {clientId && client && (
+        <ApprovalRequestDialog
+          open={approvalDialogOpen}
+          onClose={() => {
+            setApprovalDialogOpen(false);
+            setApprovalDialogPostIds([]);
+          }}
+          clientId={clientId}
+          postIds={approvalDialogPostIds}
+          onCreated={fetchScheduledPosts}
         />
       )}
     </Container>

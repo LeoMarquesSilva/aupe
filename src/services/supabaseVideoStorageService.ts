@@ -397,13 +397,11 @@ export class SupabaseVideoStorageService {
 // Instância singleton
 export const supabaseVideoStorageService = new SupabaseVideoStorageService();
 
-// Função auxiliar para validar vídeos de Reels (agora usando o serviço)
+// Função auxiliar para validar vídeos de Reels (agora usando o serviço).
+// API aceita MOV e MP4; para maior confiabilidade recomenda-se MP4 (H.264 + AAC).
 export const validateReelsVideo = (file: File): { valid: boolean; error?: string } => {
   try {
-    // Validações específicas para Reels
-    const MAX_DURATION = 90; // 90 segundos para Reels
-    const MIN_DURATION = 3;  // 3 segundos mínimo
-    const MAX_SIZE = 2 * 1024 * 1024 * 1024; // 2GB para Reels (aumentado)
+    const MAX_SIZE = 2 * 1024 * 1024 * 1024; // 2GB para Reels
 
     if (file.size > MAX_SIZE) {
       return {
@@ -412,7 +410,6 @@ export const validateReelsVideo = (file: File): { valid: boolean; error?: string
       };
     }
 
-    // Verificar tipo
     const allowedTypes = ['video/mp4', 'video/mov', 'video/quicktime', 'video/webm'];
     if (!allowedTypes.includes(file.type)) {
       return {

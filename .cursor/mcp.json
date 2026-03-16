@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "url": "https://mcp.supabase.com/mcp?project_ref=mrkcoolfxqiwaqeyquuf",
+      "headers": {
+        "Authorization": "Bearer sbp_474e4b5afc76d9ef76d78ead769859df5f447466"
+      }
+    },
+    "n8n-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "supergateway",
+        "--streamableHttp",
+        "https://ia-n8n.a8fvaf.easypanel.host/mcp-server/http",
+        "--header",
+        "authorization:Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwYTE0YzA3Yi1hNTQ4LTRiMDItOWE3Mi0zMjEyYzU0NDU2ZGQiLCJpc3MiOiJuOG4iLCJhdWQiOiJtY3Atc2VydmVyLWFwaSIsImp0aSI6ImI2YWNlNzgzLTQ2MjgtNGM5NC1iZTk4LWQ5ZTNlZjQzYWFhMyIsImlhdCI6MTc3MzI3MzEwOX0.oj_CK7Uyhrm_tKsDbhgtgGEXiOKVEtfGjyGi5tJsNps"
+      ]
+    }
+  }
+}

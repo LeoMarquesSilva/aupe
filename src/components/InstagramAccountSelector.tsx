@@ -17,7 +17,8 @@ import {
   CircularProgress,
   Alert,
   Paper,
-  Divider
+  Divider,
+  useTheme
 } from '@mui/material';
 import {
   Instagram as InstagramIcon,
@@ -40,6 +41,7 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
   onAccountSelected,
   authCode
 }) => {
+  const theme = useTheme();
   const [accounts, setAccounts] = useState<AvailableInstagramAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -140,7 +142,7 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
     >
       <DialogTitle sx={{ pb: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <InstagramIcon sx={{ mr: 1, color: '#E1306C' }} />
+          <InstagramIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
           Escolher Conta do Instagram
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>

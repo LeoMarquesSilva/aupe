@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Box, Typography, CircularProgress, Alert, IconButton } from '@mui/material';
+import { Box, Typography, CircularProgress, Alert, IconButton, useTheme } from '@mui/material';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { PostImage } from '../types';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -34,6 +34,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   helperText = '',
   disabled = false
 }) => {
+  const theme = useTheme();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
@@ -287,7 +288,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           {/* ✅ Instagram-like Preview com tamanho controlado */}
           <Box sx={{ mb: 4 }}>
             <Typography variant="subtitle1" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-              <InstagramIcon sx={{ mr: 1, color: '#E1306C' }} />
+              <InstagramIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
               Pré-visualização do Instagram
             </Typography>
             

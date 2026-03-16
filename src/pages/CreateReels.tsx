@@ -249,6 +249,7 @@ const CreateReels: React.FC = () => {
 
       resetForm();
       showNotification('Reel agendado com sucesso! Será publicado na data e hora escolhidas.', 'success');
+      setTimeout(() => navigate(selectedClientId ? `/calendar/${selectedClientId}` : '/calendar'), 1500);
     } catch (error) {
       console.error('Erro ao agendar Reel:', error);
       showNotification(getUserFriendlyMessage(error, 'agendar Reel'), 'error');
@@ -294,6 +295,7 @@ const CreateReels: React.FC = () => {
 
       resetForm();
       showNotification('Reel enviado com sucesso!', 'success');
+      setTimeout(() => navigate(selectedClientId ? `/calendar/${selectedClientId}` : '/calendar'), 1500);
     } catch (error) {
       console.error('Erro ao enviar Reel:', error);
       showNotification(getUserFriendlyMessage(error, 'enviar Reel'), 'error');
@@ -380,7 +382,7 @@ const CreateReels: React.FC = () => {
       >
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 'medium', display: 'flex', alignItems: 'center' }}>
-            <InstagramIcon sx={{ mr: 1, color: '#E1306C' }} />
+            <InstagramIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
             Selecione a Conta do Instagram
           </Typography>
           <Button 
@@ -523,7 +525,7 @@ const CreateReels: React.FC = () => {
                     {selectedClient.name}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: '#E1306C' }} />
+                    <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: theme.palette.primary.main }} />
                     <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                       @{selectedClient.instagram}
                     </Typography>
@@ -634,12 +636,15 @@ const CreateReels: React.FC = () => {
         <SubscriptionLimitsAlert type="post" />
 
         {/* Upload de Vídeo */}
-        <VideoUploader 
-          video={video} 
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Para maior confiabilidade use <strong>MP4 (H.264 + AAC)</strong>. MOV pode funcionar dependendo do codec; em caso de falha na publicação, tente converter para MP4 e reagendar.
+        </Alert>
+        <VideoUploader
+          video={video}
           onChange={handleVideoChange}
-          maxFileSize={2048} // ✅ 2GB para Reels
-          maxDuration={90} // 90 segundos para Reels
-          acceptedFormats={['video/mp4', 'video/mov', 'video/quicktime', 'video/webm', 'video/avi']}
+          maxFileSize={2048}
+          maxDuration={90}
+          acceptedFormats={['video/mp4', 'video/mov', 'video/quicktime', 'video/webm']}
           showPreview={true}
         />
         

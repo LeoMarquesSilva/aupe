@@ -1,13 +1,12 @@
-// Cores da identidade visual da marca
+// Paleta minimalista e tecnológica (alinhada ao theme.tsx)
 const BRAND_COLORS = {
-  primary: '#510000',      // vinho escuro
-  secondary: '#3A1D1A',    // marrom café escuro
-  lightGray: '#D7CFCF',    // cinza claro rosado
-  neutralGray: '#CFCFCF',  // cinza claro neutro
-  softBlack: '#0E0E0E',    // preto suave
-  greenBlack: '#151B19',   // preto esverdeado
-  pureBlack: '#000000',    // preto puro
-  offWhite: '#EDEBE9',     // off-white
+  primary: '#0f766e',
+  secondary: '#64748b',
+  lightGray: '#e2e8f0',
+  neutralGray: '#cbd5e1',
+  softBlack: '#0f172a',
+  greenBlack: '#0f172a', // texto escuro (compatível com Login/Signup)
+  offWhite: '#fafafa',
 };
 
 export default BRAND_COLORS;

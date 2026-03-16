@@ -27,6 +27,15 @@ enabled = true
 [auth]
 enabled = true
 
-# Edge Functions: get-client-dashboard-by-token é chamada sem login (link público)
-[functions.get-client-dashboard-by-token]
+# Edge Functions públicas (token/webhook) não exigem JWT
+[functions.get-client-dashboard-by-token-]
+verify_jwt = false
+
+[functions.get-approval-request-by-token]
+verify_jwt = false
+
+[functions.submit-approval-response]
+verify_jwt = false
+
+[functions.stripe-webhook]
 verify_jwt = false

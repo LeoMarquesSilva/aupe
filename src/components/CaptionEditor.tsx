@@ -5,13 +5,14 @@ interface CaptionEditorProps {
   caption: string;
   onChange: (caption: string) => void;
   disabled?: boolean;
+  label?: string;
 }
 
-const CaptionEditor: React.FC<CaptionEditorProps> = ({ caption, onChange, disabled = false }) => {
+const CaptionEditor: React.FC<CaptionEditorProps> = ({ caption, onChange, disabled = false, label }) => {
   return (
     <Box sx={{ mb: 4 }}>
       <Typography variant="h6" sx={{ mb: 2 }}>
-        Legenda da Postagem
+        {label || 'Legenda da Postagem'}
       </Typography>
       <TextField
         multiline

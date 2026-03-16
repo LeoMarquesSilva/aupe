@@ -518,7 +518,7 @@ const EditPost: React.FC = () => {
                 {client.name}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <InstagramIcon sx={{ fontSize: 16, color: '#E1306C' }} />
+                <InstagramIcon sx={{ fontSize: 16, color: theme.palette.primary.main }} />
                 <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                   @{client.instagram}
                 </Typography>
@@ -546,7 +546,7 @@ const EditPost: React.FC = () => {
           pb: 2, 
           borderBottom: '1px solid rgba(0,0,0,0.08)' 
         }}>
-          <InstagramIcon sx={{ mr: 1.5, color: '#E1306C' }} />
+          <InstagramIcon sx={{ mr: 1.5, color: theme.palette.primary.main }} />
           <Typography variant="h5" sx={{ fontWeight: 'medium' }}>
             Editar Conteúdo
           </Typography>

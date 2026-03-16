@@ -260,7 +260,7 @@ export const getPostStats = async (clientId?: string): Promise<any> => {
       pending: posts.filter(p => p.status === 'pending').length,
       sent_to_n8n: posts.filter(p => p.status === 'sent_to_n8n').length,
       processing: posts.filter(p => p.status === 'processing').length,
-      posted: posts.filter(p => p.status === 'posted').length,
+      posted: posts.filter(p => p.status === 'posted' || p.status === 'published').length,
       failed: posts.filter(p => p.status === 'failed').length,
       cancelled: posts.filter(p => p.status === 'cancelled').length,
     };
@@ -305,7 +305,7 @@ export const cleanupOldPosts = async (daysOld: number = 30): Promise<number> => 
     for (const post of posts) {
       const postDate = new Date(post.scheduledDate);
       const isOld = postDate < cutoffDate;
-      const isCompleted = ['posted', 'failed', 'cancelled'].includes(post.status);
+      const isCompleted = ['posted', 'published', 'failed', 'cancelled'].includes(post.status);
       
       if (isOld && isCompleted) {
         // ✅ NOVO: Deletar imagens/vídeos do storage antes de deletar o post

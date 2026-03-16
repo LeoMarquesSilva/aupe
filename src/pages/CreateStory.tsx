@@ -299,6 +299,7 @@ const CreateStory: React.FC = () => {
 
       resetForm();
       showNotification('Story agendado com sucesso! Será publicado na data e hora escolhidas.', 'success');
+      setTimeout(() => navigate(selectedClientId ? `/calendar/${selectedClientId}` : '/calendar'), 1500);
     } catch (error) {
       console.error('Erro ao agendar story:', error);
       showNotification(getUserFriendlyMessage(error, 'agendar story'), 'error');
@@ -354,6 +355,7 @@ const CreateStory: React.FC = () => {
 
       resetForm();
       showNotification('Story enviado com sucesso!', 'success');
+      setTimeout(() => navigate(selectedClientId ? `/calendar/${selectedClientId}` : '/calendar'), 1500);
     } catch (error) {
       console.error('Erro ao enviar story:', error);
       showNotification(getUserFriendlyMessage(error, 'enviar story'), 'error');
@@ -458,7 +460,7 @@ const CreateStory: React.FC = () => {
             >
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="h6" sx={{ fontWeight: 'medium', display: 'flex', alignItems: 'center' }}>
-                  <InstagramIcon sx={{ mr: 1, color: '#E1306C' }} />
+                  <InstagramIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
                   Selecione a Conta do Instagram
                 </Typography>
                 <Button 
@@ -601,7 +603,7 @@ const CreateStory: React.FC = () => {
                           {selectedClient.name}
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: '#E1306C' }} />
+                          <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: theme.palette.primary.main }} />
                           <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                             @{selectedClient.instagram}
                           </Typography>
@@ -804,7 +806,7 @@ const CreateStory: React.FC = () => {
                       Agendando para:
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: '#E1306C' }} />
+                      <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: theme.palette.primary.main }} />
                       <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                         @{selectedClient.instagram}
                       </Typography>
@@ -949,7 +951,7 @@ const CreateStory: React.FC = () => {
     fullWidth
   >
     <DialogTitle sx={{ display: 'flex', alignItems: 'center' }}>
-      <StoryIcon sx={{ mr: 1, color: '#E1306C' }} />
+      <StoryIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
       Prévia do Story
       {selectedClient && (
         <Chip

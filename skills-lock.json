@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "Command Development": {
+      "source": "anthropics/claude-code",
+      "sourceType": "github",
+      "computedHash": "bca581f0a2789f75d9501499b9f4dc354eb40b213ccd23d13f5b87299db1f84a"
+    }
+  }
+}

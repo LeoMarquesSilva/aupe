@@ -38,7 +38,9 @@ import Checkout from './pages/Checkout';
 import CheckoutSuccess from './pages/CheckoutSuccess';
 import CheckoutCancel from './pages/CheckoutCancel';
 import ClientDashboardView from './pages/ClientDashboardView';
+import ClientApprovalView from './pages/ClientApprovalView';
 import ShareLinksPage from './pages/ShareLinksPage';
+import ApprovalsPage from './pages/ApprovalsPage';
 
 // Layout compartilhado para todas as páginas protegidas
 const PageLayout = ({ children }: { children: React.ReactNode }) => (
@@ -161,6 +163,10 @@ const router = createBrowserRouter([
     path: "/view/:token",
     element: <PublicLayout><ClientDashboardView /></PublicLayout>,
   },
+  {
+    path: "/approve/:token",
+    element: <PublicLayout><ClientApprovalView /></PublicLayout>,
+  },
 
   // Rotas protegidas - Home e Dashboard
   {
@@ -184,6 +190,10 @@ const router = createBrowserRouter([
   {
     path: "/share-links",
     element: <ProtectedPageLayout><ShareLinksPage /></ProtectedPageLayout>,
+  },
+  {
+    path: "/approvals",
+    element: <ProtectedPageLayout><ApprovalsPage /></ProtectedPageLayout>,
   },
   {
     path: "/calendar/:clientId",

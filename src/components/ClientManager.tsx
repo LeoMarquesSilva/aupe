@@ -20,7 +20,8 @@ import {
   CircularProgress,
   Tabs,
   Tab,
-  Alert
+  Alert,
+  useTheme
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -59,6 +60,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
   onClientDeleted,
   addOnly = false
 }) => {
+  const theme = useTheme();
   const [name, setName] = useState<string>('');
   const [instagram, setInstagram] = useState<string>('');
   const [logoUrl, setLogoUrl] = useState<string>('');
@@ -338,7 +340,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                   sx={{ 
                     mb: 2, 
                     borderRadius: 2,
-                    border: client.id === selectedClientId ? '2px solid #E1306C' : '1px solid rgba(0,0,0,0.08)',
+                    border: client.id === selectedClientId ? `2px solid ${theme.palette.primary.main}` : '1px solid rgba(0,0,0,0.08)',
                     overflow: 'hidden'
                   }}
                 >
@@ -364,7 +366,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                           sx={{ 
                             width: 56, 
                             height: 56,
-                            border: client.profilePicture ? '2px solid #E1306C' : 'none'
+                            border: client.profilePicture ? `2px solid ${theme.palette.primary.main}` : 'none'
                           }}
                         >
                           {client.name.charAt(0)}
@@ -377,7 +379,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                               {client.name}
                             </Typography>
                             {client.profilePicture && (
-                              <InstagramIcon sx={{ fontSize: 16, color: '#E1306C' }} />
+                              <InstagramIcon sx={{ fontSize: 16, color: theme.palette.primary.main }} />
                             )}
                           </Box>
                         } 
@@ -403,7 +405,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                   
                   <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.02)' }}>
                     <Typography variant="subtitle2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-                      <InstagramIcon fontSize="small" sx={{ mr: 1, color: '#E1306C' }} />
+                      <InstagramIcon fontSize="small" sx={{ mr: 1, color: theme.palette.primary.main }} />
                       Conexão com Instagram
                     </Typography>
                     

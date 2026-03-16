@@ -14,7 +14,9 @@ import {
   ToggleButton,
   Avatar,
   Divider,
-  Snackbar
+  Snackbar,
+  Button,
+  Checkbox,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -28,8 +30,10 @@ import {
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
   Cancel as CancelIcon,
-  Person as PersonIcon
+  Person as PersonIcon,
+  ThumbUp as ThumbUpIcon,
 } from '@mui/icons-material';
+import { imageUrlService } from '../../services/imageUrlService';
 
 interface ScheduledPost {
   id: string;
@@ -40,6 +44,9 @@ interface ScheduledPost {
   created_at: string;
   post_type?: 'post' | 'carousel' | 'reels' | 'stories';
   video?: string;
+  /** Capa do vídeo (reels); pode vir como cover_image do banco */
+  coverImage?: string;
+  cover_image?: string;
   user_id?: string;
   organization_id?: string;
   profiles?: {
@@ -55,15 +62,19 @@ interface ScheduledPostsListProps {
   onEditPost: (post: ScheduledPost) => void;
   onDeletePost: (postId: string) => void;
   onRefreshPosts?: () => void | Promise<void>;
+  /** When provided, enables selection and "Enviar para aprovação" for pending posts */
+  onSendForApproval?: (postIds: string[]) => void;
 }
 
 const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
   posts,
   onEditPost,
   onDeletePost,
-  onRefreshPosts
+  onRefreshPosts,
+  onSendForApproval,
 }) => {
   const [filter, setFilter] = useState<'all' | 'scheduled' | 'published'>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' | 'warning' }>({ open: false, message: '', severity: 'info' });
 
   const getStatusColor = (status: string) => {
@@ -172,6 +183,26 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
     return posts;
   }, [posts, filter]);
 
+  const pendingPosts = useMemo(() => filteredPosts.filter(p => p.status === 'pending'), [filteredPosts]);
+  const canSelectForApproval = Boolean(onSendForApproval) && pendingPosts.length > 0;
+  const selectedCount = selectedIds.size;
+
+  const toggleSelect = (postId: string, isPending: boolean) => {
+    if (!isPending) return;
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(postId)) next.delete(postId);
+      else next.add(postId);
+      return next;
+    });
+  };
+
+  const handleSendForApproval = () => {
+    if (selectedCount === 0 || !onSendForApproval) return;
+    onSendForApproval(Array.from(selectedIds));
+    setSelectedIds(new Set());
+  };
+
   if (posts.length === 0) {
     return (
       <Alert severity="info" sx={{ borderRadius: 2 }}>
@@ -182,12 +213,28 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
 
   return (
     <Box>
-      {/* Filtros */}
+      {/* Filtros e ação de aprovação */}
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-        <Typography variant="h6" fontWeight={600}>
-          Posts Agendados
-        </Typography>
-        
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <Typography variant="h6" fontWeight={600}>
+            Posts Agendados
+          </Typography>
+          {canSelectForApproval && (
+            <Tooltip title="Gera um link para o cliente aprovar ou solicitar alterações depois.">
+              <span>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<ThumbUpIcon />}
+                  onClick={handleSendForApproval}
+                  disabled={selectedCount === 0}
+                >
+                  Enviar para aprovação do cliente {selectedCount > 0 ? `(${selectedCount})` : ''}
+                </Button>
+              </span>
+            </Tooltip>
+          )}
+        </Box>
         <ToggleButtonGroup
           value={filter}
           exclusive
@@ -229,17 +276,26 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
       {/* Cards */}
       <Grid container spacing={2}>
         {filteredPosts.map((post) => {
-          const imageUrl = Array.isArray(post.images) && post.images.length > 0 
-            ? (typeof post.images[0] === 'string' 
-                ? post.images[0] 
+          const isReels = post.post_type === 'reels' || !!post.video;
+          const coverUrl = post.coverImage || (post as any).cover_image || null;
+          const imageUrl = !isReels && Array.isArray(post.images) && post.images.length > 0
+            ? (typeof post.images[0] === 'string'
+                ? post.images[0]
                 : (post.images[0] as any)?.url || null)
             : null;
-          
+          const videoUrl = post.video || (isReels && Array.isArray(post.images) && post.images.length > 0 && typeof post.images[0] === 'string' ? post.images[0] : null);
+          const thumbnailUrl = isReels
+            ? (coverUrl ? imageUrlService.getPublicUrl(coverUrl) : null)
+            : (imageUrl ? (imageUrlService.getPublicUrl(imageUrl) || imageUrl) : null);
+
           const userName = post.profiles?.full_name || post.profiles?.email?.split('@')[0] || 'Usuário';
+          const isPending = post.status === 'pending';
+          const isSelected = selectedIds.has(post.id);
 
           return (
             <Grid item xs={12} sm={6} md={4} lg={3} key={post.id}>
               <Card sx={{ 
+                position: 'relative',
                 height: '100%', 
                 display: 'flex', 
                 flexDirection: 'column',
@@ -252,18 +308,55 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
                   boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                 }
               }}>
-                {/* Imagem */}
-                {imageUrl && (
+                {/* Checkbox para aprovação (apenas posts pendentes) */}
+                {canSelectForApproval && (
+                  <Box sx={{ position: 'absolute', top: 8, left: 8, zIndex: 1 }}>
+                    <Checkbox
+                      checked={isSelected}
+                      disabled={!isPending}
+                      onChange={() => toggleSelect(post.id, isPending)}
+                      size="small"
+                      sx={{ bgcolor: 'background.paper', borderRadius: 0.5, p: 0.25 }}
+                    />
+                  </Box>
+                )}
+                {/* Imagem / capa do reel / frame do vídeo */}
+                {thumbnailUrl && (
                   <CardMedia
                     component="img"
                     height="140"
-                    image={imageUrl}
+                    image={thumbnailUrl}
                     alt={post.caption}
                     sx={{ 
                       objectFit: 'cover',
                       bgcolor: 'grey.100'
                     }}
                   />
+                )}
+                {isReels && !thumbnailUrl && videoUrl && (
+                  <Box
+                    sx={{
+                      height: 140,
+                      bgcolor: 'grey.900',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <video
+                      src={imageUrlService.getPublicUrl(videoUrl)}
+                      muted
+                      preload="metadata"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        pointerEvents: 'none'
+                      }}
+                      crossOrigin="anonymous"
+                    />
+                  </Box>
                 )}
                 
                 <CardContent sx={{ flexGrow: 1, p: 2, display: 'flex', flexDirection: 'column' }}>

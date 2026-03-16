@@ -262,7 +262,7 @@ const Landing: React.FC = () => {
     { icon: <ImageIcon />, name: 'Posts', color: INSYT_COLORS.primary, gradient: 'linear-gradient(135deg, #2563EB 0%, #3B82F6 100%)' },
     { icon: <CollectionsIcon />, name: 'Carrosséis', color: INSYT_COLORS.secondary, gradient: 'linear-gradient(135deg, #7C3AED 0%, #8B5CF6 100%)' },
     { icon: <VideoIcon />, name: 'Reels', color: INSYT_COLORS.success, gradient: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)' },
-    { icon: <InstagramIcon />, name: 'Stories', color: '#E1306C', gradient: 'linear-gradient(135deg, #E1306C 0%, #F56040 100%)' },
+    { icon: <InstagramIcon />, name: 'Stories', color: '#0f766e', gradient: 'linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)' },
   ];
 
   // Planos agora são carregados do banco via useEffect acima

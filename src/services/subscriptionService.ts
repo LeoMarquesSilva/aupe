@@ -302,7 +302,7 @@ class SubscriptionService {
 
   async getSubscriptionByOrganization(organizationId: string): Promise<Subscription | null> {
     try {
-      // Buscar subscriptions ativas (pode haver múltiplas, pegar a mais recente)
+      // Buscar subscription ativa ou em trial (pode haver múltiplas, pegar a mais recente)
       const { data: subscriptions, error } = await supabase
         .from('subscriptions')
         .select(`
@@ -310,7 +310,7 @@ class SubscriptionService {
           plan:subscription_plans(*)
         `)
         .eq('organization_id', organizationId)
-        .eq('status', 'active')
+        .in('status', ['active', 'trialing'])
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -322,7 +322,7 @@ class SubscriptionService {
           .from('subscriptions')
           .select('*')
           .eq('organization_id', organizationId)
-          .eq('status', 'active')
+          .in('status', ['active', 'trialing'])
           .order('created_at', { ascending: false })
           .limit(1);
 

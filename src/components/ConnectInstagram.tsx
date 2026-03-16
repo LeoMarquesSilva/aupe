@@ -13,7 +13,8 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  useTheme
 } from '@mui/material';
 import { 
   Instagram as InstagramIcon,
@@ -36,6 +37,7 @@ interface ConnectInstagramProps {
 }
 
 const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectionUpdate }) => {
+  const theme = useTheme();
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState<boolean>(false);
@@ -475,9 +477,9 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
             onClick={handleConnect}
             disabled={loading}
             sx={{ 
-              bgcolor: '#E1306C',
+              bgcolor: theme.palette.primary.main,
               '&:hover': {
-                bgcolor: '#C13584'
+                bgcolor: theme.palette.primary.dark
               },
               borderRadius: 2,
               px: 3,

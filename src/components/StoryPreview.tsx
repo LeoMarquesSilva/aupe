@@ -256,7 +256,7 @@ const StoryPreview: React.FC<StoryPreviewProps> = ({
       transform: `rotate(${element.rotation}deg)`,
       zIndex: element.zIndex,
       cursor: isEditing ? 'move' : 'default',
-      border: selectedElementId === element.id ? '2px dashed #E1306C' : 'none',
+      border: selectedElementId === element.id ? '2px dashed #0f766e' : 'none',
       boxSizing: 'border-box'
     };
     
@@ -433,7 +433,7 @@ const StoryPreview: React.FC<StoryPreviewProps> = ({
                     width: 16,
                     height: 16,
                     borderRadius: '50%',
-                    backgroundColor: '#E1306C',
+                    backgroundColor: '#0f766e',
                     transform: 'translateX(-50%)'
                   }}
                 />
@@ -469,7 +469,7 @@ const StoryPreview: React.FC<StoryPreviewProps> = ({
               bottom: -5,
               width: 10,
               height: 10,
-              backgroundColor: selectedElementId === element.id ? '#E1306C' : 'transparent',
+              backgroundColor: selectedElementId === element.id ? '#0f766e' : 'transparent',
               cursor: 'se-resize',
               borderRadius: '50%',
               zIndex: 10

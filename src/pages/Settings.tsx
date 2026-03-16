@@ -44,10 +44,12 @@ import {
   CheckCircle as CheckCircleIcon,
   Refresh as RefreshIcon,
   Article as ArticleIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  WhatsApp as WhatsAppIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabaseClient';
+import WhatsAppSettings from '../components/settings/WhatsAppSettings';
 import { subscriptionService, Subscription } from '../services/subscriptionService';
 import { subscriptionLimitsService } from '../services/subscriptionLimitsService';
 import { format } from 'date-fns';
@@ -366,6 +368,7 @@ const Settings: React.FC = () => {
           <Tab icon={<PersonIcon />} iconPosition="start" label="Perfil" />
           <Tab icon={<CreditCardIcon />} iconPosition="start" label="Assinatura" />
           <Tab icon={<SecurityIcon />} iconPosition="start" label="Segurança" />
+          <Tab icon={<WhatsAppIcon />} iconPosition="start" label="Notificações" />
         </Tabs>
 
         {/* Tab: Perfil */}
@@ -871,6 +874,11 @@ const Settings: React.FC = () => {
               </Card>
             </Grid>
           </Grid>
+        </TabPanel>
+
+        {/* Tab: Notificações WhatsApp */}
+        <TabPanel value={currentTab} index={3}>
+          <WhatsAppSettings />
         </TabPanel>
       </Paper>
 

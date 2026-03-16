@@ -314,6 +314,18 @@ WHERE id = '{post_id}';
 - `posted` - Publicado com sucesso
 - `failed` - Falha no processamento
 
+### **Reels – falha intermitente (error code 0)**
+
+A API do Instagram pode retornar erro genérico ("Media upload has failed with error code 0") mesmo com arquivo válido. O workflow N8N deve dar uma **última chance** antes de marcar como falha:
+
+1. Quando o container de Reels retornar `container_status === 'error'` (ou `status_code === 'ERROR'`), **não** ir direto para Error Handler / Atualizar Status (failed).
+2. Inserir **Wait** de 2–3 minutos (ex.: 180 segundos).
+3. Fazer **mais uma requisição** ao Instagram: `GET https://graph.facebook.com/v22.0/{container_id}?fields=status_code&access_token={access_token}`.
+4. Se retornar `FINISHED`: seguir fluxo normal (Publicar Reel no Instagram → Atualizar Status Supabase como published).
+5. Se continuar `ERROR` ou expirado: aí sim ir para Error Handler → Atualizar Status Supabase como failed, com mensagem sugerindo reconverter o vídeo para MP4 (H.264 + AAC) e reagendar.
+
+Em caso de falha persistente, recomenda-se que o usuário reconverta o vídeo para MP4 (H.264 + AAC) e tente novamente.
+
 ### **Retry Logic:**
 - Máximo 3 tentativas
 - Campo `retry_count` incrementado a cada falha
@@ -388,6 +400,49 @@ WHERE id = '{post_id}';
 
 ---
 
+## 🛡️ **Gate de Aprovação (Proteção contra postagem não-aprovada)**
+
+O cron SQL (`process_scheduled_posts_by_time`) já inclui condições para impedir a postagem de conteúdo que exige aprovação mas não foi aprovado. Como defesa em profundidade, o workflow N8N **também deve** validar os novos campos enviados no payload `TIME_TRIGGER`:
+
+### Campos adicionais no payload `record`
+
+```json
+{
+  "record": {
+    "requires_approval": false,
+    "approval_status": "approved",
+    "for_approval_only": false
+  }
+}
+```
+
+### Filtro recomendado no primeiro nó do N8N
+
+Adicionar um nó **IF** logo após o Webhook com as seguintes condições de bloqueio:
+
+```javascript
+const record = $input.first().json.record;
+
+// BLOQUEAR se o conteúdo é apenas para aprovação (nunca deve postar)
+if (record.for_approval_only === true) {
+  return []; // não processar
+}
+
+// BLOQUEAR se exige aprovação mas não está aprovado
+if (record.requires_approval === true && record.approval_status !== 'approved') {
+  return []; // não processar
+}
+
+// Tudo OK — prosseguir com postagem
+return $input.all();
+```
+
+### Resultado
+
+Dupla proteção: o banco de dados já filtra na seleção e no update, e o N8N valida novamente antes de iniciar a publicação no Instagram.
+
+---
+
 ## 🎯 **Pontos Importantes**
 
 1. **Foco no TIME_TRIGGER:** Ignore webhooks INSERT/UPDATE, processe apenas TIME_TRIGGER
@@ -396,6 +451,7 @@ WHERE id = '{post_id}';
 4. **Timezone:** Horários em UTC e Brasília fornecidos
 5. **Status Updates:** Sempre atualizar status no Supabase após processamento
 6. **Error Handling:** Capturar erros e atualizar com detalhes
+7. **Gate de Aprovação:** Validar `for_approval_only` e `requires_approval`/`approval_status` antes de processar (ver seção acima)
 
 ---
 

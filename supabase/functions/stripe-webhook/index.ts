@@ -14,7 +14,7 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 // Supabase URL e Service Role Key são automaticamente disponibilizados pelo Supabase
 // Se não estiverem disponíveis, usar variáveis de ambiente customizadas
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('SUPABASE_PROJECT_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('❌ SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY não configurados');
@@ -116,6 +116,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     }
   } catch (error: any) {
     console.error('❌ Erro ao processar checkout completado:', error);
+    throw error;
   }
 }
 
@@ -147,6 +148,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     }
   } catch (error: any) {
     console.error('❌ Erro ao processar subscription criada:', error);
+    throw error;
   }
 }
 
@@ -157,6 +159,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     console.log(`✅ Subscription atualizada: ${subscription.id}`);
   } catch (error: any) {
     console.error('❌ Erro ao processar subscription atualizada:', error);
+    throw error;
   }
 }
 
@@ -183,6 +186,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     }
   } catch (error: any) {
     console.error('❌ Erro ao processar subscription deletada:', error);
+    throw error;
   }
 }
 
@@ -202,6 +206,18 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
       .single();
 
     if (subscription) {
+      // Evita duplicidade quando o Stripe reenviar o mesmo evento
+      const { data: existingPayment } = await supabase
+        .from('payments')
+        .select('id')
+        .eq('stripe_invoice_id', invoice.id)
+        .maybeSingle();
+
+      if (existingPayment) {
+        console.log(`ℹ️ Pagamento já registrado (ignorado): ${invoice.id}`);
+        return;
+      }
+
       // Criar registro de pagamento
       await supabase.from('payments').insert({
         subscription_id: subscription.id,
@@ -219,6 +235,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
     }
   } catch (error: any) {
     console.error('❌ Erro ao processar pagamento bem-sucedido:', error);
+    throw error;
   }
 }
 
@@ -242,6 +259,7 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
     }
   } catch (error: any) {
     console.error('❌ Erro ao processar pagamento falhado:', error);
+    throw error;
   }
 }
 

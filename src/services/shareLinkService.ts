@@ -216,18 +216,31 @@ export async function fetchDashboardByToken(token: string): Promise<{
   if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
     throw new Error('REACT_APP_SUPABASE_URL não está configurada. Configure no arquivo .env e reinicie o app.');
   }
-  // Nome exato da função no Supabase (no seu deploy está com hífen no final)
-  const functionName = 'get-client-dashboard-by-token-';
-  const url = `${supabaseUrl}/functions/v1/${functionName}?token=${encodeURIComponent(token)}`;
-  const res = await fetch(url, { method: 'GET' });
-  let body: { error?: string } = {};
-  try {
-    body = await res.json();
-  } catch {
-    body = { error: res.status === 404 ? 'Link inválido ou expirado.' : 'Erro ao carregar dados.' };
+  // Compatibilidade entre ambientes: alguns deploys usam slug com hífen final
+  const functionCandidates = ['get-client-dashboard-by-token', 'get-client-dashboard-by-token-'];
+  let lastError = 'Link inválido ou expirado.';
+
+  for (const functionName of functionCandidates) {
+    const url = `${supabaseUrl}/functions/v1/${functionName}?token=${encodeURIComponent(token)}`;
+    const res = await fetch(url, { method: 'GET' });
+    let body: { error?: string } = {};
+
+    try {
+      body = await res.json();
+    } catch {
+      body = { error: res.status === 404 ? 'Link inválido ou expirado.' : 'Erro ao carregar dados.' };
+    }
+
+    if (res.ok) {
+      return body as Awaited<ReturnType<typeof fetchDashboardByToken>>;
+    }
+
+    // 404 pode significar slug diferente entre ambientes; tenta próximo candidato
+    if (res.status !== 404) {
+      lastError = body?.error || 'Link inválido ou expirado.';
+      break;
+    }
   }
-  if (!res.ok) {
-    throw new Error(body?.error || 'Link inválido ou expirado.');
-  }
-  return body as Awaited<ReturnType<typeof fetchDashboardByToken>>;
+
+  throw new Error(lastError);
 }

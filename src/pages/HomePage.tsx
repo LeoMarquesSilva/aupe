@@ -55,10 +55,10 @@ import { postService } from '../services/supabaseClient';
 import { ImageUrlService } from '../services/imageUrlService';
 
 const COLORS = {
-  primary: '#510000',
-  secondary: '#3A1D1A',
-  lightGray: '#D7CFCF',
-  offWhite: '#EDEBE9',
+  primary: '#0f766e',
+  secondary: '#64748b',
+  lightGray: '#e2e8f0',
+  offWhite: '#fafafa',
 };
 
 const getGreeting = () => {
@@ -380,7 +380,7 @@ const HomePage: React.FC = () => {
     transition: 'all 0.2s ease',
     '&:hover': {
       borderColor: COLORS.primary,
-      boxShadow: '0 2px 8px rgba(81, 0, 0, 0.08)',
+      boxShadow: '0 2px 8px rgba(15, 118, 110, 0.08)',
     },
   };
 
@@ -518,7 +518,7 @@ const HomePage: React.FC = () => {
                       width: 48,
                       height: 48,
                       borderRadius: 1.5,
-                      bgcolor: 'rgba(81, 0, 0, 0.08)',
+                      bgcolor: 'rgba(15, 118, 110, 0.08)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -549,7 +549,7 @@ const HomePage: React.FC = () => {
                       width: 48,
                       height: 48,
                       borderRadius: 1.5,
-                      bgcolor: 'rgba(81, 0, 0, 0.08)',
+                      bgcolor: 'rgba(15, 118, 110, 0.08)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -580,7 +580,7 @@ const HomePage: React.FC = () => {
                       width: 48,
                       height: 48,
                       borderRadius: 1.5,
-                      bgcolor: 'rgba(81, 0, 0, 0.08)',
+                      bgcolor: 'rgba(15, 118, 110, 0.08)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -842,6 +842,11 @@ const HomePage: React.FC = () => {
                             {p.errorMessage && (
                               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontFamily: '"Poppins", sans-serif' }}>
                                 {p.errorMessage.slice(0, 60)}{p.errorMessage.length > 60 ? '…' : ''}
+                              </Typography>
+                            )}
+                            {p.status === 'failed' && p.postType === 'reels' && (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontFamily: '"Poppins", sans-serif', mt: 0.5 }}>
+                                Converter o vídeo para MP4 (H.264 + AAC) e tentar novamente pode resolver.
                               </Typography>
                             )}
                           </Box>

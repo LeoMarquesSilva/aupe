@@ -92,8 +92,8 @@ const ClientDashboard: React.FC = () => {
             // Agendados = apenas pending (posts que ainda não foram enviados)
             scheduled: posts.filter(p => p.status === 'pending').length,
             
-            // Publicados = published (posts publicados com sucesso pelo N8N)
-            posted: posts.filter(p => p.status === 'published').length,
+            // Publicados = posted/published (compatibilidade com dados legados)
+            posted: posts.filter(p => p.status === 'posted' || p.status === 'published').length,
             
             // Falhados = failed + cancelled
             draft: posts.filter(p => 
@@ -422,7 +422,7 @@ const ClientDashboard: React.FC = () => {
                               position: 'absolute',
                               bottom: -2,
                               right: -2,
-                              bgcolor: '#E1306C',
+                              bgcolor: theme.palette.primary.main,
                               borderRadius: '50%',
                               p: 0.4,
                               display: 'flex',
@@ -483,7 +483,7 @@ const ClientDashboard: React.FC = () => {
                         fontSize: '0.75rem'
                       }}
                     >
-                      <InstagramIcon sx={{ fontSize: 14, color: '#E1306C' }} />
+                      <InstagramIcon sx={{ fontSize: 14, color: theme.palette.primary.main }} />
                       @{client.instagram}
                     </Typography>
                     
@@ -641,7 +641,7 @@ const ClientDashboard: React.FC = () => {
                           setConnectInstagramOpen(true);
                         }}
                         sx={{ 
-                          color: isInstagramConnected(client) ? '#4caf50' : '#E1306C',
+                          color: isInstagramConnected(client) ? '#4caf50' : theme.palette.primary.main,
                           '&:hover': { bgcolor: isInstagramConnected(client) ? 'rgba(76, 175, 80, 0.1)' : 'rgba(225, 48, 108, 0.1)' }
                         }}
                       >
@@ -673,7 +673,7 @@ const ClientDashboard: React.FC = () => {
                           handleCreatePost(client);
                         }}
                         sx={{ 
-                          color: '#E1306C',
+                          color: theme.palette.primary.main,
                           '&:hover': { bgcolor: 'rgba(225, 48, 108, 0.1)' }
                         }}
                       >
@@ -809,7 +809,7 @@ const ClientDashboard: React.FC = () => {
       >
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <InstagramIcon sx={{ color: '#E1306C' }} />
+            <InstagramIcon sx={{ color: theme.palette.primary.main }} />
             <Typography variant="h6">
               {selectedClient ? `Conectar Instagram - ${selectedClient.name}` : 'Conectar Instagram'}
             </Typography>

@@ -60,7 +60,7 @@ import {
   FilterList as FilterListIcon,
   Clear as ClearIcon
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, parseISO, isValid, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useTheme } from '@mui/material/styles';
@@ -75,6 +75,7 @@ import UrlCacheMonitor from '../components/UrlCacheMonitor';
 
 const StoryCalendar: React.FC = () => {
   const navigate = useNavigate();
+  const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
   const theme = useTheme();
   
   // Estados principais
@@ -111,6 +112,13 @@ const StoryCalendar: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Inicializar filtro de cliente quando clientId vem na URL (ex.: redirect após agendamento)
+  useEffect(() => {
+    if (clientIdParam && clients.length > 0 && clients.some((c) => c.id === clientIdParam)) {
+      setSelectedClient(clientIdParam);
+    }
+  }, [clientIdParam, clients]);
 
   const loadData = async () => {
     try {
@@ -311,7 +319,7 @@ const StoryCalendar: React.FC = () => {
   // Função para obter cor por tipo de conteúdo (usando brand colors)
   const getContentTypeColor = (type: string): string => {
     switch (type) {
-      case 'post': return '#E1306C'; // Instagram pink
+      case 'post': return theme.palette.primary.main;
       case 'carousel': return '#833AB4'; // Instagram purple
       case 'reels': return '#F56040'; // Instagram orange
       case 'stories': return '#FCAF45'; // Instagram yellow

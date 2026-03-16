@@ -1117,7 +1117,7 @@ const AdminSettings: React.FC = () => {
                         size="small"
                         label={post.status}
                         color={
-                          post.status === 'published' ? 'success' :
+                          (post.status === 'published' || post.status === 'posted') ? 'success' :
                           post.status === 'scheduled' ? 'info' :
                           post.status === 'failed' ? 'error' : 'default'
                         }

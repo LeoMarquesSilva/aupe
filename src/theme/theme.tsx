@@ -1,56 +1,60 @@
 import { createTheme } from '@mui/material/styles';
 
-// Cores da identidade visual da marca
+// Paleta minimalista e tecnológica (inspirada Supabase/Vercel)
 const BRAND_COLORS = {
-  primary: '#510000',      // vinho escuro
-  secondary: '#3A1D1A',    // marrom café escuro
-  lightGray: '#D7CFCF',    // cinza claro rosado
-  neutralGray: '#CFCFCF',  // cinza claro neutro
-  softBlack: '#0E0E0E',    // preto suave
-  greenBlack: '#151B19',   // preto esverdeado
-  pureBlack: '#000000',    // preto puro
-  offWhite: '#EDEBE9',     // off-white
+  primary: '#0f766e',       // teal (accent)
+  primaryLight: '#14b8a6',
+  primaryDark: '#0d9488',
+  secondary: '#64748b',     // slate-500
+  secondaryLight: '#94a3b8',
+  secondaryDark: '#475569',
+  backgroundDefault: '#f8fafc',
+  backgroundPaper: '#ffffff',
+  textPrimary: '#0f172a',
+  textSecondary: '#64748b',
+  border: '#e2e8f0',
+  borderMuted: '#f1f5f9',
+  offWhite: '#fafafa',
 };
 
-// Criação do tema com a identidade visual da marca
+// Criação do tema com identidade minimalista/tech
 const theme = createTheme({
   palette: {
     primary: {
       main: BRAND_COLORS.primary,
-      light: '#6b1a1a',
-      dark: '#3c0000',
-      contrastText: BRAND_COLORS.offWhite,
+      light: BRAND_COLORS.primaryLight,
+      dark: BRAND_COLORS.primaryDark,
+      contrastText: '#ffffff',
     },
     secondary: {
       main: BRAND_COLORS.secondary,
-      light: '#533a37',
-      dark: '#271310',
-      contrastText: BRAND_COLORS.offWhite,
+      light: BRAND_COLORS.secondaryLight,
+      dark: BRAND_COLORS.secondaryDark,
+      contrastText: '#ffffff',
     },
     background: {
-      default: BRAND_COLORS.offWhite,
-      paper: '#FFFFFF',
+      default: BRAND_COLORS.backgroundDefault,
+      paper: BRAND_COLORS.backgroundPaper,
     },
     text: {
-      primary: BRAND_COLORS.softBlack,
-      secondary: BRAND_COLORS.secondary,
+      primary: BRAND_COLORS.textPrimary,
+      secondary: BRAND_COLORS.textSecondary,
     },
     error: {
-      main: '#b71c1c',
+      main: '#dc2626',
     },
     warning: {
-      main: '#8B4513',
+      main: '#d97706',
     },
     info: {
-      main: '#510000',
+      main: BRAND_COLORS.primary,
     },
     success: {
-      main: '#2e7d32',
+      main: '#059669',
     },
-    divider: BRAND_COLORS.lightGray,
+    divider: BRAND_COLORS.border,
   },
   typography: {
-    // Definindo as fontes da marca
     fontFamily: '"Poppins", "Roboto", "Helvetica", "Arial", sans-serif',
     h1: {
       fontFamily: '"Argent CF", serif',
@@ -105,18 +109,18 @@ const theme = createTheme({
     },
     body2: {
       fontFamily: '"Poppins", sans-serif',
-      fontWeight: 300, // Light
+      fontWeight: 300,
       fontSize: '0.875rem',
     },
     button: {
       fontFamily: '"Poppins", sans-serif',
-      fontWeight: 500, // Medium
+      fontWeight: 500,
       fontSize: '0.875rem',
       textTransform: 'none',
     },
     caption: {
       fontFamily: '"Poppins", sans-serif',
-      fontWeight: 300, // Light
+      fontWeight: 300,
       fontSize: '0.75rem',
     },
   },
@@ -169,24 +173,24 @@ const theme = createTheme({
           padding: '8px 16px',
           boxShadow: 'none',
           '&:hover': {
-            boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.15)',
+            boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.08)',
           },
         },
         contained: {
           '&:hover': {
-            boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.15)',
+            boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.08)',
           },
         },
         containedPrimary: {
           backgroundColor: BRAND_COLORS.primary,
           '&:hover': {
-            backgroundColor: '#6b1a1a',
+            backgroundColor: BRAND_COLORS.primaryDark,
           },
         },
         containedSecondary: {
           backgroundColor: BRAND_COLORS.secondary,
           '&:hover': {
-            backgroundColor: '#533a37',
+            backgroundColor: BRAND_COLORS.secondaryDark,
           },
         },
         outlined: {
@@ -199,8 +203,8 @@ const theme = createTheme({
           borderColor: BRAND_COLORS.primary,
           color: BRAND_COLORS.primary,
           '&:hover': {
-            borderColor: '#6b1a1a',
-            backgroundColor: 'rgba(81, 0, 0, 0.04)',
+            borderColor: BRAND_COLORS.primaryDark,
+            backgroundColor: 'rgba(15, 118, 110, 0.04)',
           },
         },
       },
@@ -208,7 +212,7 @@ const theme = createTheme({
     MuiAppBar: {
       styleOverrides: {
         root: {
-          boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+          boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.06)',
         },
       },
     },
@@ -216,8 +220,8 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           borderRadius: 12,
-          boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)',
-          border: `1px solid ${BRAND_COLORS.lightGray}`,
+          boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.04)',
+          border: `1px solid ${BRAND_COLORS.border}`,
         },
       },
     },
@@ -227,7 +231,7 @@ const theme = createTheme({
           borderRadius: 12,
         },
         elevation1: {
-          boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.05)',
+          boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.04)',
         },
       },
     },
@@ -236,7 +240,7 @@ const theme = createTheme({
         root: {
           borderRadius: 8,
           '& fieldset': {
-            borderColor: BRAND_COLORS.neutralGray,
+            borderColor: BRAND_COLORS.border,
           },
           '&:hover .MuiOutlinedInput-notchedOutline': {
             borderColor: BRAND_COLORS.secondary,
@@ -252,12 +256,12 @@ const theme = createTheme({
         root: {
           padding: '10px 16px',
           '&:hover': {
-            backgroundColor: 'rgba(81, 0, 0, 0.04)',
+            backgroundColor: 'rgba(15, 118, 110, 0.04)',
           },
           '&.Mui-selected': {
-            backgroundColor: 'rgba(81, 0, 0, 0.08)',
+            backgroundColor: 'rgba(15, 118, 110, 0.08)',
             '&:hover': {
-              backgroundColor: 'rgba(81, 0, 0, 0.12)',
+              backgroundColor: 'rgba(15, 118, 110, 0.12)',
             },
           },
         },
@@ -309,7 +313,7 @@ const theme = createTheme({
     MuiDivider: {
       styleOverrides: {
         root: {
-          backgroundColor: BRAND_COLORS.lightGray,
+          backgroundColor: BRAND_COLORS.border,
         },
       },
     },
@@ -317,26 +321,26 @@ const theme = createTheme({
       styleOverrides: {
         head: {
           fontWeight: 500,
-          backgroundColor: 'rgba(81, 0, 0, 0.04)',
+          backgroundColor: 'rgba(15, 118, 110, 0.04)',
         },
       },
     },
     MuiAlert: {
       styleOverrides: {
         standardSuccess: {
-          backgroundColor: 'rgba(46, 125, 50, 0.1)',
-          color: '#2e7d32',
+          backgroundColor: 'rgba(5, 150, 105, 0.1)',
+          color: '#059669',
         },
         standardError: {
-          backgroundColor: 'rgba(183, 28, 28, 0.1)',
-          color: '#b71c1c',
+          backgroundColor: 'rgba(220, 38, 38, 0.1)',
+          color: '#dc2626',
         },
         standardWarning: {
-          backgroundColor: 'rgba(139, 69, 19, 0.1)',
-          color: '#8B4513',
+          backgroundColor: 'rgba(217, 119, 6, 0.1)',
+          color: '#d97706',
         },
         standardInfo: {
-          backgroundColor: 'rgba(81, 0, 0, 0.1)',
+          backgroundColor: 'rgba(15, 118, 110, 0.1)',
           color: BRAND_COLORS.primary,
         },
       },

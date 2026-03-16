@@ -252,6 +252,7 @@ const CreatePost: React.FC = () => {
 
       resetForm();
       showNotification(`${postType === 'carousel' ? 'Carrossel' : 'Postagem'} agendada com sucesso! Será publicada na data e hora escolhidas.`, 'success');
+      setTimeout(() => navigate(selectedClientId ? `/calendar/${selectedClientId}` : '/calendar'), 1500);
     } catch (error) {
       console.error('Erro ao agendar postagem:', error);
       showNotification(getUserFriendlyMessage(error, 'agendar postagem'), 'error');
@@ -305,6 +306,7 @@ const CreatePost: React.FC = () => {
 
       resetForm();
       showNotification(`${postType === 'carousel' ? 'Carrossel' : 'Postagem'} enviada com sucesso!`, 'success');
+      setTimeout(() => navigate(selectedClientId ? `/calendar/${selectedClientId}` : '/calendar'), 1500);
     } catch (error) {
       console.error('Erro ao enviar postagem:', error);
       showNotification(getUserFriendlyMessage(error, 'enviar postagem'), 'error');
@@ -406,7 +408,7 @@ const CreatePost: React.FC = () => {
       >
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 'medium', display: 'flex', alignItems: 'center' }}>
-            <InstagramIcon sx={{ mr: 1, color: '#E1306C' }} />
+            <InstagramIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
             Selecione a Conta do Instagram
           </Typography>
           <Button 
@@ -552,7 +554,7 @@ const CreatePost: React.FC = () => {
                     {selectedClient.name}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: '#E1306C' }} />
+                    <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: theme.palette.primary.main }} />
                     <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                       @{selectedClient.instagram}
                     </Typography>
@@ -636,7 +638,7 @@ const CreatePost: React.FC = () => {
           pb: 2, 
           borderBottom: '1px solid rgba(0,0,0,0.08)' 
         }}>
-          <InstagramIcon sx={{ mr: 1.5, color: '#E1306C' }} />
+          <InstagramIcon sx={{ mr: 1.5, color: theme.palette.primary.main }} />
           <Typography variant="h5" sx={{ fontWeight: 'medium' }}>
             Nova Postagem
           </Typography>

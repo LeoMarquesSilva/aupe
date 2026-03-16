@@ -59,7 +59,17 @@ const columnMapping: Record<string, string> = {
   'lastRetryAt': 'last_retry_at',
   'n8nResponse': 'n8n_response',
   'shareToFeed': 'share_to_feed',
-  'coverImage': 'cover_image'
+  'coverImage': 'cover_image',
+  'forApprovalOnly': 'for_approval_only',
+  'requiresApproval': 'requires_approval',
+  'approvalStatus': 'approval_status',
+  'approvalFeedback': 'approval_feedback',
+  'approvalRespondedAt': 'approval_responded_at',
+  'expiresAt': 'expires_at',
+  'createdBy': 'created_by',
+  'approvalRequestId': 'approval_request_id',
+  'scheduledPostId': 'scheduled_post_id',
+  'sortOrder': 'sort_order',
 };
 
 // Função para converter camelCase para snake_case com mapeamento específico
@@ -99,7 +109,7 @@ const convertFromDbFormat = (obj: Record<string, any>) => {
       const jsKey = reverseMapping[key] || key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
       
       // Converter strings de data para objetos Date
-      if ((key === 'token_expiry' || key === 'created_at' || key === 'updated_at' || key === 'posted_at' || key === 'last_retry_at') && obj[key]) {
+      if ((key === 'token_expiry' || key === 'created_at' || key === 'updated_at' || key === 'posted_at' || key === 'last_retry_at' || key === 'expires_at' || key === 'approval_responded_at') && obj[key]) {
         try {
           result[jsKey] = new Date(obj[key]);
         } catch (e) {
@@ -958,7 +968,17 @@ export const postService = {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
 
-      // ✅ CORRIGIDO: Incluir todos os campos necessários para Reels
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile?.organization_id) {
+        throw new Error('Organização não encontrada. Entre em contato com o suporte.');
+      }
+
+      // ✅ CORRIGIDO: Incluir todos os campos necessários para Reels e aprovação
       const postData = {
         clientId: post.clientId,
         userId: user.id,
@@ -972,7 +992,9 @@ export const postService = {
         // ✅ NOVOS CAMPOS para Reels
         video: post.video,
         shareToFeed: post.shareToFeed,
-        coverImage: post.coverImage
+        coverImage: post.coverImage,
+        // Conteúdo só para aprovação (não envia para N8N/postar)
+        forApprovalOnly: post.forApprovalOnly
       };
 
       // Remover campos undefined/null
@@ -981,7 +1003,8 @@ export const postService = {
       );
 
       // Converter camelCase para snake_case
-      const dbData = convertToDbFormat(filteredPostData);
+      const dbData = convertToDbFormat(filteredPostData) as Record<string, unknown>;
+      dbData.organization_id = profile.organization_id;
 
       console.log('Salvando post no Supabase (com campos de Reels):', dbData);
 
@@ -1022,7 +1045,7 @@ export const postService = {
         ...additionalData
       };
 
-      // Se o status é 'posted', definir postedAt
+      // Se o status é de publicação concluída no fluxo tipado do app, definir postedAt
       if (status === 'posted' && !updateData.postedAt) {
         updateData.postedAt = new Date().toISOString();
       }

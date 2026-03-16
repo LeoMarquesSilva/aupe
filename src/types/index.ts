@@ -209,12 +209,46 @@ export interface PostData {
   caption: string;
   images: string[];
   scheduledDate: string;
-  postType: 'post' | 'carousel' | 'reels' | 'stories';
+  postType: 'post' | 'carousel' | 'reels' | 'stories' | 'roteiro';
   immediate?: boolean;
   // Campos específicos para Reels
   video?: string; // URL do vídeo para Reels
   shareToFeed?: boolean; // Para Reels
   coverImage?: string; // Para Reels
+}
+
+// Approval module types
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+
+/** Valid approval statuses for runtime checks */
+export const APPROVAL_STATUSES: readonly ApprovalStatus[] = ['pending', 'approved', 'rejected'];
+
+/** Type guard: value is a valid ApprovalStatus */
+export function isApprovalStatus(value: unknown): value is ApprovalStatus {
+  return typeof value === 'string' && APPROVAL_STATUSES.includes(value as ApprovalStatus);
+}
+
+/** Normalizes unknown value to ApprovalStatus; defaults to 'pending' for invalid/empty */
+export function normalizeApprovalStatus(value: unknown): ApprovalStatus {
+  if (isApprovalStatus(value)) return value;
+  return 'pending';
+}
+
+export interface ApprovalRequest {
+  id: string;
+  clientId: string;
+  token: string;
+  expiresAt: string;
+  label: string | null;
+  createdAt: string;
+  createdBy: string | null;
+}
+
+export interface ApprovalRequestPost {
+  id: string;
+  approvalRequestId: string;
+  scheduledPostId: string;
+  sortOrder: number;
 }
 
 // Interface para posts agendados (nova tabela)
@@ -224,7 +258,7 @@ export interface ScheduledPost {
   caption: string;
   images: (string | { url: string })[];  // Tipo mais específico
   scheduledDate: string;
-  postType: 'post' | 'carousel' | 'reels' | 'stories';
+  postType: 'post' | 'carousel' | 'reels' | 'stories' | 'roteiro';
   status: 'pending' | 'sent_to_n8n' | 'processing' | 'posted' | 'failed' | 'cancelled';
   immediate?: boolean;
   userId: string;
@@ -233,6 +267,13 @@ export interface ScheduledPost {
   video?: string; // URL do vídeo
   shareToFeed?: boolean;
   coverImage?: string;
+  
+  // Approval (client approval flow)
+  forApprovalOnly?: boolean;
+  requiresApproval?: boolean;
+  approvalStatus?: ApprovalStatus;
+  approvalFeedback?: string | null;
+  approvalRespondedAt?: string | null;
   
   // Timestamps
   createdAt: string;
@@ -279,6 +320,7 @@ export const POST_STATUS = {
 } as const;
 
 // Constantes específicas para Reels
+// API aceita MOV e MP4; codec pode variar (H.264 mais previsível). MP4 H.264 é o mais confiável.
 export const REEL_SETTINGS: ReelSettings = {
   maxDuration: 90, // 90 segundos
   minDuration: 3,  // 3 segundos

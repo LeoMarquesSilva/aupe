@@ -32,6 +32,8 @@ import {
 import { supabaseVideoStorageService, VideoUploadResult } from '../services/supabaseVideoStorageService';
 import { authService } from '../services/supabaseClient';
 import { ReelVideo } from '../types';
+import { detectVideoFormat, VideoFormatInfo } from '../services/videoFormatValidator';
+import VideoConversionDialog from './VideoConversionDialog';
 
 interface VideoUploaderProps {
   video: ReelVideo | null;
@@ -69,6 +71,11 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
   
   const [metadataProcessed, setMetadataProcessed] = useState<string | null>(null);
   const [localVideoUrl, setLocalVideoUrl] = useState<string | null>(null);
+
+  // Estado do dialog de conversão de formato
+  const [conversionDialogOpen, setConversionDialogOpen] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [detectedFormat, setDetectedFormat] = useState<VideoFormatInfo | null>(null);
 
   // ✅ Resetar estados quando o vídeo muda
   useEffect(() => {
@@ -193,13 +200,8 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
     return true;
   };
 
-  // Função para processar arquivo selecionado
-  const handleFileSelect = useCallback(async (file: File) => {
-    console.log('🎬 Arquivo selecionado:', file.name, file.type, formatFileSize(file.size));
-
-    if (!validateFile(file)) return;
-
-    // ✅ Criar URL local para preview imediato
+  // Upload do arquivo para Supabase (chamado após validação de formato)
+  const uploadFile = useCallback(async (file: File) => {
     const localUrl = URL.createObjectURL(file);
     setLocalVideoUrl(localUrl);
 
@@ -209,23 +211,17 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
     setMetadataProcessed(null);
 
     try {
-      console.log('🚀 Iniciando upload de vídeo:', file.name);
-      
-      // Obter usuário atual
       const user = await authService.getCurrentUser();
       if (!user) {
         throw new Error('Usuário não autenticado');
       }
-      
-      // Progresso mais realista para arquivos grandes
+
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
-          const increment = file.size > 500 * 1024 * 1024 ? 
-            Math.random() * 5 : 
+          const increment = file.size > 500 * 1024 * 1024 ?
+            Math.random() * 5 :
             Math.random() * 15;
-          
-          const newProgress = Math.min(prev + increment, 85);
-          return newProgress;
+          return Math.min(prev + increment, 85);
         });
       }, file.size > 500 * 1024 * 1024 ? 1000 : 500);
 
@@ -238,45 +234,91 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      console.log('✅ Upload resultado:', uploadResult);
-
-      // Criar objeto ReelVideo
       const reelVideo: ReelVideo = {
         id: `video-${Date.now()}`,
         url: uploadResult.url,
         publicUrl: uploadResult.publicUrl,
         path: uploadResult.path,
         fileName: file.name,
-        file: file, // ✅ Manter referência para preview local
+        file: file,
         size: uploadResult.size,
         duration: uploadResult.duration || 0,
-        width: 1080, // Será atualizado quando o vídeo carregar
+        width: 1080,
         height: 1920,
         aspectRatio: 9/16,
         thumbnail: uploadResult.thumbnail,
         format: file.type
       };
 
-      console.log('✅ ReelVideo criado:', reelVideo);
       onChange(reelVideo);
 
-      // Limpar progresso após um breve delay
       setTimeout(() => {
         setUploadProgress(0);
       }, 1500);
 
     } catch (error) {
-      console.error('❌ Erro no upload:', error);
+      console.error('Erro no upload:', error);
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido no upload';
       setError(`Erro no upload: ${errorMessage}`);
       onChange(null);
-      // Limpar URL local em caso de erro
       URL.revokeObjectURL(localUrl);
       setLocalVideoUrl(null);
     } finally {
       setIsUploading(false);
     }
   }, [maxFileSize, maxDuration, onChange]);
+
+  // Função para processar arquivo selecionado (com detecção de formato)
+  const handleFileSelect = useCallback(async (file: File) => {
+    console.log('🎬 Arquivo selecionado:', file.name, file.type, formatFileSize(file.size));
+
+    if (!validateFile(file)) return;
+
+    // Detectar formato/codec do vídeo antes do upload
+    try {
+      const formatInfo = await detectVideoFormat(file);
+      console.log('🔍 Formato detectado:', formatInfo);
+
+      if (!formatInfo.isCompatible) {
+        // HEVC detectado — mostrar dialog de conversão
+        setPendingFile(file);
+        setDetectedFormat(formatInfo);
+        setConversionDialogOpen(true);
+        return;
+      }
+    } catch (err) {
+      // Se a detecção falhar, prosseguir normalmente
+      console.warn('Falha na detecção de formato, prosseguindo com upload:', err);
+    }
+
+    await uploadFile(file);
+  }, [maxFileSize, maxDuration, onChange, uploadFile]);
+
+  // Callback quando o arquivo convertido está pronto
+  const handleConvertedFileReady = useCallback(async (convertedFile: File) => {
+    setConversionDialogOpen(false);
+    setPendingFile(null);
+    setDetectedFormat(null);
+    await uploadFile(convertedFile);
+  }, [uploadFile]);
+
+  // Callback quando o usuário quer escolher outro arquivo
+  const handlePickAnotherFile = useCallback(() => {
+    setConversionDialogOpen(false);
+    setPendingFile(null);
+    setDetectedFormat(null);
+    // Abrir o file picker novamente
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setTimeout(() => openFileSelector(), 100);
+  }, []);
+
+  const handleConversionDialogClose = useCallback(() => {
+    setConversionDialogOpen(false);
+    setPendingFile(null);
+    setDetectedFormat(null);
+  }, []);
 
   // ✅ Função para processar metadados sem loop
   const handleVideoMetadata = useCallback((e: React.SyntheticEvent<HTMLVideoElement>) => {
@@ -728,6 +770,16 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
           <Button onClick={() => setShowDetails(false)}>Fechar</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Dialog de conversão de formato */}
+      <VideoConversionDialog
+        open={conversionDialogOpen}
+        file={pendingFile}
+        formatInfo={detectedFormat}
+        onClose={handleConversionDialogClose}
+        onPickAnother={handlePickAnotherFile}
+        onFileReady={handleConvertedFileReady}
+      />
     </Box>
   );
 };
