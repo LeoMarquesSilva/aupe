@@ -1,9 +1,15 @@
 // ===== INTERFACES EXISTENTES (MANTER TUDO) =====
+export type PostingPlatform = 'instagram' | 'linkedin';
+
+export type InternalApprovalStatus = 'pending' | 'approved' | 'rejected';
+
 export interface Client {
   id: string;
   name: string;
   instagram: string;
   logoUrl?: string;
+  /** When false, client is inactive (scheduling UI may hide or warn). */
+  isActive?: boolean;
   accessToken?: string;
   userId?: string;
   appId?: string;
@@ -274,6 +280,11 @@ export interface ScheduledPost {
   approvalStatus?: ApprovalStatus;
   approvalFeedback?: string | null;
   approvalRespondedAt?: string | null;
+  approvalFeedbackAttachments?: string[];
+  postingPlatform?: PostingPlatform;
+  requiresInternalApproval?: boolean;
+  internalApprovalStatus?: InternalApprovalStatus | null;
+  internalApprovalComment?: string | null;
   
   // Timestamps
   createdAt: string;

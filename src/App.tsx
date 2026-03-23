@@ -39,6 +39,7 @@ import CheckoutSuccess from './pages/CheckoutSuccess';
 import CheckoutCancel from './pages/CheckoutCancel';
 import ClientDashboardView from './pages/ClientDashboardView';
 import ClientApprovalView from './pages/ClientApprovalView';
+import ManagerInternalApprovalView from './pages/ManagerInternalApprovalView';
 import ShareLinksPage from './pages/ShareLinksPage';
 import ApprovalsPage from './pages/ApprovalsPage';
 
@@ -166,6 +167,10 @@ const router = createBrowserRouter([
   {
     path: "/approve/:token",
     element: <PublicLayout><ClientApprovalView /></PublicLayout>,
+  },
+  {
+    path: "/revisao-interna/:token",
+    element: <PublicLayout><ManagerInternalApprovalView /></PublicLayout>,
   },
 
   // Rotas protegidas - Home e Dashboard

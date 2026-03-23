@@ -50,6 +50,7 @@ import {
   Link as LinkIcon,
   ViewColumn as KanbanIcon,
   Search as SearchIcon,
+  AssignmentInd as GestorLinkIcon,
 } from '@mui/icons-material';
 import * as TabsRadix from '@radix-ui/react-tabs';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -59,11 +60,16 @@ import { supabase, clientService, postService } from '../services/supabaseClient
 import { Client, isApprovalStatus } from '../types';
 import {
   listAllActiveApprovalLinks,
+  listAllActiveInternalApprovalLinks,
   ActiveApprovalLinkWithClient,
+  ActiveInternalApprovalLinkListItem,
   deleteApprovalLink,
+  deleteInternalApprovalLink,
   getPostIdsInActiveLinks,
+  getPostIdsInActiveInternalLinks,
 } from '../services/approvalService';
 import ApprovalRequestDialog from '../components/ApprovalRequestDialog';
+import InternalApprovalLinkDialog from '../components/InternalApprovalLinkDialog';
 import ApprovalUploadDrawer from '../components/ApprovalUploadDrawer';
 import ApprovalKanban from '../components/ApprovalKanban';
 import ApprovalPostDetailModal from '../components/ApprovalPostDetailModal';
@@ -71,6 +77,10 @@ import ApprovalEditDrawer from '../components/ApprovalEditDrawer';
 import type { ApprovalKanbanPostInput } from '../components/ApprovalKanban';
 
 export type { ApprovalKanbanPostInput };
+
+type UnifiedActiveApprovalLinkRow =
+  | { kind: 'client'; link: ActiveApprovalLinkWithClient }
+  | { kind: 'gestor'; link: ActiveInternalApprovalLinkListItem };
 
 type ScheduledPostRow = {
   id: string;
@@ -88,7 +98,26 @@ type ScheduledPostRow = {
   post_type?: string;
   postType?: string;
   video?: string;
+  requires_internal_approval?: boolean;
+  requiresInternalApproval?: boolean;
+  internal_approval_status?: string | null;
+  internalApprovalStatus?: string | null;
 };
+
+function isInternalApprovalReady(post: ScheduledPostRow): boolean {
+  const req = post.requiresInternalApproval === true || post.requires_internal_approval === true;
+  if (!req) return true;
+  const st = post.internalApprovalStatus ?? post.internal_approval_status;
+  return st === 'approved';
+}
+
+/** Post aguardando revisão do gestor (link interno). */
+function needsInternalReview(post: ScheduledPostRow): boolean {
+  const req = post.requiresInternalApproval === true || post.requires_internal_approval === true;
+  if (!req) return false;
+  const st = post.internalApprovalStatus ?? post.internal_approval_status;
+  return st === 'pending' || st === null || st === '';
+}
 
 const ApprovalsPage: React.FC = () => {
   const theme = useTheme();
@@ -99,12 +128,14 @@ const ApprovalsPage: React.FC = () => {
   const [postsLoading, setPostsLoading] = useState(false);
   const [selectedPostIds, setSelectedPostIds] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [internalDialogOpen, setInternalDialogOpen] = useState(false);
+  const [postIdsInActiveInternalLinks, setPostIdsInActiveInternalLinks] = useState<Set<string>>(new Set());
   const [uploadDrawerOpen, setUploadDrawerOpen] = useState(false);
   const [allApprovalPosts, setAllApprovalPosts] = useState<ApprovalKanbanPostInput[]>([]);
   const [kanbanLoading, setKanbanLoading] = useState(false);
   const [selectedPostForModal, setSelectedPostForModal] = useState<ApprovalKanbanPostInput | null>(null);
 
-  const [links, setLinks] = useState<ActiveApprovalLinkWithClient[]>([]);
+  const [unifiedLinks, setUnifiedLinks] = useState<UnifiedActiveApprovalLinkRow[]>([]);
   const [linksLoading, setLinksLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -131,6 +162,15 @@ const ApprovalsPage: React.FC = () => {
     }
   }, [selectedClientId]);
 
+  const refreshInternalLinkPostIds = useCallback(async () => {
+    try {
+      const ids = await getPostIdsInActiveInternalLinks();
+      setPostIdsInActiveInternalLinks(ids);
+    } catch {
+      setError('Não foi possível atualizar os posts em links de revisão interna.');
+    }
+  }, []);
+
   const fetchClients = useCallback(async () => {
     try {
       const data = await clientService.getClients();
@@ -144,11 +184,20 @@ const ApprovalsPage: React.FC = () => {
     setLinksLoading(true);
     setError(null);
     try {
-      const data = await listAllActiveApprovalLinks();
-      setLinks(data);
+      const [clientData, internalData] = await Promise.all([
+        listAllActiveApprovalLinks(),
+        listAllActiveInternalApprovalLinks(),
+      ]);
+      const merged: UnifiedActiveApprovalLinkRow[] = [
+        ...clientData.map((link) => ({ kind: 'client' as const, link })),
+        ...internalData.map((link) => ({ kind: 'gestor' as const, link })),
+      ].sort(
+        (a, b) => new Date(b.link.createdAt).getTime() - new Date(a.link.createdAt).getTime()
+      );
+      setUnifiedLinks(merged);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao carregar links.');
-      setLinks([]);
+      setUnifiedLinks([]);
     } finally {
       setLinksLoading(false);
     }
@@ -161,6 +210,10 @@ const ApprovalsPage: React.FC = () => {
   useEffect(() => {
     fetchLinks();
   }, [fetchLinks]);
+
+  useEffect(() => {
+    refreshInternalLinkPostIds();
+  }, [refreshInternalLinkPostIds]);
 
   const fetchAllApprovalPosts = useCallback(async () => {
     setKanbanLoading(true);
@@ -328,6 +381,15 @@ const ApprovalsPage: React.FC = () => {
     setSelectedPostIds(new Set());
     fetchClientPosts();
     refreshActiveLinkPostIds();
+    refreshInternalLinkPostIds();
+    fetchAllApprovalPosts();
+  };
+
+  const handleInternalDialogCreated = () => {
+    setSelectedPostIds(new Set());
+    fetchLinks();
+    fetchClientPosts();
+    refreshInternalLinkPostIds();
     fetchAllApprovalPosts();
   };
 
@@ -335,29 +397,52 @@ const ApprovalsPage: React.FC = () => {
     setActiveTab('links');
   };
 
-  const handleCopy = async (link: ActiveApprovalLinkWithClient) => {
+  const linkRowId = (item: UnifiedActiveApprovalLinkRow) => `${item.kind}-${item.link.id}`;
+
+  const handleCopy = async (item: UnifiedActiveApprovalLinkRow) => {
     try {
-      await navigator.clipboard.writeText(link.url);
-      setCopiedId(link.id);
+      await navigator.clipboard.writeText(item.link.url);
+      setCopiedId(linkRowId(item));
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
       setError('Não foi possível copiar o link.');
     }
   };
 
-  const openLink = (link: ActiveApprovalLinkWithClient) => {
-    window.open(link.url, '_blank', 'noopener,noreferrer');
+  const openLink = (item: UnifiedActiveApprovalLinkRow) => {
+    window.open(item.link.url, '_blank', 'noopener,noreferrer');
   };
 
-  const handleDeleteLink = async (link: ActiveApprovalLinkWithClient) => {
-    if (!window.confirm(`Excluir o link de aprovação para ${link.clientName}? Os posts vinculados deixarão de estar em "aguardando aprovação".`)) return;
-    setDeletingLinkId(link.id);
+  const handleDeleteLink = async (item: UnifiedActiveApprovalLinkRow) => {
+    if (item.kind === 'client') {
+      const link = item.link;
+      if (
+        !window.confirm(
+          `Excluir o link de aprovação para ${link.clientName}? Os posts vinculados deixarão de estar em "aguardando aprovação".`
+        )
+      )
+        return;
+    } else {
+      const link = item.link;
+      if (
+        !window.confirm(
+          `Excluir o link de revisão interna (${link.clientsSummary})? O gestor deixa de acessar este URL; os posts podem ser incluídos noutro link.`
+        )
+      )
+        return;
+    }
+    setDeletingLinkId(linkRowId(item));
     setError(null);
     try {
-      await deleteApprovalLink(link.id);
+      if (item.kind === 'client') {
+        await deleteApprovalLink(item.link.id);
+      } else {
+        await deleteInternalApprovalLink(item.link.id);
+      }
       await fetchLinks();
       await fetchAllApprovalPosts();
       await refreshActiveLinkPostIds();
+      await refreshInternalLinkPostIds();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao excluir link.');
     } finally {
@@ -366,7 +451,39 @@ const ApprovalsPage: React.FC = () => {
   };
 
   const pendingPosts = posts;
-  const eligiblePosts = pendingPosts.filter((post) => !postIdsInActiveLinks.has(post.id));
+  const eligiblePosts = pendingPosts.filter(
+    (post) => !postIdsInActiveLinks.has(post.id) && isInternalApprovalReady(post)
+  );
+  const gestorEligiblePosts = useMemo(
+    () =>
+      pendingPosts.filter(
+        (post) =>
+          needsInternalReview(post) &&
+          !postIdsInActiveInternalLinks.has(post.id) &&
+          !postIdsInActiveLinks.has(post.id)
+      ),
+    [pendingPosts, postIdsInActiveInternalLinks, postIdsInActiveLinks]
+  );
+
+  const selectedPosts = useMemo(
+    () => pendingPosts.filter((p) => selectedPostIds.has(p.id)),
+    [pendingPosts, selectedPostIds]
+  );
+
+  const canOpenGestorDialog = useMemo(
+    () =>
+      selectedPosts.length > 0 &&
+      selectedPosts.every((p) => gestorEligiblePosts.some((g) => g.id === p.id)),
+    [selectedPosts, gestorEligiblePosts]
+  );
+
+  const canOpenClientDialog = useMemo(
+    () =>
+      selectedPosts.length > 0 &&
+      selectedPosts.every((p) => eligiblePosts.some((e) => e.id === p.id)),
+    [selectedPosts, eligiblePosts]
+  );
+
   const selectedCount = selectedPostIds.size;
 
   const getPostImageUrl = (post: ScheduledPostRow) => {
@@ -649,7 +766,17 @@ const ApprovalsPage: React.FC = () => {
                     disabled={eligiblePosts.length === 0}
                     sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
                   >
-                    Selecionar elegíveis ({eligiblePosts.length})
+                    Selecionar p/ cliente ({eligiblePosts.length})
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="secondary"
+                    onClick={() => setSelectedPostIds(new Set(gestorEligiblePosts.map((p) => p.id)))}
+                    disabled={gestorEligiblePosts.length === 0}
+                    sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                  >
+                    Selecionar p/ gestor ({gestorEligiblePosts.length})
                   </Button>
                   <Button
                     size="small"
@@ -671,9 +798,25 @@ const ApprovalsPage: React.FC = () => {
                     const imageUrl = getPostImageUrl(post);
                     const isSelected = selectedPostIds.has(post.id);
                     const isInActiveLink = postIdsInActiveLinks.has(post.id);
+                    const isInActiveInternalLink = postIdsInActiveInternalLinks.has(post.id);
+                    const internalReady = isInternalApprovalReady(post);
+                    const needsGestor = needsInternalReview(post);
+                    const canSelectForClient = !isInActiveLink && internalReady;
+                    const canSelectForGestor =
+                      needsGestor && !isInActiveInternalLink && !isInActiveLink;
+                    const checkboxEnabled = canSelectForClient || canSelectForGestor;
+                    const tooltipTitle = isInActiveLink
+                      ? 'Este post já está em um link de aprovação ativo (cliente)'
+                      : isInActiveInternalLink
+                        ? 'Este post já está em um link de revisão interna ativo'
+                        : !internalReady && !needsGestor
+                          ? 'Pré-aprovação interna necessária ou status inválido para seleção.'
+                          : !internalReady && needsGestor
+                            ? ''
+                            : '';
                     return (
                       <Grid item xs={12} sm={6} md={4} key={post.id}>
-                        <Tooltip title={isInActiveLink ? 'Este post já está em um link de aprovação ativo' : ''}>
+                        <Tooltip title={tooltipTitle}>
                           <Card
                             variant="outlined"
                             sx={{
@@ -682,13 +825,13 @@ const ApprovalsPage: React.FC = () => {
                               alignItems: 'stretch',
                               borderColor: isSelected ? 'primary.main' : 'divider',
                               borderWidth: isSelected ? 2 : 1,
-                              opacity: isInActiveLink ? 0.6 : 1,
+                              opacity: checkboxEnabled ? 1 : 0.6,
                             }}
                           >
                             <Checkbox
                               checked={isSelected}
                               onChange={() => togglePost(post.id)}
-                              disabled={isInActiveLink}
+                              disabled={!checkboxEnabled}
                               sx={{ alignSelf: 'center', py: 0 }}
                             />
                           {imageUrl ? (
@@ -748,6 +891,22 @@ const ApprovalsPage: React.FC = () => {
                                 sx={{ mt: 0.5, fontSize: '0.65rem', height: 18 }}
                               />
                             )}
+                            {isInActiveInternalLink && (
+                              <Chip
+                                label="Em link gestor"
+                                size="small"
+                                color="secondary"
+                                sx={{ mt: 0.5, fontSize: '0.65rem', height: 18 }}
+                              />
+                            )}
+                            {!internalReady && !isInActiveLink && needsGestor && (
+                              <Chip
+                                label="Aguardando gestor"
+                                size="small"
+                                color="secondary"
+                                sx={{ mt: 0.5, fontSize: '0.65rem', height: 18 }}
+                              />
+                            )}
                           </CardContent>
                         </Card>
                         </Tooltip>
@@ -755,15 +914,33 @@ const ApprovalsPage: React.FC = () => {
                     );
                   })}
                 </Grid>
-                <Button
-                  variant="contained"
-                  startIcon={<ThumbUpIcon />}
-                  onClick={handleOpenDialog}
-                  disabled={selectedCount === 0}
-                  sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
-                >
-                  Gerar link de aprovação {selectedCount > 0 ? `(${selectedCount})` : ''}
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    startIcon={<GestorLinkIcon />}
+                    onClick={() => setInternalDialogOpen(true)}
+                    disabled={!canOpenGestorDialog}
+                    sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                  >
+                    Gerar link para o gestor {selectedCount > 0 ? `(${selectedCount})` : ''}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<ThumbUpIcon />}
+                    onClick={handleOpenDialog}
+                    disabled={!canOpenClientDialog}
+                    sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                  >
+                    Gerar link ao cliente {selectedCount > 0 ? `(${selectedCount})` : ''}
+                  </Button>
+                </Box>
+                {selectedCount > 0 && !canOpenGestorDialog && !canOpenClientDialog && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                    Selecione apenas posts do mesmo tipo de link: todos para revisão do gestor, ou todos já liberados
+                    para envio ao cliente.
+                  </Typography>
+                )}
               </>
             )}
           </>
@@ -913,7 +1090,7 @@ const ApprovalsPage: React.FC = () => {
             Links de aprovação ativos
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-            Links já enviados; o cliente abre o link e aprova ou solicita alterações.
+            Links de cliente (aprovação externa) e de gestor (revisão interna) ativos; copie ou revogue quando precisar.
           </Typography>
         </Box>
         <Button
@@ -921,6 +1098,7 @@ const ApprovalsPage: React.FC = () => {
           onClick={async () => {
             await fetchLinks();
             await refreshActiveLinkPostIds();
+            await refreshInternalLinkPostIds();
           }}
           size="small"
           disabled={linksLoading}
@@ -934,7 +1112,7 @@ const ApprovalsPage: React.FC = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress />
         </Box>
-      ) : links.length === 0 ? (
+      ) : unifiedLinks.length === 0 ? (
         <Paper
           elevation={0}
           sx={{
@@ -947,10 +1125,10 @@ const ApprovalsPage: React.FC = () => {
         >
           <ThumbUpIcon sx={{ fontSize: 48, color: theme.palette.text.disabled, mb: 1 }} />
           <Typography variant="h6" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600, mb: 0.5 }}>
-            Nenhum link de aprovação ativo
+            Nenhum link ativo
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-            No Passo 1 acima, selecione o cliente, marque os posts e clique em &quot;Gerar link de aprovação&quot;. Depois envie o link ao cliente (Passo 2).
+            Gere um link para o <strong>cliente</strong> (Passo 1–2) ou um link para o <strong>gestor</strong> (revisão interna). Ambos aparecem aqui enquanto não expirarem.
           </Typography>
         </Paper>
       ) : (
@@ -966,6 +1144,9 @@ const ApprovalsPage: React.FC = () => {
           <Table size={isMobile ? 'small' : 'medium'}>
             <TableHead>
               <TableRow sx={{ bgcolor: alpha(theme.palette.primary.main, 0.06) }}>
+                {!isMobile && (
+                  <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>Tipo</TableCell>
+                )}
                 <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>Cliente</TableCell>
                 {!isMobile && (
                   <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>Rótulo</TableCell>
@@ -981,89 +1162,149 @@ const ApprovalsPage: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {links.map((link) => (
-                <TableRow key={link.id} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Avatar
-                        src={link.clientPhotoUrl ?? undefined}
-                        imgProps={{ referrerPolicy: 'no-referrer' }}
-                        sx={{
-                          width: 40,
-                          height: 40,
-                          bgcolor: alpha(theme.palette.secondary.main, 0.2),
-                          fontSize: '0.875rem',
-                          fontFamily: '"Poppins", sans-serif',
-                        }}
-                      >
-                        {link.clientName.charAt(0).toUpperCase()}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 500 }}>
-                          {link.clientName}
-                        </Typography>
-                        {link.clientInstagram && (
-                          <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                            @{link.clientInstagram}
-                          </Typography>
+              {unifiedLinks.map((item) => {
+                const rid = linkRowId(item);
+                const isGestor = item.kind === 'gestor';
+                const link = item.link;
+                const displayName = item.kind === 'gestor' ? item.link.clientsSummary : item.link.clientName;
+                const gestorLink = item.kind === 'gestor' ? item.link : null;
+                return (
+                  <TableRow key={rid} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
+                    {!isMobile && (
+                      <TableCell>
+                        <Chip
+                          label={isGestor ? 'Gestor' : 'Cliente'}
+                          size="small"
+                          sx={{
+                            fontFamily: '"Poppins", sans-serif',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            ...(isGestor
+                              ? {
+                                  bgcolor: 'rgba(139, 92, 246, 0.12)',
+                                  color: '#6d28d9',
+                                  border: 'none',
+                                }
+                              : {
+                                  bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                  color: theme.palette.primary.dark,
+                                  border: 'none',
+                                }),
+                          }}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        {isMobile && (
+                          <Chip
+                            label={isGestor ? 'Gestor' : 'Cliente'}
+                            size="small"
+                            sx={{
+                              fontFamily: '"Poppins", sans-serif',
+                              fontSize: '0.65rem',
+                              height: 20,
+                              flexShrink: 0,
+                              ...(isGestor
+                                ? { bgcolor: 'rgba(139, 92, 246, 0.12)', color: '#6d28d9' }
+                                : { bgcolor: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.dark }),
+                            }}
+                          />
                         )}
+                        <Avatar
+                          src={link.clientPhotoUrl ?? undefined}
+                          imgProps={{ referrerPolicy: 'no-referrer' }}
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            bgcolor: alpha(theme.palette.secondary.main, 0.2),
+                            fontSize: '0.875rem',
+                            fontFamily: '"Poppins", sans-serif',
+                          }}
+                        >
+                          {(displayName && displayName !== '—' ? displayName : '?').charAt(0).toUpperCase()}
+                        </Avatar>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 500 }}>
+                            {displayName}
+                          </Typography>
+                          {link.clientInstagram && (
+                            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                              @{link.clientInstagram}
+                            </Typography>
+                          )}
+                          {gestorLink && !isMobile && (
+                            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif', display: 'block' }}>
+                              {gestorLink.postCount} post{gestorLink.postCount !== 1 ? 's' : ''} · revisão interna
+                            </Typography>
+                          )}
+                        </Box>
                       </Box>
-                    </Box>
-                  </TableCell>
-                  {!isMobile && (
-                    <TableCell>
-                      {link.label ? (
-                        <Chip label={link.label} size="small" sx={{ fontFamily: '"Poppins", sans-serif', fontSize: '0.75rem' }} />
-                      ) : (
-                        <Typography variant="caption" color="text.disabled">—</Typography>
-                      )}
                     </TableCell>
-                  )}
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                      {format(parseISO(link.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                      {format(parseISO(link.expiresAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                    </Typography>
-                  </TableCell>
-                  {!isMobile && (
+                    {!isMobile && (
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          {link.label ? (
+                            <Chip label={link.label} size="small" sx={{ fontFamily: '"Poppins", sans-serif', fontSize: '0.75rem', width: 'fit-content' }} />
+                          ) : (
+                            <Typography variant="caption" color="text.disabled">
+                              —
+                            </Typography>
+                          )}
+                          {gestorLink && (
+                            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                              {gestorLink.postCount} post{gestorLink.postCount !== 1 ? 's' : ''}
+                            </Typography>
+                          )}
+                        </Box>
+                      </TableCell>
+                    )}
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', color: 'text.secondary' }}>
-                        {link.createdByLabel}
+                      <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                        {format(parseISO(link.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                       </Typography>
                     </TableCell>
-                  )}
-                  <TableCell align="right">
-                    <Tooltip title="Abrir link">
-                      <IconButton size="small" onClick={() => openLink(link)} sx={{ color: theme.palette.primary.main }}>
-                        <OpenIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title={copiedId === link.id ? 'Copiado!' : 'Copiar link'}>
-                      <IconButton size="small" onClick={() => handleCopy(link)}>
-                        <CopyIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Excluir link">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteLink(link)}
-                        disabled={deletingLinkId === link.id}
-                        color="error"
-                      >
-                        {deletingLinkId === link.id ? (
-                          <CircularProgress size={18} />
-                        ) : (
-                          <DeleteIcon fontSize="small" />
-                        )}
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                        {format(parseISO(link.expiresAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      </Typography>
+                    </TableCell>
+                    {!isMobile && (
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', color: 'text.secondary' }}>
+                          {link.createdByLabel}
+                        </Typography>
+                      </TableCell>
+                    )}
+                    <TableCell align="right">
+                      <Tooltip title="Abrir link">
+                        <IconButton size="small" onClick={() => openLink(item)} sx={{ color: theme.palette.primary.main }}>
+                          <OpenIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={copiedId === rid ? 'Copiado!' : 'Copiar link'}>
+                        <IconButton size="small" onClick={() => handleCopy(item)}>
+                          <CopyIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Excluir link">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteLink(item)}
+                          disabled={deletingLinkId === rid}
+                          color="error"
+                        >
+                          {deletingLinkId === rid ? (
+                            <CircularProgress size={18} />
+                          ) : (
+                            <DeleteIcon fontSize="small" />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
@@ -1084,6 +1325,13 @@ const ApprovalsPage: React.FC = () => {
         onGoToLinks={handleGoToLinksTab}
       />
 
+      <InternalApprovalLinkDialog
+        open={internalDialogOpen}
+        onClose={() => setInternalDialogOpen(false)}
+        postIds={Array.from(selectedPostIds)}
+        onCreated={handleInternalDialogCreated}
+      />
+
       <ApprovalUploadDrawer
         open={uploadDrawerOpen}
         onClose={() => setUploadDrawerOpen(false)}
@@ -1098,6 +1346,10 @@ const ApprovalsPage: React.FC = () => {
         onScheduleSuccess={fetchAllApprovalPosts}
         onRemoveFromApproval={fetchAllApprovalPosts}
         onDeletePost={fetchAllApprovalPosts}
+        onInternalApprovalSuccess={() => {
+          fetchAllApprovalPosts();
+          fetchClientPosts();
+        }}
         onEditRequest={() => {
           setPostForEdit(selectedPostForModal);
           setSelectedPostForModal(null);

@@ -37,5 +37,14 @@ verify_jwt = false
 [functions.submit-approval-response]
 verify_jwt = false
 
+[functions.upload-approval-feedback-attachment]
+verify_jwt = false
+
+[functions.get-internal-approval-by-token]
+verify_jwt = false
+
+[functions.submit-internal-approval-response]
+verify_jwt = false
+
 [functions.stripe-webhook]
 verify_jwt = false

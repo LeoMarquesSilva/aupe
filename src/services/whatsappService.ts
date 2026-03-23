@@ -11,6 +11,10 @@ export interface WhatsappConfig {
   organizationId?: string;
   instanceName: string;
   phoneNumber: string;
+  /** Se preenchido, avisos do link de aprovação do cliente vão para este destino; senão usa `phoneNumber`. */
+  clientApprovalPhone?: string | null;
+  /** Destino quando o gestor responde ao link de revisão interna; vazio = não envia WhatsApp nesse fluxo. */
+  internalApprovalPhone?: string | null;
   enabled: boolean;
 }
 
@@ -65,6 +69,8 @@ function fromDb(row: Record<string, unknown>): WhatsappConfig {
     organizationId: row.organization_id as string,
     instanceName: (row.instance_name as string) || '',
     phoneNumber: (row.phone_number as string) || '',
+    clientApprovalPhone: (row.client_approval_phone as string) ?? null,
+    internalApprovalPhone: (row.internal_approval_phone as string) ?? null,
     enabled: (row.enabled as boolean) ?? false,
   };
 }
@@ -95,14 +101,28 @@ export const whatsappService = {
     return fromDb(data as Record<string, unknown>);
   },
 
-  /** Salva o número e o toggle de notificações da organização */
-  async saveConfig(phoneNumber: string, enabled: boolean): Promise<WhatsappConfig> {
+  /** Salva números de destino e o toggle de notificações da organização */
+  async saveConfig(params: {
+    phoneNumber: string;
+    enabled: boolean;
+    clientApprovalPhone?: string | null;
+    internalApprovalPhone?: string | null;
+  }): Promise<WhatsappConfig> {
     const orgId = await getCurrentOrganizationId();
     const instanceName = buildInstanceName(orgId);
+    const clientPh = (params.clientApprovalPhone ?? '').trim() || null;
+    const internalPh = (params.internalApprovalPhone ?? '').trim() || null;
     const { data, error } = await supabase
       .from('whatsapp_config')
       .upsert(
-        { organization_id: orgId, instance_name: instanceName, phone_number: phoneNumber, enabled },
+        {
+          organization_id: orgId,
+          instance_name: instanceName,
+          phone_number: params.phoneNumber.trim(),
+          enabled: params.enabled,
+          client_approval_phone: clientPh,
+          internal_approval_phone: internalPh,
+        },
         { onConflict: 'organization_id' }
       )
       .select()

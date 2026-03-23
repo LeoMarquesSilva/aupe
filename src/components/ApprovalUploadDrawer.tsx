@@ -12,6 +12,10 @@ import {
   Alert,
   CircularProgress,
   Stack,
+  ToggleButtonGroup,
+  ToggleButton,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -23,6 +27,7 @@ import {
   Save as SaveIcon,
   Description as DescriptionIcon,
 } from '@mui/icons-material';
+import * as SocialPlatformIcons from './icons/SocialPlatformIcons';
 import { PostImage, ReelVideo } from '../types';
 import ImageUploader from './ImageUploader';
 import VideoUploader from './VideoUploader';
@@ -68,6 +73,8 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
   const [coverImage, setCoverImage] = useState<PostImage[]>([]);
   const [caption, setCaption] = useState('');
   const [scheduledDate, setScheduledDate] = useState<string>(getDefaultScheduledDate());
+  const [postingPlatform, setPostingPlatform] = useState<'instagram' | 'linkedin'>('instagram');
+  const [requiresInternalApproval, setRequiresInternalApproval] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +86,8 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
     setCoverImage([]);
     setCaption('');
     setScheduledDate(getDefaultScheduledDate());
+    setPostingPlatform('instagram');
+    setRequiresInternalApproval(false);
     setError(null);
     onClose();
   };
@@ -91,6 +100,8 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
     setCoverImage([]);
     setCaption('');
     setScheduledDate(getDefaultScheduledDate());
+    setPostingPlatform('instagram');
+    setRequiresInternalApproval(false);
     setError(null);
   };
 
@@ -132,6 +143,8 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
         video: video?.url,
         coverImage: coverUrl,
         scheduledDate: scheduledDate || undefined,
+        postingPlatform,
+        requiresInternalApproval,
       };
       await saveContentForApproval(clientId, payload);
       onSuccess();
@@ -221,7 +234,55 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
 
             <Box>
               <Typography variant="subtitle2" sx={{ mb: 1, fontFamily: '"Poppins", sans-serif' }}>
-                Data e horário do agendamento
+                Plataforma de publicação
+              </Typography>
+              <ToggleButtonGroup
+                exclusive
+                fullWidth
+                size="small"
+                value={postingPlatform}
+                onChange={(_, v) => v && setPostingPlatform(v)}
+                sx={{ mb: 1 }}
+              >
+                <ToggleButton value="instagram" sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}>
+                  <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.75}>
+                    <SocialPlatformIcons.InstagramBrandIcon sx={{ fontSize: 20 }} />
+                    <span>Instagram</span>
+                  </Stack>
+                </ToggleButton>
+                <ToggleButton value="linkedin" sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}>
+                  <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.75}>
+                    <SocialPlatformIcons.LinkedInBrandIcon sx={{ fontSize: 20, color: '#0A66C2' }} />
+                    <span>LinkedIn</span>
+                  </Stack>
+                </ToggleButton>
+              </ToggleButtonGroup>
+              {postingPlatform === 'linkedin' && (
+                <Alert severity="info" sx={{ mb: 2, fontFamily: '"Poppins", sans-serif' }}>
+                  LinkedIn não tem publicação automática no sistema. A data serve como referência para o cliente e para a equipe.
+                </Alert>
+              )}
+            </Box>
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={requiresInternalApproval}
+                  onChange={(e) => setRequiresInternalApproval(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                  Exigir pré-aprovação interna antes de enviar ao cliente
+                </Typography>
+              }
+              sx={{ alignItems: 'flex-start', ml: 0 }}
+            />
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontFamily: '"Poppins", sans-serif' }}>
+                Data e horário {postingPlatform === 'linkedin' ? '(referência)' : 'do agendamento'}
               </Typography>
               <DateTimePicker
                 scheduledDate={scheduledDate || getDefaultScheduledDate()}

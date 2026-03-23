@@ -16,17 +16,16 @@ import {
   Comment as CommentIcon,
   CalendarToday as CalendarIcon,
   Visibility as VisibilityIcon,
-  CheckCircle as CheckCircleIcon,
-  Build as BuildIcon,
   Warning as WarningIcon,
   Description as DescriptionIcon,
 } from '@mui/icons-material';
+import * as SocialPlatformIcons from './icons/SocialPlatformIcons';
 import { format, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { Client } from '../types';
 import { imageUrlService } from '../services/imageUrlService';
 
-export type ApprovalKanbanColumn = 'awaiting' | 'approved' | 'scheduled' | 'adjustments';
+export type ApprovalKanbanColumn = 'internal' | 'awaiting' | 'approved' | 'scheduled' | 'adjustments';
 
 export interface ApprovalKanbanPost {
   id: string;
@@ -40,6 +39,9 @@ export interface ApprovalKanbanPost {
   postType?: string;
   post_type?: string;
   approvalFeedback?: string | null;
+  postingPlatform?: 'instagram' | 'linkedin';
+  requiresInternalApproval?: boolean;
+  internalApprovalStatus?: 'pending' | 'approved' | 'rejected' | null;
   client?: Client;
   createdAt?: string;
   approvalRespondedAt?: string | null;
@@ -124,6 +126,8 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
   const scheduledDate = dateRaw ? new Date(dateRaw) : null;
   const isOverdue = column === 'adjustments' && scheduledDate && isPast(scheduledDate);
   const cardTitle = getCardTitle(post, typeLabel);
+  const platform = post.postingPlatform ?? 'instagram';
+  const isLinkedInPlatform = platform === 'linkedin';
 
   return (
     <Card
@@ -212,6 +216,46 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
         <Typography variant="caption" sx={{ color: TEXT_SECONDARY, fontSize: '0.75rem', display: 'block', mb: 1, fontFamily: '"Poppins", sans-serif' }}>
           Tipo: {typeLabel}
         </Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+          {column === 'internal' && (
+            <Chip
+              size="small"
+              label="Revisão do gestor"
+              sx={{
+                height: 20,
+                fontFamily: '"Poppins", sans-serif',
+                fontSize: '0.6875rem',
+                fontWeight: 600,
+                bgcolor: 'rgba(139, 92, 246, 0.12)',
+                color: '#6d28d9',
+                border: 'none',
+                borderRadius: '9999px',
+              }}
+            />
+          )}
+          <Chip
+            size="small"
+            icon={
+              isLinkedInPlatform ? (
+                <SocialPlatformIcons.LinkedInBrandIcon sx={{ fontSize: '16px !important', color: '#0A66C2 !important' }} />
+              ) : (
+                <SocialPlatformIcons.InstagramBrandIcon sx={{ fontSize: '16px !important' }} />
+              )
+            }
+            label={isLinkedInPlatform ? 'LinkedIn' : 'Instagram'}
+            sx={{
+              height: 20,
+              fontFamily: '"Poppins", sans-serif',
+              fontSize: '0.6875rem',
+              fontWeight: 600,
+              bgcolor: isLinkedInPlatform ? 'rgba(10, 102, 194, 0.12)' : 'rgba(225, 48, 108, 0.1)',
+              color: isLinkedInPlatform ? '#0A66C2' : '#C13584',
+              border: 'none',
+              borderRadius: '9999px',
+              '& .MuiChip-icon': { ml: '6px' },
+            }}
+          />
+        </Box>
         {column === 'scheduled' && (
           <Chip
             size="small"

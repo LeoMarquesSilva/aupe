@@ -1,5 +1,5 @@
 import { supabase, postService } from './supabaseClient';
-import type { ApprovalRequest, ScheduledPost, ApprovalStatus } from '../types';
+import type { ApprovalRequest, PostingPlatform, ScheduledPost, ApprovalStatus } from '../types';
 import { isApprovalStatus } from '../types';
 
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -15,6 +15,10 @@ export interface SaveContentForApprovalPayload {
   video?: string;
   coverImage?: string;
   scheduledDate?: string;
+  /** instagram = pode publicar após aprovação; linkedin = só referência, sem automação */
+  postingPlatform?: PostingPlatform;
+  /** Se true, gestor precisa aprovar internamente antes de incluir no link ao cliente */
+  requiresInternalApproval?: boolean;
 }
 
 /**
@@ -31,6 +35,8 @@ export async function saveContentForApproval(
   const scheduledDate = payload.scheduledDate ?? defaultDate.toISOString();
 
   const isRoteiro = payload.postType === 'roteiro';
+  const postingPlatform: PostingPlatform = payload.postingPlatform === 'linkedin' ? 'linkedin' : 'instagram';
+  const requiresInternal = payload.requiresInternalApproval === true;
 
   const saved = await postService.saveScheduledPost({
     clientId,
@@ -42,8 +48,26 @@ export async function saveContentForApproval(
     forApprovalOnly: true,
     video: isRoteiro ? undefined : payload.video,
     coverImage: isRoteiro ? undefined : payload.coverImage,
+    postingPlatform,
+    requiresInternalApproval: requiresInternal,
+    internalApprovalStatus: requiresInternal ? 'pending' : undefined,
   });
   return saved as ScheduledPost;
+}
+
+/** Valida pré-aprovação interna antes de criar link ao cliente (RPC legacy + nova). */
+export async function assertPostsReadyForClientApproval(postIds: string[]): Promise<void> {
+  if (postIds.length === 0) return;
+  const { data, error } = await supabase
+    .from('scheduled_posts')
+    .select('id, requires_internal_approval, internal_approval_status')
+    .in('id', postIds);
+  if (error) throw error;
+  for (const row of data ?? []) {
+    if (row.requires_internal_approval && row.internal_approval_status !== 'approved') {
+      throw new Error('Um ou mais posts exigem pré-aprovação interna antes de enviar ao cliente.');
+    }
+  }
 }
 
 export interface ApprovalRequestWithPosts extends ApprovalRequest {
@@ -84,6 +108,8 @@ async function createApprovalRequestLegacy(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Usuário não autenticado');
 
+  await assertPostsReadyForClientApproval(postIds);
+
   const finalToken = token || generateToken();
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + expiresInDays);
@@ -121,6 +147,7 @@ async function createApprovalRequestLegacy(
       requires_approval: true,
       approval_status: 'pending',
       approval_feedback: null,
+      approval_feedback_attachments: [],
       approval_responded_at: null,
     })
     .in('id', postIds);
@@ -157,6 +184,8 @@ export async function createApprovalRequest(
     throw new Error('Selecione ao menos um post para criar a solicitação.');
   }
 
+  await assertPostsReadyForClientApproval(normalizedPostIds);
+
   const token = generateToken();
   const { data: rpcRows, error: rpcError } = await supabase.rpc('create_approval_request_atomic', {
     p_client_id: clientId,
@@ -179,6 +208,9 @@ export async function createApprovalRequest(
     if (message.includes('já está vinculado')) {
       throw new Error('Um ou mais posts já estão em um link ativo. Atualize a lista e tente novamente.');
     }
+    if (message.includes('pré-aprovação interna')) {
+      throw new Error('Um ou mais posts exigem pré-aprovação interna antes de enviar ao cliente.');
+    }
     throw new Error(message);
   }
   const requestRow = Array.isArray(rpcRows) ? rpcRows[0] : rpcRows;
@@ -194,6 +226,174 @@ export async function createApprovalRequest(
     url: `${base}/approve/${encodeURIComponent(requestRow.token)}`,
     label: requestRow.label ?? null,
   };
+}
+
+export interface CreateInternalApprovalLinkResult {
+  id: string;
+  token: string;
+  expiresAt: string;
+  url: string;
+  label: string | null;
+}
+
+/** Public URL for gestor internal pre-approval (token in path). */
+export function getInternalApprovalRequestUrl(token: string): string {
+  const base = typeof window !== 'undefined' ? window.location.origin : '';
+  return `${base}/revisao-interna/${encodeURIComponent(token)}`;
+}
+
+/**
+ * Creates a tokenized link for gestor internal pre-approval (RPC + junction tables).
+ */
+export async function createInternalApprovalLink(
+  postIds: string[],
+  expiresInDays: number = 7,
+  label?: string
+): Promise<CreateInternalApprovalLinkResult> {
+  if (!APPROVAL_EXPIRY_OPTIONS.has(expiresInDays)) {
+    throw new Error('Validade inválida. Use 7, 15 ou 30 dias.');
+  }
+  const normalizedPostIds = [...new Set(postIds.filter(Boolean))];
+  if (normalizedPostIds.length === 0) {
+    throw new Error('Selecione ao menos um post.');
+  }
+
+  const token = generateToken();
+  const { data: rpcRows, error: rpcError } = await supabase.rpc('create_internal_approval_link_atomic', {
+    p_post_ids: normalizedPostIds,
+    p_expires_in_days: expiresInDays,
+    p_label: label || null,
+    p_token: token,
+  });
+
+  if (rpcError) {
+    const message = rpcError.message || 'Falha ao criar link interno.';
+    if (
+      message.includes('create_internal_approval_link_atomic') ||
+      message.includes('schema cache') ||
+      message.includes('Could not find the function')
+    ) {
+      throw new Error(
+        'Função create_internal_approval_link_atomic não encontrada. Aplique a migração mais recente no Supabase.'
+      );
+    }
+    if (message.includes('link interno ativo')) {
+      throw new Error('Um ou mais posts já estão em um link interno ativo.');
+    }
+    if (message.includes('revisão interna') || message.includes('gestor')) {
+      throw new Error(message);
+    }
+    throw new Error(message);
+  }
+
+  const row = Array.isArray(rpcRows) ? rpcRows[0] : rpcRows;
+  if (!row?.id || !row?.token || !row?.expires_at) {
+    throw new Error('Falha ao criar link interno.');
+  }
+
+  return {
+    id: row.id,
+    token: row.token,
+    expiresAt: row.expires_at,
+    url: getInternalApprovalRequestUrl(row.token),
+    label: row.label ?? null,
+  };
+}
+
+/** Post IDs currently tied to a non-expired internal (gestor) approval link (user org via RLS). */
+export async function getPostIdsInActiveInternalLinks(): Promise<Set<string>> {
+  const now = new Date().toISOString();
+  const { data: links, error: linkError } = await supabase
+    .from('internal_approval_links')
+    .select('id')
+    .gt('expires_at', now);
+  if (linkError) throw linkError;
+  if (!links?.length) return new Set();
+  const linkIds = links.map((l) => l.id);
+  const { data: rows, error: jError } = await supabase
+    .from('internal_approval_link_posts')
+    .select('scheduled_post_id')
+    .in('internal_approval_link_id', linkIds);
+  if (jError) throw jError;
+  return new Set((rows ?? []).map((r) => r.scheduled_post_id));
+}
+
+/** Response from get-internal-approval-by-token Edge Function */
+export interface InternalApprovalPublicData {
+  organization: { id: string; name: string };
+  label?: string;
+  posts: {
+    id: string;
+    caption: string;
+    images: (string | { url: string })[];
+    video?: string;
+    coverImage?: string;
+    postType: string;
+    postingPlatform?: PostingPlatform;
+    scheduledDate?: string;
+    clientName: string;
+    internalApprovalStatus: string;
+    internalApprovalComment?: string;
+  }[];
+  expiresAt: string;
+}
+
+export async function fetchInternalApprovalByToken(token: string): Promise<InternalApprovalPublicData> {
+  if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+    throw new Error('REACT_APP_SUPABASE_URL não está configurada.');
+  }
+  const url = `${functionsBase}/functions/v1/get-internal-approval-by-token?token=${encodeURIComponent(token)}`;
+  const res = await fetch(url, { method: 'GET' });
+  let body: { error?: string } = {};
+  try {
+    body = await res.json();
+  } catch {
+    body = { error: res.status === 404 ? 'Link inválido ou expirado.' : 'Erro ao carregar dados.' };
+  }
+  if (!res.ok) {
+    throw new Error(body?.error || 'Link inválido ou expirado.');
+  }
+  return body as InternalApprovalPublicData;
+}
+
+export interface SubmitInternalApprovalResponseResult {
+  success: boolean;
+  message?: string;
+}
+
+const MAX_INTERNAL_COMMENT_LENGTH = 2000;
+
+export async function submitInternalApprovalResponse(
+  token: string,
+  postId: string,
+  action: 'approve' | 'reject',
+  comment?: string
+): Promise<SubmitInternalApprovalResponseResult> {
+  if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+    throw new Error('REACT_APP_SUPABASE_URL não está configurada.');
+  }
+  const trimmed = (comment ?? '').trim();
+  if (action === 'reject' && trimmed.length > MAX_INTERNAL_COMMENT_LENGTH) {
+    throw new Error(`Comentário muito longo. Máximo ${MAX_INTERNAL_COMMENT_LENGTH} caracteres.`);
+  }
+  const url = `${functionsBase}/functions/v1/submit-internal-approval-response`;
+  const res = await fetch(url, {
+    method: 'POST',
+    body: JSON.stringify({ token, postId, action, comment: trimmed }),
+  });
+  let body: { error?: string; success?: boolean; message?: string } = {};
+  try {
+    body = await res.json();
+  } catch {
+    body = { error: 'Erro ao enviar resposta.' };
+  }
+  if (!res.ok) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[submitInternalApprovalResponse]', { status: res.status, body });
+    }
+    throw new Error(body?.error || 'Erro ao enviar resposta.');
+  }
+  return { success: body.success ?? true, message: body.message };
 }
 
 /**
@@ -376,6 +576,197 @@ export async function listAllActiveApprovalLinks(): Promise<ActiveApprovalLinkWi
   });
 }
 
+export interface ActiveInternalApprovalLinkListItem {
+  id: string;
+  token: string;
+  url: string;
+  expiresAt: string;
+  label: string | null;
+  createdAt: string;
+  createdBy: string | null;
+  createdByLabel: string;
+  postCount: number;
+  /** Nome(s) do(s) cliente(s) dos posts do link */
+  clientsSummary: string;
+  clientInstagram: string | null;
+  clientPhotoUrl: string | null;
+}
+
+type InternalLinkPostRow = {
+  scheduled_post_id: string;
+  scheduled_posts:
+    | {
+        clients:
+          | {
+              name: string;
+              instagram: string | null;
+              profile_picture: string | null;
+              logo_url: string | null;
+            }
+          | {
+              name: string;
+              instagram: string | null;
+              profile_picture: string | null;
+              logo_url: string | null;
+            }[]
+          | null;
+      }
+    | {
+        clients:
+          | {
+              name: string;
+              instagram: string | null;
+              profile_picture: string | null;
+              logo_url: string | null;
+            }
+          | {
+              name: string;
+              instagram: string | null;
+              profile_picture: string | null;
+              logo_url: string | null;
+            }[]
+          | null;
+      }[]
+    | null;
+};
+
+function summarizeInternalLinkClients(junction: InternalLinkPostRow[] | null | undefined): {
+  clientsSummary: string;
+  clientInstagram: string | null;
+  clientPhotoUrl: string | null;
+  postCount: number;
+} {
+  const rows = junction ?? [];
+  const postCount = rows.length;
+  const seen = new Map<string, { name: string; instagram: string | null; photo: string | null }>();
+  for (const j of rows) {
+    const sp = j.scheduled_posts;
+    const post = Array.isArray(sp) ? sp[0] : sp;
+    const raw = post?.clients;
+    const c = Array.isArray(raw) ? raw[0] : raw;
+    if (!c?.name) continue;
+    if (!seen.has(c.name)) {
+      const photo = c.profile_picture || c.logo_url || null;
+      seen.set(c.name, { name: c.name, instagram: c.instagram ?? null, photo });
+    }
+  }
+  const list = [...seen.values()];
+  if (list.length === 0) {
+    return {
+      clientsSummary: postCount > 0 ? `${postCount} post${postCount !== 1 ? 's' : ''}` : '—',
+      clientInstagram: null,
+      clientPhotoUrl: null,
+      postCount,
+    };
+  }
+  if (list.length === 1) {
+    return {
+      clientsSummary: list[0].name,
+      clientInstagram: list[0].instagram,
+      clientPhotoUrl: list[0].photo,
+      postCount,
+    };
+  }
+  const names = list.slice(0, 2).map((x) => x.name);
+  const extra = list.length - 2;
+  const clientsSummary =
+    extra > 0 ? `${names.join(', ')} e +${extra}` : names.join(' e ');
+  return {
+    clientsSummary,
+    clientInstagram: null,
+    clientPhotoUrl: list[0].photo,
+    postCount,
+  };
+}
+
+/**
+ * Lista links ativos de pré-aprovação interna (gestor), em paralelo aos links de cliente.
+ */
+export async function listAllActiveInternalApprovalLinks(): Promise<ActiveInternalApprovalLinkListItem[]> {
+  const now = new Date().toISOString();
+
+  const { data: rows, error } = await supabase
+    .from('internal_approval_links')
+    .select(
+      `
+      id,
+      token,
+      expires_at,
+      label,
+      created_at,
+      created_by,
+      internal_approval_link_posts (
+        scheduled_post_id,
+        scheduled_posts (
+          clients (name, instagram, profile_picture, logo_url)
+        )
+      )
+    `
+    )
+    .gt('expires_at', now)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  const typedRows = (rows || []) as Array<{
+    id: string;
+    token: string;
+    expires_at: string;
+    label: string | null;
+    created_at: string;
+    created_by: string | null;
+    internal_approval_link_posts: InternalLinkPostRow[] | null;
+  }>;
+
+  const creatorIds = [...new Set(typedRows.map((r) => r.created_by).filter(Boolean))] as string[];
+  let creatorMap: Record<string, { full_name: string | null; email: string }> = {};
+  if (creatorIds.length > 0) {
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', creatorIds);
+    if (profilesData) {
+      creatorMap = profilesData.reduce(
+        (acc, p) => {
+          acc[p.id] = { full_name: p.full_name ?? null, email: p.email ?? '' };
+          return acc;
+        },
+        {} as Record<string, { full_name: string | null; email: string }>
+      );
+    }
+  }
+
+  return typedRows.map((row) => {
+    const creator = row.created_by ? creatorMap[row.created_by] : null;
+    const createdByLabel = creator ? (creator.full_name || creator.email || 'Usuário') : '—';
+    const { clientsSummary, clientInstagram, clientPhotoUrl, postCount } = summarizeInternalLinkClients(
+      row.internal_approval_link_posts
+    );
+    return {
+      id: row.id,
+      token: row.token,
+      url: getInternalApprovalRequestUrl(row.token),
+      expiresAt: row.expires_at,
+      label: row.label,
+      createdAt: row.created_at,
+      createdBy: row.created_by,
+      createdByLabel,
+      postCount,
+      clientsSummary,
+      clientInstagram,
+      clientPhotoUrl,
+    };
+  });
+}
+
+/**
+ * Remove um link de revisão interna (gestor). Os posts permanecem; deixam de estar vinculados ao link.
+ */
+export async function deleteInternalApprovalLink(linkId: string): Promise<void> {
+  const { error } = await supabase.from('internal_approval_links').delete().eq('id', linkId);
+  if (error) throw error;
+}
+
 /** Response shape from get-approval-request-by-token (public approval page) */
 export interface ApprovalRequestPublicData {
   client: { id: string; name: string; instagram: string; logoUrl?: string; profilePicture?: string };
@@ -386,9 +777,11 @@ export interface ApprovalRequestPublicData {
     video?: string;
     coverImage?: string;
     postType: string;
+    postingPlatform?: PostingPlatform;
     scheduledDate: string;
     approvalStatus: ApprovalStatus;
     approvalFeedback?: string;
+    approvalFeedbackAttachments?: string[];
     approvalRespondedAt?: string;
   }[];
   expiresAt: string;
@@ -427,11 +820,58 @@ const MAX_FEEDBACK_LENGTH = 2000;
  * Submits client approval or rejection (calls Edge Function).
  * Returns result with optional message (e.g. "Este post já foi respondido anteriormente").
  */
+const MAX_CLIENT_ATTACHMENTS = 5;
+
+/**
+ * Upload de anexo para feedback de alteração (página pública do cliente).
+ */
+export async function uploadApprovalFeedbackAttachment(
+  token: string,
+  postId: string,
+  file: File
+): Promise<string> {
+  if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+    throw new Error('REACT_APP_SUPABASE_URL não está configurada.');
+  }
+  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+  if (!allowed.includes(file.type)) {
+    throw new Error('Tipo de arquivo não permitido (JPEG, PNG, WebP, GIF ou PDF).');
+  }
+  if (file.size > 4 * 1024 * 1024) {
+    throw new Error('Arquivo muito grande. Máximo 4 MB.');
+  }
+  const buf = await file.arrayBuffer();
+  let binary = '';
+  const bytes = new Uint8Array(buf);
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  const fileBase64 = btoa(binary);
+  const url = `${functionsBase}/functions/v1/upload-approval-feedback-attachment`;
+  const res = await fetch(url, {
+    method: 'POST',
+    body: JSON.stringify({
+      token,
+      postId,
+      fileBase64,
+      fileName: file.name,
+      mimeType: file.type,
+    }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body?.error || 'Falha ao enviar anexo.');
+  }
+  if (!body?.url || typeof body.url !== 'string') {
+    throw new Error('Resposta inválida do servidor.');
+  }
+  return body.url as string;
+}
+
 export async function submitApprovalResponse(
   token: string,
   postId: string,
   action: 'approve' | 'reject',
-  feedback?: string
+  feedback?: string,
+  attachmentUrls?: string[]
 ): Promise<SubmitApprovalResponseResult> {
   if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
     throw new Error('REACT_APP_SUPABASE_URL não está configurada.');
@@ -440,12 +880,16 @@ export async function submitApprovalResponse(
   if (action === 'reject' && trimmedFeedback.length > MAX_FEEDBACK_LENGTH) {
     throw new Error(`Feedback muito longo. Máximo ${MAX_FEEDBACK_LENGTH} caracteres.`);
   }
+  const urls = (attachmentUrls ?? []).filter(Boolean).slice(0, MAX_CLIENT_ATTACHMENTS);
+  if (action === 'reject' && urls.length > MAX_CLIENT_ATTACHMENTS) {
+    throw new Error(`Máximo ${MAX_CLIENT_ATTACHMENTS} anexos.`);
+  }
   const url = `${functionsBase}/functions/v1/submit-approval-response`;
   const res = await fetch(url, {
     method: 'POST',
     // Intentionally omit custom headers to avoid browser preflight instability on some networks.
     // The edge function accepts and parses JSON payload regardless of content-type.
-    body: JSON.stringify({ token, postId, action, feedback: trimmedFeedback }),
+    body: JSON.stringify({ token, postId, action, feedback: trimmedFeedback, attachmentUrls: urls }),
   });
   let body: { error?: string; success?: boolean; message?: string } = {};
   try {
@@ -463,6 +907,22 @@ export async function submitApprovalResponse(
  * Remove um post do fluxo de aprovação (sai de "aguardando") e desvincula de qualquer link.
  * O post continua existindo; deixa de exigir aprovação.
  */
+/** Pré-aprovação interna (Kanban organização). */
+export async function updateInternalApproval(
+  postId: string,
+  status: 'approved' | 'rejected',
+  comment?: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('scheduled_posts')
+    .update({
+      internal_approval_status: status,
+      internal_approval_comment: comment?.trim() || null,
+    })
+    .eq('id', postId);
+  if (error) throw new Error(error.message || 'Falha ao atualizar revisão interna.');
+}
+
 export async function removePostFromApproval(postId: string): Promise<void> {
   const { error: junctionError } = await supabase
     .from('approval_request_posts')

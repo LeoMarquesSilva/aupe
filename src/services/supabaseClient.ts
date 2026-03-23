@@ -65,6 +65,12 @@ const columnMapping: Record<string, string> = {
   'approvalStatus': 'approval_status',
   'approvalFeedback': 'approval_feedback',
   'approvalRespondedAt': 'approval_responded_at',
+  'approvalFeedbackAttachments': 'approval_feedback_attachments',
+  'postingPlatform': 'posting_platform',
+  'requiresInternalApproval': 'requires_internal_approval',
+  'internalApprovalStatus': 'internal_approval_status',
+  'internalApprovalComment': 'internal_approval_comment',
+  'isActive': 'is_active',
   'expiresAt': 'expires_at',
   'createdBy': 'created_by',
   'approvalRequestId': 'approval_request_id',
@@ -246,7 +252,8 @@ export const clientService = {
           profilePicture: client.profile_picture,
           tokenExpiry: client.token_expiry ? new Date(client.token_expiry) : undefined,
           pageId: client.page_id,
-          pageName: client.page_name
+          pageName: client.page_name,
+          isActive: client.is_active !== false,
         };
         
         return convertedClient;
@@ -305,7 +312,8 @@ export const clientService = {
         profilePicture: data.profile_picture,
         tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
         pageId: data.page_id,
-        pageName: data.page_name
+        pageName: data.page_name,
+        isActive: data.is_active !== false,
       };
       
       return convertedClient;
@@ -447,6 +455,8 @@ export const clientService = {
         Object.entries(client).filter(([key, value]) => {
           // Sempre manter o ID
           if (key === 'id') return true;
+
+          if (typeof value === 'boolean') return true;
           
           // Pular campos do Instagram para não sobrescrever
           if (['instagramAccountId', 'username', 'profilePicture', 'tokenExpiry', 'pageId', 'pageName'].includes(key)) {
@@ -502,7 +512,8 @@ export const clientService = {
         profilePicture: data.profile_picture,
         tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
         pageId: data.page_id,
-        pageName: data.page_name
+        pageName: data.page_name,
+        isActive: data.is_active !== false,
       };
       
       return convertedClient;
@@ -994,7 +1005,11 @@ export const postService = {
         shareToFeed: post.shareToFeed,
         coverImage: post.coverImage,
         // Conteúdo só para aprovação (não envia para N8N/postar)
-        forApprovalOnly: post.forApprovalOnly
+        forApprovalOnly: post.forApprovalOnly,
+        postingPlatform: post.postingPlatform,
+        requiresInternalApproval: post.requiresInternalApproval,
+        internalApprovalStatus: post.internalApprovalStatus,
+        internalApprovalComment: post.internalApprovalComment,
       };
 
       // Remover campos undefined/null

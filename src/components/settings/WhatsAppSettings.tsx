@@ -42,6 +42,14 @@ import {
 
 const POLL_INTERVAL_MS = 4000;
 
+type GroupPickerTarget = 'main' | 'client' | 'internal';
+
+const GROUP_PICKER_TARGET_LABEL: Record<GroupPickerTarget, string> = {
+  main: 'Número ou grupo principal',
+  client: 'Respostas do link do cliente',
+  internal: 'Respostas do link do gestor',
+};
+
 const STATE_LABELS: Record<InstanceConnectionState, string> = {
   open: 'Conectado',
   close: 'Desconectado',
@@ -65,6 +73,8 @@ const WhatsAppSettings: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [clientApprovalPhone, setClientApprovalPhone] = useState('');
+  const [internalApprovalPhone, setInternalApprovalPhone] = useState('');
   const [enabled, setEnabled] = useState(false);
   const [instanceName, setInstanceName] = useState('');
 
@@ -80,6 +90,7 @@ const WhatsAppSettings: React.FC = () => {
   const [groupsError, setGroupsError] = useState<string | null>(null);
   const [groupSearch, setGroupSearch] = useState('');
   const [showGroupPicker, setShowGroupPicker] = useState(false);
+  const [groupPickerTarget, setGroupPickerTarget] = useState<GroupPickerTarget>('main');
 
   // Test message
   const [testSending, setTestSending] = useState(false);
@@ -97,6 +108,8 @@ const WhatsAppSettings: React.FC = () => {
         setInstanceName(instName);
         if (cfg) {
           setPhoneNumber(cfg.phoneNumber);
+          setClientApprovalPhone(cfg.clientApprovalPhone ?? '');
+          setInternalApprovalPhone(cfg.internalApprovalPhone ?? '');
           setEnabled(cfg.enabled);
         }
       })
@@ -168,8 +181,9 @@ const WhatsAppSettings: React.FC = () => {
     } catch (e) { setSaveError(e instanceof Error ? e.message : 'Erro ao desconectar.'); }
   };
 
-  const handleFetchGroups = async () => {
+  const handleOpenGroupPicker = async (target: GroupPickerTarget) => {
     if (!instanceName) return;
+    setGroupPickerTarget(target);
     setGroupsLoading(true);
     setGroupsError(null);
     setGroupSearch('');
@@ -187,9 +201,12 @@ const WhatsAppSettings: React.FC = () => {
   };
 
   const handleSelectGroup = (group: WhatsAppGroup) => {
-    setPhoneNumber(group.id);
+    if (groupPickerTarget === 'client') setClientApprovalPhone(group.id);
+    else if (groupPickerTarget === 'internal') setInternalApprovalPhone(group.id);
+    else setPhoneNumber(group.id);
     setShowGroupPicker(false);
     setGroupSearch('');
+    setTestResult(null);
   };
 
   const handleSendTest = async () => {
@@ -209,7 +226,12 @@ const WhatsAppSettings: React.FC = () => {
     setSaveError(null);
     setSaveSuccess(false);
     try {
-      await whatsappService.saveConfig(phoneNumber.trim(), enabled);
+      await whatsappService.saveConfig({
+        phoneNumber: phoneNumber.trim(),
+        enabled,
+        clientApprovalPhone: clientApprovalPhone.trim(),
+        internalApprovalPhone: internalApprovalPhone.trim(),
+      });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (e) {
@@ -222,7 +244,16 @@ const WhatsAppSettings: React.FC = () => {
   );
 
   const isNumberAGroup = phoneNumber.endsWith('@g.us');
+  const isClientGroup = clientApprovalPhone.endsWith('@g.us');
+  const isInternalGroup = internalApprovalPhone.endsWith('@g.us');
   const hasValidNumber = phoneNumber.trim().length > 0;
+
+  const pickerActiveValue =
+    groupPickerTarget === 'main'
+      ? phoneNumber
+      : groupPickerTarget === 'client'
+        ? clientApprovalPhone
+        : internalApprovalPhone;
 
   if (loading) {
     return (
@@ -342,59 +373,205 @@ const WhatsAppSettings: React.FC = () => {
             Destino das notificações
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5, fontFamily: '"Poppins", sans-serif' }}>
-            Escolha um número pessoal ou selecione um grupo do WhatsApp para receber os avisos de aprovação.
+            Defina o número ou grupo padrão (também usado no teste). Você pode direcionar respostas do link do{' '}
+            <strong>cliente</strong> e do link do <strong>gestor</strong> para pessoas diferentes.
           </Typography>
 
-          {/* Number field */}
-          <TextField
-            label="Número ou grupo"
-            placeholder="5511999999999"
-            value={phoneNumber}
-            onChange={(e) => { setPhoneNumber(e.target.value); setTestResult(null); }}
-            fullWidth
-            size="small"
-            helperText={
-              isNumberAGroup
-                ? 'Grupo selecionado — as notificações serão enviadas para esse grupo.'
-                : 'Somente números: código do país + DDD + número. Ex: 5511999999999'
-            }
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  {isNumberAGroup
-                    ? <GroupIcon sx={{ fontSize: 18, color: 'primary.main' }} />
-                    : <PersonIcon sx={{ fontSize: 18, color: 'text.secondary' }} />}
-                </InputAdornment>
-              ),
+          {/* Number field + grupo */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              gap: 1,
+              alignItems: { xs: 'stretch', sm: 'flex-start' },
+              mb: 1,
             }}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 }, mb: 1.5 }}
-          />
-
-          {/* Group picker button */}
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={groupsLoading ? <CircularProgress size={14} /> : <GroupIcon />}
-            onClick={handleFetchGroups}
-            disabled={groupsLoading || connectionState !== 'open'}
-            sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none', mb: showGroupPicker ? 1.5 : 0 }}
           >
-            {groupsLoading ? 'Buscando grupos…' : 'Selecionar grupo'}
-          </Button>
+            <TextField
+              label="Número ou grupo principal (padrão)"
+              placeholder="5511999999999"
+              value={phoneNumber}
+              onChange={(e) => { setPhoneNumber(e.target.value); setTestResult(null); }}
+              fullWidth
+              size="small"
+              helperText={
+                isNumberAGroup
+                  ? 'Grupo selecionado — as notificações serão enviadas para esse grupo.'
+                  : 'Usado no teste e como destino das respostas do cliente se o campo específico abaixo estiver vazio. Ex: 5511999999999'
+              }
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    {isNumberAGroup
+                      ? <GroupIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+                      : <PersonIcon sx={{ fontSize: 18, color: 'text.secondary' }} />}
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ flex: 1, minWidth: 0, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            />
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={
+                groupsLoading && groupPickerTarget === 'main'
+                  ? <CircularProgress size={14} />
+                  : <GroupIcon />
+              }
+              onClick={() => void handleOpenGroupPicker('main')}
+              disabled={groupsLoading || connectionState !== 'open'}
+              sx={{
+                fontFamily: '"Poppins", sans-serif',
+                textTransform: 'none',
+                alignSelf: { xs: 'stretch', sm: 'center' },
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {groupsLoading && groupPickerTarget === 'main' ? 'Buscando…' : 'Grupo'}
+            </Button>
+          </Box>
 
           {connectionState !== 'open' && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, fontFamily: '"Poppins", sans-serif' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5, fontFamily: '"Poppins", sans-serif' }}>
               Conecte o WhatsApp acima para poder selecionar grupos.
             </Typography>
           )}
 
-          {/* Group picker list */}
+          <Divider sx={{ my: 2.5 }} />
+
+          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+            Destinos por tipo de resposta
+          </Typography>
+
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              gap: 1,
+              alignItems: { xs: 'stretch', sm: 'flex-start' },
+              mb: 2,
+            }}
+          >
+            <TextField
+              label="Respostas do link de aprovação (cliente)"
+              placeholder="Vazio = usar o principal acima"
+              value={clientApprovalPhone}
+              onChange={(e) => {
+                setClientApprovalPhone(e.target.value);
+                setTestResult(null);
+              }}
+              fullWidth
+              size="small"
+              helperText="Quando o cliente aprovar ou pedir ajustes no link enviado a ele. Pode ser outro número ou ID de grupo (@g.us)."
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    {isClientGroup
+                      ? <GroupIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+                      : <PersonIcon sx={{ fontSize: 18, color: 'text.secondary' }} />}
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ flex: 1, minWidth: 0, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            />
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={
+                groupsLoading && groupPickerTarget === 'client'
+                  ? <CircularProgress size={14} />
+                  : <GroupIcon />
+              }
+              onClick={() => void handleOpenGroupPicker('client')}
+              disabled={groupsLoading || connectionState !== 'open'}
+              sx={{
+                fontFamily: '"Poppins", sans-serif',
+                textTransform: 'none',
+                alignSelf: { xs: 'stretch', sm: 'center' },
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {groupsLoading && groupPickerTarget === 'client' ? 'Buscando…' : 'Grupo'}
+            </Button>
+          </Box>
+
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              gap: 1,
+              alignItems: { xs: 'stretch', sm: 'flex-start' },
+              mb: showGroupPicker ? 1.5 : 1,
+            }}
+          >
+            <TextField
+              label="Respostas do link do gestor (revisão interna)"
+              placeholder="Obrigatório para notificar este fluxo"
+              value={internalApprovalPhone}
+              onChange={(e) => {
+                setInternalApprovalPhone(e.target.value);
+                setTestResult(null);
+              }}
+              fullWidth
+              size="small"
+              helperText="Quando o gestor aprovar ou pedir ajustes no link de pré-aprovação interna. Se ficar vazio, não enviamos WhatsApp para esse caso."
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    {isInternalGroup
+                      ? <GroupIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+                      : <PersonIcon sx={{ fontSize: 18, color: 'text.secondary' }} />}
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ flex: 1, minWidth: 0, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            />
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={
+                groupsLoading && groupPickerTarget === 'internal'
+                  ? <CircularProgress size={14} />
+                  : <GroupIcon />
+              }
+              onClick={() => void handleOpenGroupPicker('internal')}
+              disabled={groupsLoading || connectionState !== 'open'}
+              sx={{
+                fontFamily: '"Poppins", sans-serif',
+                textTransform: 'none',
+                alignSelf: { xs: 'stretch', sm: 'center' },
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {groupsLoading && groupPickerTarget === 'internal' ? 'Buscando…' : 'Grupo'}
+            </Button>
+          </Box>
+
+          {/* Group picker list (preenche o campo do botão que abriu) */}
           {showGroupPicker && (
             <Paper
               variant="outlined"
-              sx={{ borderRadius: 2, overflow: 'hidden', mt: 1 }}
+              sx={{ borderRadius: 2, overflow: 'hidden', mb: 2 }}
             >
-              <Box sx={{ p: 1.5, borderBottom: `1px solid ${theme.palette.divider}` }}>
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderBottom: `1px solid ${theme.palette.divider}`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1,
+                }}
+              >
+                <Chip
+                  size="small"
+                  label={GROUP_PICKER_TARGET_LABEL[groupPickerTarget]}
+                  color="primary"
+                  variant="outlined"
+                  sx={{ alignSelf: 'flex-start', fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}
+                />
                 <TextField
                   size="small"
                   fullWidth
@@ -430,7 +607,7 @@ const WhatsAppSettings: React.FC = () => {
                 {filteredGroups.map((group) => (
                   <ListItemButton
                     key={group.id}
-                    selected={phoneNumber === group.id}
+                    selected={pickerActiveValue === group.id}
                     onClick={() => handleSelectGroup(group)}
                     sx={{
                       borderBottom: `1px solid ${alpha(theme.palette.divider, 0.4)}`,
@@ -452,7 +629,7 @@ const WhatsAppSettings: React.FC = () => {
                         </Typography>
                       }
                     />
-                    {phoneNumber === group.id && (
+                    {pickerActiveValue === group.id && (
                       <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main', ml: 1 }} />
                     )}
                   </ListItemButton>
@@ -481,10 +658,10 @@ const WhatsAppSettings: React.FC = () => {
             label={
               <Box>
                 <Typography variant="body2" fontWeight={600} sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                  Ativar notificações
+                  Ativar notificações WhatsApp
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                  Receber mensagem quando o cliente responder à aprovação
+                  Avisos quando o cliente ou o gestor responder aos respectivos links (conforme destinos acima)
                 </Typography>
               </Box>
             }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Container,
@@ -50,8 +50,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { roleService } from '../services/roleService';
 import { subscriptionService } from '../services/subscriptionService';
 import { subscriptionLimitsService, SubscriptionLimits } from '../services/subscriptionLimitsService';
-import { supabase } from '../services/supabaseClient';
-import { postService } from '../services/supabaseClient';
+import { supabase, postService } from '../services/supabaseClient';
 import { ImageUrlService } from '../services/imageUrlService';
 
 const COLORS = {
@@ -115,10 +114,12 @@ const HomePage: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [organizationName, setOrganizationName] = useState<string | null>(null);
   const [orgStats, setOrgStats] = useState<{
-    clientsCount: number;
     scheduledPosts: number;
     publishedPosts: number;
   } | null>(null);
+  const [homeClients, setHomeClients] = useState<
+    { id: string; name: string; instagram?: string | null; is_active?: boolean | null }[]
+  >([]);
   const [postsByMonth, setPostsByMonth] = useState<{ name: string; posts: number; fullMonth: string }[]>([]);
   const [upcomingPosts, setUpcomingPosts] = useState<PostWithClient[]>([]);
   const [failedPosts, setFailedPosts] = useState<PostWithClient[]>([]);
@@ -128,6 +129,11 @@ const HomePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
+
+  const activeClientsCount = useMemo(
+    () => homeClients.filter((c) => c.is_active !== false).length,
+    [homeClients]
+  );
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -146,6 +152,7 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       if (!user) {
+        setHomeClients([]);
         setLoading(false);
         return;
       }
@@ -161,13 +168,18 @@ const HomePage: React.FC = () => {
 
         const orgId = (profile as any)?.organization_id;
         if (!orgId) {
+          setHomeClients([]);
           setLoading(false);
           return;
         }
 
-        const [orgData, clientsRes, postsRes] = await Promise.all([
+        const [orgData, clientsDataRes, postsRes] = await Promise.all([
           subscriptionService.getOrganization(orgId),
-          supabase.from('clients').select('id', { count: 'exact', head: true }).eq('organization_id', orgId),
+          supabase
+            .from('clients')
+            .select('id, name, instagram, is_active')
+            .eq('organization_id', orgId)
+            .order('name'),
           supabase
             .from('scheduled_posts')
             .select('id, status, posted_at, scheduled_date')
@@ -175,6 +187,7 @@ const HomePage: React.FC = () => {
         ]);
 
         setOrganizationName(orgData?.name || null);
+        setHomeClients(clientsDataRes.data ?? []);
 
         const allPosts = postsRes.data || [];
         const scheduled = allPosts.filter(
@@ -185,7 +198,6 @@ const HomePage: React.FC = () => {
         ).length;
 
         setOrgStats({
-          clientsCount: clientsRes.count ?? 0,
           scheduledPosts: scheduled,
           publishedPosts: published,
         });
@@ -532,10 +544,10 @@ const HomePage: React.FC = () => {
                       variant="h4"
                       sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 700, color: COLORS.primary }}
                     >
-                      {orgStats.clientsCount}
+                      {activeClientsCount}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                      Clientes ativos
+                      Clientes ativos ({homeClients.length} no total)
                     </Typography>
                   </Box>
                 </Box>
@@ -645,7 +657,18 @@ const HomePage: React.FC = () => {
             {!nextPost.imagePreviewUrl && nextPost.videoUrl && (
               <Box
                 onClick={() => setPreviewModalOpen(true)}
-                sx={{ cursor: 'pointer', position: 'relative', flexShrink: 0, width: { xs: '100%', sm: 280 }, minWidth: { sm: 280 }, height: 280, bgcolor: 'grey.900', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                sx={{
+                  cursor: 'pointer',
+                  position: 'relative',
+                  flexShrink: 0,
+                  width: { xs: '100%', sm: 280 },
+                  minWidth: { sm: 280 },
+                  height: 280,
+                  bgcolor: 'grey.900',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
                 <ReelsIcon sx={{ fontSize: 80, color: 'rgba(255,255,255,0.5)' }} />
                 <Box

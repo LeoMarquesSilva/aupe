@@ -9,6 +9,17 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 const supabaseUrl        = Deno.env.get('SUPABASE_URL')             || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
+function isValidPublicAttachmentUrl(projectUrl: string, url: string): boolean {
+  try {
+    const origin = new URL(projectUrl).origin;
+    const u = new URL(url);
+    if (u.origin !== origin) return false;
+    return u.pathname.includes('/object/public/approval-feedback/');
+  } catch {
+    return false;
+  }
+}
+
 // Evolution API — set as Supabase Edge Function secrets (supabase secrets set ...)
 const EVOLUTION_BASE_URL = (Deno.env.get('EVOLUTION_BASE_URL') || '').replace(/\/$/, '');
 const EVOLUTION_API_KEY  = Deno.env.get('EVOLUTION_API_KEY')  || '';
@@ -17,12 +28,14 @@ const MIN_TOKEN_LENGTH = 16;
 const MAX_TOKEN_LENGTH = 128;
 const VALID_TOKEN_REGEX = /^[a-zA-Z0-9]+$/;
 const MAX_FEEDBACK_LENGTH = 2000;
+const MAX_ATTACHMENT_URLS = 5;
 
 interface ApprovalNotificationContext {
   respondedAt: string;
   requestCreatedAt?: string | null;
   requestCreatedBy?: string | null;
   requestLabel?: string | null;
+  attachmentCount?: number;
 }
 
 function corsHeaders(): Record<string, string> {
@@ -89,7 +102,7 @@ async function sendWhatsAppNotification(
 
     const { data: postRow, error: postErr } = await supabaseClient
       .from('scheduled_posts')
-      .select('organization_id, caption, client_id, scheduled_date, post_type')
+      .select('organization_id, caption, client_id, scheduled_date, post_type, posting_platform')
       .eq('id', postId)
       .single();
 
@@ -121,7 +134,7 @@ async function sendWhatsAppNotification(
 
     const { data: waCfg, error: waErr } = await supabaseClient
       .from('whatsapp_config')
-      .select('instance_name, phone_number')
+      .select('instance_name, phone_number, client_approval_phone')
       .eq('organization_id', postRow.organization_id)
       .eq('enabled', true)
       .maybeSingle();
@@ -130,8 +143,12 @@ async function sendWhatsAppNotification(
       console.error('[WhatsApp] Erro ao buscar config:', waErr.message);
       return;
     }
-    if (!waCfg?.instance_name || !waCfg?.phone_number) {
-      console.warn('[WhatsApp] Nenhuma config para organization_id:', postRow.organization_id, '- organização habilitou notificações?');
+    const clientDestRaw =
+      typeof waCfg?.client_approval_phone === 'string' ? waCfg.client_approval_phone.trim() : '';
+    const defaultDestRaw = typeof waCfg?.phone_number === 'string' ? waCfg.phone_number.trim() : '';
+    const notifyNumber = clientDestRaw || defaultDestRaw;
+    if (!waCfg?.instance_name || !notifyNumber) {
+      console.warn('[WhatsApp] Nenhuma config ou destino (cliente/principal) para organization_id:', postRow.organization_id);
       return;
     }
 
@@ -145,18 +162,28 @@ async function sendWhatsAppNotification(
     const requestLabelText = context?.requestLabel?.trim() ? context.requestLabel.trim() : null;
 
     let text: string;
+    const platform = postRow.posting_platform === 'linkedin' ? 'linkedin' : 'instagram';
+    const isLinkedIn = platform === 'linkedin';
+    const isRoteiro = postRow.post_type === 'roteiro';
+
     if (action === 'approve') {
+      const footer = isLinkedIn
+        ? 'Conteúdo LinkedIn aprovado (sem publicação automática no sistema).'
+        : isRoteiro
+          ? 'Roteiro aprovado para uso interno.'
+          : 'Post liberado para publicação automática no horário agendado.';
       text =
         `✅ *Aprovação recebida!*\n\n` +
         `👤 Cliente: ${clientName}\n` +
         `📝 Post: ${captionSnippet}\n` +
         `🎬 Tipo: ${postTypeLabel}\n` +
+        `${isLinkedIn ? `📱 Plataforma: LinkedIn\n` : ''}` +
         `📅 Agendado para: ${scheduledAtLabel}\n` +
         `🔗 Link gerado em: ${requestCreatedAtLabel}\n` +
         `👨‍💻 Gerado por: ${createdByLabel}\n` +
         `⏱️ Aprovado em: ${respondedAtLabel}` +
         `${requestLabelText ? `\n🏷️ Solicitação: ${requestLabelText}` : ''}` +
-        `\n\n${postTypeLabel === 'roteiro' ? 'Roteiro aprovado para uso interno.' : 'Post liberado para publicação automática no horário agendado.'}`;
+        `\n\n${footer}`;
     } else {
       const feedbackText = feedback?.trim() ? `\n\n💬 Feedback: ${feedback.trim()}` : '';
       text =
@@ -164,17 +191,19 @@ async function sendWhatsAppNotification(
         `👤 Cliente: ${clientName}\n` +
         `📝 Post: ${captionSnippet}\n` +
         `🎬 Tipo: ${postTypeLabel}\n` +
+        `${isLinkedIn ? `📱 Plataforma: LinkedIn\n` : ''}` +
         `📅 Agendado para: ${scheduledAtLabel}\n` +
         `🔗 Link gerado em: ${requestCreatedAtLabel}\n` +
         `👨‍💻 Gerado por: ${createdByLabel}\n` +
         `⏱️ Respondido em: ${respondedAtLabel}` +
         `${requestLabelText ? `\n🏷️ Solicitação: ${requestLabelText}` : ''}` +
         `${feedbackText}` +
+        `${context?.attachmentCount ? `\n📎 Anexos: ${context.attachmentCount}` : ''}` +
         `\n\nRevise o conteúdo e reenvie para aprovação.`;
     }
 
     const apiUrl = `${EVOLUTION_BASE_URL}/message/sendText/${waCfg.instance_name}`;
-    const payload = { number: waCfg.phone_number, text };
+    const payload = { number: notifyNumber, text };
 
     const res = await fetch(apiUrl, {
       method: 'POST',
@@ -187,7 +216,7 @@ async function sendWhatsAppNotification(
       console.error('[WhatsApp] Evolution API erro:', res.status, errBody);
       return;
     }
-    console.log('[WhatsApp] Notificação enviada para', waCfg.phone_number);
+    console.log('[WhatsApp] Notificação (aprovação cliente) enviada para', notifyNumber);
   } catch (err) {
     console.error('[WhatsApp] Erro (non-fatal):', err);
   }
@@ -202,7 +231,7 @@ serve(async (req) => {
     return errorResponse('Método não permitido', 405);
   }
 
-  let body: { token?: string; postId?: string; action?: string; feedback?: string };
+  let body: { token?: string; postId?: string; action?: string; feedback?: string; attachmentUrls?: unknown };
   try {
     const rawBody = await req.text();
     body = JSON.parse(rawBody);
@@ -217,8 +246,26 @@ serve(async (req) => {
   const trimmedFeedback = rawFeedback.trim();
   const feedback = trimmedFeedback.slice(0, MAX_FEEDBACK_LENGTH);
 
+  let attachmentUrls: string[] = [];
+  if (Array.isArray(body.attachmentUrls)) {
+    attachmentUrls = body.attachmentUrls
+      .filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length <= 2048)
+      .slice(0, MAX_ATTACHMENT_URLS);
+  }
+
   if (action === 'reject' && trimmedFeedback.length > MAX_FEEDBACK_LENGTH) {
     return errorResponse(`Feedback muito longo. Máximo ${MAX_FEEDBACK_LENGTH} caracteres.`, 400);
+  }
+
+  if (action === 'reject' && attachmentUrls.length > 0) {
+    if (!supabaseUrl) {
+      return errorResponse('Configuração inválida.', 500);
+    }
+    for (const u of attachmentUrls) {
+      if (!isValidPublicAttachmentUrl(supabaseUrl, u)) {
+        return errorResponse('URL de anexo inválida.', 400);
+      }
+    }
   }
 
   if (
@@ -261,7 +308,7 @@ serve(async (req) => {
 
     const { data: postRow, error: postError } = await supabase
       .from('scheduled_posts')
-      .select('approval_status, post_type')
+      .select('approval_status, post_type, posting_platform')
       .eq('id', postId)
       .single();
 
@@ -284,7 +331,8 @@ serve(async (req) => {
     }
 
     if (action === 'approve') {
-      const keepAsApprovalOnly = postRow.post_type === 'roteiro';
+      const keepAsApprovalOnly =
+        postRow.post_type === 'roteiro' || postRow.posting_platform === 'linkedin';
       const { error: updateError } = await supabase
         .from('scheduled_posts')
         .update({
@@ -292,6 +340,7 @@ serve(async (req) => {
           for_approval_only: keepAsApprovalOnly ? true : false,
           approval_responded_at: now,
           approval_feedback: null,
+          approval_feedback_attachments: [],
         })
         .eq('id', postId);
 
@@ -312,6 +361,7 @@ serve(async (req) => {
         .update({
           approval_status: 'rejected',
           approval_feedback: feedback || null,
+          approval_feedback_attachments: attachmentUrls.length ? attachmentUrls : [],
           approval_responded_at: now,
         })
         .eq('id', postId);
@@ -326,6 +376,7 @@ serve(async (req) => {
         requestCreatedAt: requestRow.created_at,
         requestCreatedBy: requestRow.created_by,
         requestLabel: requestRow.label,
+        attachmentCount: attachmentUrls.length,
       });
     }
 

@@ -17,285 +17,41 @@ import {
   Chip,
   AppBar,
   Toolbar,
+  Link,
 } from '@mui/material';
 import {
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  ChevronLeft as ChevronLeftIcon,
-  ChevronRight as ChevronRightIcon,
+  OpenInFull as OpenInFullIcon,
+  AttachFile as AttachFileIcon,
+  Instagram as InstagramIcon,
 } from '@mui/icons-material';
+import * as SocialPlatformIcons from '../components/icons/SocialPlatformIcons';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   fetchApprovalRequestByToken,
   submitApprovalResponse,
+  uploadApprovalFeedbackAttachment,
   type ApprovalRequestPublicData,
 } from '../services/approvalService';
 import { ImageUrlService } from '../services/imageUrlService';
+import PublicApprovalPostExpandedDialog from '../components/PublicApprovalPostExpandedDialog';
+import {
+  POST_TYPE,
+  getFirstImageUrl,
+  getImageUrls,
+  PostMediaPreview,
+} from '../components/PublicApprovalPostMedia';
+
+export { POST_TYPE, getFirstImageUrl, getImageUrls, PostMediaPreview } from '../components/PublicApprovalPostMedia';
 
 type PostItem = ApprovalRequestPublicData['posts'][number];
 
 const AGENCY_LOGO_URL = '/LOGO-AUPE.jpg';
 const APP_NAME = 'AUPE';
-const POST_TYPE = { POST: 'post', CAROUSEL: 'carousel', REELS: 'reels', STORIES: 'stories', ROTEIRO: 'roteiro' } as const;
-
-function getFirstImageUrl(post: PostItem): string | undefined {
-  const raw = post.images?.[0];
-  if (typeof raw === 'string') return raw;
-  if (raw && typeof raw === 'object' && 'url' in raw) return (raw as { url: string }).url;
-  return undefined;
-}
-
-function getImageUrls(post: PostItem): string[] {
-  const arr = post.images ?? [];
-  return arr.map((item) => {
-    if (typeof item === 'string') return item;
-    if (item && typeof item === 'object' && 'url' in item) return (item as { url: string }).url;
-    return '';
-  }).filter(Boolean);
-}
-
-/** Aspect ratio CSS por tipo (Instagram): feed 4:5, reels/stories 9:16 — evita corte */
-function getMediaAspectRatioCss(postType: string): string {
-  switch (postType) {
-    case POST_TYPE.REELS:
-    case POST_TYPE.STORIES:
-      return '9 / 16'; // vertical
-    case POST_TYPE.CAROUSEL:
-    case POST_TYPE.POST:
-    default:
-      return '4 / 5'; // feed portrait
-  }
-}
-
-/** Container de mídia por tipo: aspect-ratio correto e object-fit contain (nunca corta) */
-function PostMediaPreview({
-  postType,
-  imageUrls,
-  firstImage,
-  videoUrl,
-  coverImageUrl,
-}: {
-  postType: string;
-  imageUrls: string[];
-  firstImage: string | undefined;
-  videoUrl?: string;
-  coverImageUrl?: string;
-}) {
-  const carouselRef = useRef<HTMLDivElement>(null);
-  const [carouselIndex, setCarouselIndex] = useState(0);
-  const aspectRatioCss = getMediaAspectRatioCss(postType);
-  const isReels = postType === POST_TYPE.REELS;
-  const isStories = postType === POST_TYPE.STORIES;
-  const isCarousel = postType === POST_TYPE.CAROUSEL || imageUrls.length > 1;
-  const isVertical = isReels || isStories;
-
-  const containerSx = {
-    width: '100%',
-    bgcolor: '#000',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    position: 'relative' as const,
-    aspectRatio: aspectRatioCss,
-    maxHeight: isVertical ? 560 : 420,
-  };
-
-  const mediaSx = {
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain' as const,
-    display: 'block',
-  };
-
-  // Reels: vídeo 9:16 ou capa
-  if (isReels) {
-    return (
-      <Box sx={containerSx}>
-        {videoUrl ? (
-          <video
-            src={ImageUrlService.getPublicUrl(videoUrl)}
-            poster={coverImageUrl ? ImageUrlService.getPublicUrl(coverImageUrl) : undefined}
-            controls
-            style={{ ...mediaSx }}
-          />
-        ) : coverImageUrl ? (
-          <img
-            src={ImageUrlService.getPublicUrl(coverImageUrl)}
-            alt=""
-            style={{ ...mediaSx }}
-          />
-        ) : firstImage ? (
-          <img src={ImageUrlService.getPublicUrl(firstImage)} alt="" style={{ ...mediaSx }} />
-        ) : (
-          <Typography color="text.secondary">Reels</Typography>
-        )}
-      </Box>
-    );
-  }
-
-  // Stories: 9:16, primeira imagem ou vídeo
-  if (isStories) {
-    return (
-      <Box sx={containerSx}>
-        {firstImage ? (
-          <img src={ImageUrlService.getPublicUrl(firstImage)} alt="" style={{ ...mediaSx }} />
-        ) : (
-          <Typography color="text.secondary">Story</Typography>
-        )}
-      </Box>
-    );
-  }
-
-  // Carrossel: várias imagens, fundo neutro (sem faixas pretas), botões prev/next visíveis
-  if (isCarousel && imageUrls.length > 0) {
-    const total = imageUrls.length;
-    const goTo = (index: number) => {
-      const next = Math.max(0, Math.min(index, total - 1));
-      setCarouselIndex(next);
-      const el = carouselRef.current;
-      if (el) {
-        const slide = el.children[next] as HTMLElement;
-        slide?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
-      }
-    };
-
-    return (
-      <Box
-        sx={{
-          width: '100%',
-          bgcolor: '#e8e8e8',
-          aspectRatio: aspectRatioCss,
-          maxHeight: 420,
-          overflow: 'hidden',
-          position: 'relative',
-        }}
-      >
-        <Box
-          ref={carouselRef}
-          onScroll={() => {
-            const el = carouselRef.current;
-            if (!el || imageUrls.length <= 1) return;
-            const index = Math.round(el.scrollLeft / el.clientWidth);
-            setCarouselIndex(Math.min(index, imageUrls.length - 1));
-          }}
-          sx={{
-            display: 'flex',
-            overflowX: 'auto',
-            overflowY: 'hidden',
-            width: '100%',
-            height: '100%',
-            scrollSnapType: 'x mandatory',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-            '&::-webkit-scrollbar': { display: 'none' },
-            '& > *': { scrollSnapAlign: 'start', scrollSnapStop: 'always', flexShrink: 0 },
-          }}
-        >
-          {imageUrls.map((url, i) => (
-            <Box
-              key={i}
-              sx={{
-                width: '100%',
-                minWidth: '100%',
-                height: '100%',
-                bgcolor: '#e8e8e8',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <img
-                src={ImageUrlService.getPublicUrl(url)}
-                alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-              />
-            </Box>
-          ))}
-        </Box>
-
-        {/* Botões prev/next bem visíveis */}
-        {total > 1 && (
-          <>
-            <IconButton
-              onClick={() => goTo(carouselIndex - 1)}
-              disabled={carouselIndex === 0}
-              sx={{
-                position: 'absolute',
-                left: 8,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                zIndex: 2,
-                bgcolor: 'rgba(255,255,255,0.95)',
-                boxShadow: 2,
-                '&:hover': { bgcolor: 'white', boxShadow: 3 },
-                '&:disabled': { bgcolor: 'rgba(255,255,255,0.5)' },
-                '& .MuiSvgIcon-root': { fontSize: 28 },
-              }}
-            >
-              <ChevronLeftIcon />
-            </IconButton>
-            <IconButton
-              onClick={() => goTo(carouselIndex + 1)}
-              disabled={carouselIndex === total - 1}
-              sx={{
-                position: 'absolute',
-                right: 8,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                zIndex: 2,
-                bgcolor: 'rgba(255,255,255,0.95)',
-                boxShadow: 2,
-                '&:hover': { bgcolor: 'white', boxShadow: 3 },
-                '&:disabled': { bgcolor: 'rgba(255,255,255,0.5)' },
-                '& .MuiSvgIcon-root': { fontSize: 28 },
-              }}
-            >
-              <ChevronRightIcon />
-            </IconButton>
-            {/* Indicador de posição (ex.: 1/5) */}
-            <Typography
-              variant="caption"
-              sx={{
-                position: 'absolute',
-                bottom: 8,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                zIndex: 2,
-                bgcolor: 'rgba(0,0,0,0.5)',
-                color: 'white',
-                px: 1.5,
-                py: 0.5,
-                borderRadius: 2,
-                fontWeight: 600,
-              }}
-            >
-              {carouselIndex + 1} / {total}
-            </Typography>
-          </>
-        )}
-      </Box>
-    );
-  }
-
-  // Post (imagem única): 4:5, contain
-  if (firstImage) {
-    return (
-      <Box sx={containerSx}>
-        <img src={ImageUrlService.getPublicUrl(firstImage)} alt="" style={{ ...mediaSx }} />
-      </Box>
-    );
-  }
-
-  return (
-    <Box sx={{ ...containerSx, minHeight: 200 }}>
-      <Typography color="text.secondary">Mídia</Typography>
-    </Box>
-  );
-}
 
 const ClientApprovalView: React.FC = () => {
   const theme = useTheme();
@@ -312,9 +68,14 @@ const ClientApprovalView: React.FC = () => {
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [rejectPostId, setRejectPostId] = useState<string | null>(null);
   const [rejectFeedback, setRejectFeedback] = useState('');
+  const [rejectAttachments, setRejectAttachments] = useState<string[]>([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [focusPost, setFocusPost] = useState<PostItem | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const openRejectForPost = (postId: string) => {
     setRejectPostId(postId);
     setRejectFeedback('');
+    setRejectAttachments([]);
   };
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
   const [captionExpanded, setCaptionExpanded] = useState<Record<string, boolean>>({});
@@ -371,15 +132,27 @@ const ClientApprovalView: React.FC = () => {
   const handleRejectSubmit = async (postId: string) => {
     setSubmitting(postId);
     try {
-      const result = await submitApprovalResponse(decodedToken, postId, 'reject', rejectFeedback);
+      const result = await submitApprovalResponse(
+        decodedToken,
+        postId,
+        'reject',
+        rejectFeedback,
+        rejectAttachments
+      );
       setData((prev) => prev ? {
         ...prev,
         posts: prev.posts.map((p) => p.id === postId
-          ? { ...p, approvalStatus: 'rejected' as const, approvalFeedback: rejectFeedback }
+          ? {
+            ...p,
+            approvalStatus: 'rejected' as const,
+            approvalFeedback: rejectFeedback,
+            approvalFeedbackAttachments: rejectAttachments.length ? [...rejectAttachments] : undefined,
+          }
           : p),
       } : null);
       setRejectPostId(null);
       setRejectFeedback('');
+      setRejectAttachments([]);
       setSnackbar({
         open: true,
         message: result.message || 'Solicitação de alteração enviada.',
@@ -543,6 +316,23 @@ const ClientApprovalView: React.FC = () => {
                 <Typography variant="subtitle1" fontWeight={600} sx={{ flex: 1, minWidth: 0 }}>
                   @{username}
                 </Typography>
+                {(post.postingPlatform ?? 'instagram') === 'linkedin' ? (
+                  <Box
+                    component="span"
+                    title="LinkedIn"
+                    sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      mr: 0.5,
+                    }}
+                  >
+                    <SocialPlatformIcons.LinkedInBrandIcon
+                      sx={{ fontSize: 22, color: '#0A66C2' }}
+                    />
+                  </Box>
+                ) : (
+                  <InstagramIcon sx={{ fontSize: 22, color: '#E4405F', mr: 0.5 }} titleAccess="Instagram" />
+                )}
                 <Chip
                   label={
                     post.postType === POST_TYPE.ROTEIRO
@@ -558,6 +348,26 @@ const ClientApprovalView: React.FC = () => {
                   size="small"
                   sx={{ fontSize: '0.7rem', height: 22 }}
                 />
+              </Box>
+
+              <Box sx={{ px: 1.5, pb: 1, pt: 0 }}>
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  size="medium"
+                  fullWidth={isMobile}
+                  startIcon={<OpenInFullIcon />}
+                  onClick={() => setFocusPost(post)}
+                  aria-label="Ampliar conteúdo do post para leitura"
+                  sx={{
+                    py: 1,
+                    minHeight: 44,
+                    fontFamily: '"Poppins", sans-serif',
+                    textTransform: 'none',
+                  }}
+                >
+                  Ampliar conteúdo
+                </Button>
               </Box>
 
               {post.postType === POST_TYPE.ROTEIRO ? (
@@ -606,7 +416,9 @@ const ClientApprovalView: React.FC = () => {
               {scheduledDate && (
                 <Box sx={{ px: 1.5, pb: 1 }}>
                   <Typography variant="caption" color="text.secondary">
-                    Agendado para: {scheduledDate}
+                    {(post.postingPlatform ?? 'instagram') === 'linkedin'
+                      ? `Data de referência: ${scheduledDate} (sem publicação automática)`
+                      : `Agendado para: ${scheduledDate}`}
                   </Typography>
                 </Box>
               )}
@@ -630,12 +442,51 @@ const ClientApprovalView: React.FC = () => {
                             {post.approvalFeedback}
                           </Typography>
                         )}
+                        {post.approvalFeedbackAttachments && post.approvalFeedbackAttachments.length > 0 && (
+                          <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                            {post.approvalFeedbackAttachments.map((u, i) => (
+                              <Link
+                                key={u}
+                                href={u.startsWith('http') ? u : ImageUrlService.getPublicUrl(u)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                variant="body2"
+                              >
+                                Anexo {i + 1}
+                              </Link>
+                            ))}
+                          </Box>
+                        )}
                       </>
                     )}
                   </Box>
                 ) : (
                   <>
                     <Collapse in={isRejectOpen}>
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        hidden
+                        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.pdf"
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          e.target.value = '';
+                          if (!f || !rejectPostId || rejectAttachments.length >= 5) return;
+                          setUploadingAttachment(true);
+                          try {
+                            const url = await uploadApprovalFeedbackAttachment(decodedToken, rejectPostId, f);
+                            setRejectAttachments((prev) => [...prev, url]);
+                          } catch (err) {
+                            setSnackbar({
+                              open: true,
+                              message: err instanceof Error ? err.message : 'Erro ao enviar anexo.',
+                              severity: 'error',
+                            });
+                          } finally {
+                            setUploadingAttachment(false);
+                          }
+                        }}
+                      />
                       <TextField
                         fullWidth
                         multiline
@@ -648,6 +499,26 @@ const ClientApprovalView: React.FC = () => {
                         inputProps={{ maxLength: 2000 }}
                         helperText={rejectFeedback.length > 0 ? `${rejectFeedback.length}/2000` : undefined}
                       />
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1, alignItems: 'center' }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={uploadingAttachment ? <CircularProgress size={16} /> : <AttachFileIcon />}
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={!!submitting || uploadingAttachment || rejectAttachments.length >= 5}
+                        >
+                          Anexar (máx. 5, 4 MB)
+                        </Button>
+                        {rejectAttachments.map((u) => (
+                          <Chip
+                            key={u}
+                            size="small"
+                            label="Anexo"
+                            onDelete={() => setRejectAttachments((prev) => prev.filter((x) => x !== u))}
+                            disabled={!!submitting}
+                          />
+                        ))}
+                      </Box>
                       <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
                         <Button
                           variant="contained"
@@ -659,7 +530,7 @@ const ClientApprovalView: React.FC = () => {
                         </Button>
                         <Button
                           variant="outlined"
-                          onClick={() => { setRejectPostId(null); setRejectFeedback(''); }}
+                          onClick={() => { setRejectPostId(null); setRejectFeedback(''); setRejectAttachments([]); }}
                           disabled={!!submitting}
                         >
                           Cancelar
@@ -702,6 +573,12 @@ const ClientApprovalView: React.FC = () => {
         })
       )}
       </Box>
+
+      <PublicApprovalPostExpandedDialog
+        open={!!focusPost}
+        onClose={() => setFocusPost(null)}
+        post={focusPost}
+      />
 
       <Snackbar
         open={snackbar.open}

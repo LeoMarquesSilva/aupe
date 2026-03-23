@@ -25,6 +25,7 @@ import {
   useMediaQuery,
   Tooltip
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import { 
   Add as AddIcon,
@@ -40,7 +41,8 @@ import {
   PersonAdd as PersonAddIcon,
   Schedule as ScheduleIcon,
   CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon
+  Cancel as CancelIcon,
+  Block as BlockIcon,
 } from '@mui/icons-material';
 import { clientService, postService } from '../services/supabaseClient';
 import { Client } from '../types';
@@ -67,6 +69,7 @@ const ClientDashboard: React.FC = () => {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clientActionMenuOpen, setClientActionMenuOpen] = useState<boolean>(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
+  const [togglingActiveClientId, setTogglingActiveClientId] = useState<string | null>(null);
   const [clientStats, setClientStats] = useState<Record<string, { 
     scheduled: number, 
     posted: number, 
@@ -183,6 +186,21 @@ const ClientDashboard: React.FC = () => {
     fetchClients();
   };
   
+  const handleToggleClientActive = async (client: Client) => {
+    const currentlyActive = client.isActive !== false;
+    const next = !currentlyActive;
+    setTogglingActiveClientId(client.id);
+    setError(null);
+    try {
+      const updated = await clientService.updateClient({ id: client.id, isActive: next });
+      setClients((prev) => prev.map((c) => (c.id === client.id ? { ...c, ...updated } : c)));
+    } catch {
+      setError('Não foi possível atualizar o status do cliente. Tente novamente.');
+    } finally {
+      setTogglingActiveClientId(null);
+    }
+  };
+
   // Função para lidar com a exclusão de um cliente
   const handleDeleteClient = async () => {
     if (!selectedClient) return;
@@ -350,7 +368,9 @@ const ClientDashboard: React.FC = () => {
       {/* Grid de clientes */}
       {!loading && !error && filteredClients.length > 0 && (
         <Grid container spacing={3}>
-          {filteredClients.map(client => (
+          {filteredClients.map(client => {
+            const clientIsActive = client.isActive !== false;
+            return (
             <Grid item xs={12} sm={6} md={4} key={client.id}>
               <Card 
                 elevation={1}
@@ -360,14 +380,15 @@ const ClientDashboard: React.FC = () => {
                   flexDirection: 'column',
                   borderRadius: 2,
                   border: '1px solid',
-                  borderColor: 'divider',
+                  borderColor: clientIsActive ? 'divider' : alpha(theme.palette.warning.main, 0.55),
                   transition: 'all 0.2s ease-in-out',
                   overflow: 'hidden',
                   bgcolor: 'background.paper',
+                  opacity: clientIsActive ? 1 : 0.97,
                   '&:hover': {
                     elevation: 4,
                     boxShadow: theme.shadows[4],
-                    borderColor: 'primary.light',
+                    borderColor: clientIsActive ? 'primary.light' : alpha(theme.palette.warning.main, 0.7),
                     transform: 'translateY(-2px)'
                   }
                 }}
@@ -454,20 +475,31 @@ const ClientDashboard: React.FC = () => {
                         {client.name}
                       </Typography>
                       
-                      <Chip
-                        icon={<InstagramIcon sx={{ fontSize: 12 }} />}
-                        label={isInstagramConnected(client) ? 'Conectado' : 'Desconectado'}
-                        size="small"
-                        color={isInstagramConnected(client) ? 'success' : 'default'}
-                        sx={{
-                          height: 20,
-                          fontSize: '0.65rem',
-                          fontWeight: 500,
-                          '& .MuiChip-icon': {
-                            fontSize: 12
-                          }
-                        }}
-                      />
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'center' }}>
+                        <Chip
+                          icon={<InstagramIcon sx={{ fontSize: 12 }} />}
+                          label={isInstagramConnected(client) ? 'Conectado' : 'Desconectado'}
+                          size="small"
+                          color={isInstagramConnected(client) ? 'success' : 'default'}
+                          sx={{
+                            height: 20,
+                            fontSize: '0.65rem',
+                            fontWeight: 500,
+                            '& .MuiChip-icon': {
+                              fontSize: 12
+                            }
+                          }}
+                        />
+                        {!clientIsActive && (
+                          <Chip
+                            label="Inativo"
+                            size="small"
+                            color="warning"
+                            variant="outlined"
+                            sx={{ height: 20, fontSize: '0.65rem', fontWeight: 600 }}
+                          />
+                        )}
+                      </Box>
                     </Box>
                     
                     <Typography 
@@ -616,7 +648,7 @@ const ClientDashboard: React.FC = () => {
                 </CardActionArea>
                 
                 <Divider />
-                
+
                 <CardActions sx={{ justifyContent: 'space-between', px: 1.5, py: 1 }}>
                   <Box>
                     <Tooltip title="Editar cliente">
@@ -647,6 +679,42 @@ const ClientDashboard: React.FC = () => {
                       >
                         <InstagramIcon fontSize="small" />
                       </IconButton>
+                    </Tooltip>
+
+                    <Tooltip
+                      title={
+                        clientIsActive
+                          ? 'Inativar cliente (continua na lista; alguns fluxos podem ocultá-lo)'
+                          : 'Ativar cliente no painel'
+                      }
+                    >
+                      <span>
+                        <IconButton
+                          size="small"
+                          color={clientIsActive ? 'warning' : 'success'}
+                          disabled={togglingActiveClientId === client.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleToggleClientActive(client);
+                          }}
+                          sx={{
+                            ...(clientIsActive
+                              ? {}
+                              : {
+                                  bgcolor: alpha(theme.palette.success.main, 0.12),
+                                  '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.2) },
+                                }),
+                          }}
+                        >
+                          {togglingActiveClientId === client.id ? (
+                            <CircularProgress size={18} color="inherit" />
+                          ) : clientIsActive ? (
+                            <BlockIcon fontSize="small" />
+                          ) : (
+                            <CheckCircleIcon fontSize="small" />
+                          )}
+                        </IconButton>
+                      </span>
                     </Tooltip>
                     
                     <Tooltip title="Excluir cliente">
@@ -748,7 +816,8 @@ const ClientDashboard: React.FC = () => {
                 </CardActions>
               </Card>
             </Grid>
-          ))}
+            );
+          })}
         </Grid>
       )}
       

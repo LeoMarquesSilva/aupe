@@ -1,6 +1,5 @@
-// Edge Function: Returns approval request data for the client approval page (public link).
-// Usage: GET /get-approval-request-by-token?token=xxx
-// Security: token validated (format + exists + not expired). No credentials in response.
+// Public page for gestor internal pre-approval (token only, no JWT).
+// GET /get-internal-approval-by-token?token=xxx
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
@@ -17,7 +16,7 @@ function corsHeaders(): Record<string, string> {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
-    'Vary': 'Origin',
+    Vary: 'Origin',
   };
 }
 
@@ -26,10 +25,10 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 function invalidTokenResponse(): Response {
-  return new Response(
-    JSON.stringify({ error: 'Link inválido ou expirado.' }),
-    { status: 404, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } }
-  );
+  return new Response(JSON.stringify({ error: 'Link inválido ou expirado.' }), {
+    status: 404,
+    headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
+  });
 }
 
 serve(async (req) => {
@@ -46,7 +45,6 @@ serve(async (req) => {
 
   const url = new URL(req.url);
   const rawToken = url.searchParams.get('token');
-
   if (!rawToken || typeof rawToken !== 'string') {
     return invalidTokenResponse();
   }
@@ -63,80 +61,84 @@ serve(async (req) => {
   try {
     const now = new Date().toISOString();
 
-    const { data: requestRow, error: requestError } = await supabase
-      .from('approval_requests')
-      .select('id, client_id, expires_at')
+    const { data: linkRow, error: linkError } = await supabase
+      .from('internal_approval_links')
+      .select('id, organization_id, expires_at, label')
       .eq('token', token)
       .gt('expires_at', now)
       .single();
 
-    if (requestError || !requestRow) {
+    if (linkError || !linkRow) {
       return invalidTokenResponse();
     }
 
-    const clientId = requestRow.client_id;
-
-    const { data: clientRow, error: clientError } = await supabase
-      .from('clients')
-      .select('id, name, instagram, logo_url, profile_picture')
-      .eq('id', clientId)
+    const { data: orgRow, error: orgError } = await supabase
+      .from('organizations')
+      .select('id, name')
+      .eq('id', linkRow.organization_id)
       .single();
 
-    if (clientError || !clientRow) {
+    if (orgError || !orgRow) {
       return invalidTokenResponse();
     }
 
     const { data: junctionRows, error: junctionError } = await supabase
-      .from('approval_request_posts')
+      .from('internal_approval_link_posts')
       .select('scheduled_post_id, sort_order')
-      .eq('approval_request_id', requestRow.id)
+      .eq('internal_approval_link_id', linkRow.id)
       .order('sort_order', { ascending: true });
 
     if (junctionError || !junctionRows?.length) {
       return new Response(
         JSON.stringify({
-          client: {
-            id: clientRow.id,
-            name: clientRow.name,
-            instagram: clientRow.instagram,
-            logoUrl: clientRow.logo_url ?? undefined,
-            profilePicture: clientRow.profile_picture ?? undefined,
-          },
+          organization: { id: orgRow.id, name: orgRow.name },
+          label: linkRow.label ?? undefined,
           posts: [],
-          expiresAt: requestRow.expires_at,
+          expiresAt: linkRow.expires_at,
         }),
         { status: 200, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } }
       );
     }
 
     const postIds = junctionRows.map((r: { scheduled_post_id: string }) => r.scheduled_post_id);
+
     const { data: postsRows, error: postsError } = await supabase
       .from('scheduled_posts')
       .select(
-        'id, caption, images, video, cover_image, post_type, scheduled_date, approval_status, approval_feedback, approval_responded_at, posting_platform, approval_feedback_attachments'
+        'id, caption, images, video, cover_image, post_type, scheduled_date, posting_platform, client_id, requires_internal_approval, internal_approval_status, internal_approval_comment'
       )
       .in('id', postIds)
-      .eq('client_id', clientId);
+      .eq('organization_id', linkRow.organization_id);
 
     if (postsError || !postsRows?.length) {
       return new Response(
         JSON.stringify({
-          client: {
-            id: clientRow.id,
-            name: clientRow.name,
-            instagram: clientRow.instagram,
-            logoUrl: clientRow.logo_url ?? undefined,
-            profilePicture: clientRow.profile_picture ?? undefined,
-          },
+          organization: { id: orgRow.id, name: orgRow.name },
+          label: linkRow.label ?? undefined,
           posts: [],
-          expiresAt: requestRow.expires_at,
+          expiresAt: linkRow.expires_at,
         }),
         { status: 200, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } }
       );
     }
 
-    type PostRow = Record<string, unknown> & { id: string; scheduled_date?: string | null };
-    const posts = (postsRows as PostRow[])
+    const clientIds = [
+      ...new Set(
+        (postsRows as { client_id?: string | null }[])
+          .map((p) => p.client_id)
+          .filter((x): x is string => typeof x === 'string' && x.length > 0)
+      ),
+    ];
+    const clientNameById = new Map<string, string>();
+    if (clientIds.length > 0) {
+      const { data: clientsData } = await supabase.from('clients').select('id, name').in('id', clientIds);
+      for (const c of clientsData ?? []) {
+        clientNameById.set(c.id, c.name ?? 'Cliente');
+      }
+    }
+
+    type Row = Record<string, unknown> & { id: string; scheduled_date?: string | null };
+    const posts = (postsRows as Row[])
       .sort((a, b) => {
         const ta = a.scheduled_date ? new Date(a.scheduled_date as string).getTime() : Number.MAX_SAFE_INTEGER;
         const tb = b.scheduled_date ? new Date(b.scheduled_date as string).getTime() : Number.MAX_SAFE_INTEGER;
@@ -144,10 +146,7 @@ serve(async (req) => {
         return String(a.id).localeCompare(String(b.id));
       })
       .map((row: Record<string, unknown>) => {
-        const attachments = row.approval_feedback_attachments;
-        const attachmentUrls = Array.isArray(attachments)
-          ? attachments.filter((x): x is string => typeof x === 'string')
-          : [];
+        const cid = row.client_id as string | null | undefined;
         return {
           id: row.id,
           caption: row.caption ?? '',
@@ -157,35 +156,26 @@ serve(async (req) => {
           postType: row.post_type ?? 'post',
           postingPlatform: row.posting_platform === 'linkedin' ? 'linkedin' : 'instagram',
           scheduledDate: row.scheduled_date,
-          approvalStatus: row.approval_status ?? 'pending',
-          approvalFeedback: row.approval_feedback ?? undefined,
-          approvalFeedbackAttachments: attachmentUrls.length ? attachmentUrls : undefined,
-          approvalRespondedAt: row.approval_responded_at ?? undefined,
+          clientName: cid ? clientNameById.get(cid) ?? 'Cliente' : 'Cliente',
+          internalApprovalStatus: row.internal_approval_status ?? 'pending',
+          internalApprovalComment: row.internal_approval_comment ?? undefined,
         };
       });
 
     return new Response(
       JSON.stringify({
-        client: {
-          id: clientRow.id,
-          name: clientRow.name,
-          instagram: clientRow.instagram,
-          logoUrl: clientRow.logo_url ?? undefined,
-          profilePicture: clientRow.profile_picture ?? undefined,
-        },
+        organization: { id: orgRow.id, name: orgRow.name },
+        label: linkRow.label ?? undefined,
         posts,
-        expiresAt: requestRow.expires_at,
+        expiresAt: linkRow.expires_at,
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
-      }
+      { status: 200, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } }
     );
   } catch (err) {
-    console.error('get-approval-request-by-token error:', err);
-    return new Response(
-      JSON.stringify({ error: 'Erro ao carregar dados.' }),
-      { status: 500, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } }
-    );
+    console.error('get-internal-approval-by-token error:', err);
+    return new Response(JSON.stringify({ error: 'Erro ao carregar dados.' }), {
+      status: 500,
+      headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
+    });
   }
 });

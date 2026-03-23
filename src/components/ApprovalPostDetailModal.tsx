@@ -7,6 +7,7 @@ import {
   Button,
   Box,
   Typography,
+  TextField,
   Avatar,
   Chip,
   useTheme,
@@ -29,9 +30,10 @@ import { ptBR } from 'date-fns/locale';
 import { roleService } from '../services/roleService';
 import { imageUrlService } from '../services/imageUrlService';
 import { postService } from '../services/supabaseClient';
-import { removePostFromApproval } from '../services/approvalService';
+import { removePostFromApproval, updateInternalApproval } from '../services/approvalService';
 import DateTimePicker from './DateTimePicker';
 import type { ApprovalKanbanPostInput } from './ApprovalKanban';
+import * as SocialPlatformIcons from './icons/SocialPlatformIcons';
 
 interface ApprovalPostDetailModalProps {
   open: boolean;
@@ -41,6 +43,7 @@ interface ApprovalPostDetailModalProps {
   onRemoveFromApproval?: () => void;
   onDeletePost?: () => void;
   onEditRequest?: () => void;
+  onInternalApprovalSuccess?: () => void;
 }
 
 const getThumbnailUrl = (post: ApprovalKanbanPostInput): string | null => {
@@ -98,6 +101,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
   onRemoveFromApproval,
   onDeletePost,
   onEditRequest,
+  onInternalApprovalSuccess,
 }) => {
   const theme = useTheme();
   const [creatorLabel, setCreatorLabel] = useState<string>('—');
@@ -107,6 +111,9 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
   const [removing, setRemoving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [internalComment, setInternalComment] = useState('');
+  const [internalBusy, setInternalBusy] = useState(false);
+  const [internalError, setInternalError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !post?.userId) {
@@ -130,8 +137,25 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
       const initial = post.scheduledDate ?? post.scheduled_date ?? '';
       setScheduleDate(initial || '');
       setScheduleError(null);
+      setInternalComment('');
+      setInternalError(null);
     }
   }, [open, post?.id, post?.scheduledDate, post?.scheduled_date]);
+
+  const handleInternalDecision = async (status: 'approved' | 'rejected') => {
+    if (!post || internalBusy) return;
+    setInternalBusy(true);
+    setInternalError(null);
+    try {
+      await updateInternalApproval(post.id, status, internalComment);
+      onInternalApprovalSuccess?.();
+      onClose();
+    } catch (e) {
+      setInternalError(e instanceof Error ? e.message : 'Erro ao registrar revisão interna.');
+    } finally {
+      setInternalBusy(false);
+    }
+  };
 
   const handleSchedulePost = async () => {
     if (!post || !scheduleDate || scheduling) return;
@@ -140,12 +164,15 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
     setScheduling(true);
     setScheduleError(null);
     try {
+      const isLinkedIn = (post.postingPlatform ?? 'instagram') === 'linkedin';
       const isAlreadyScheduledInQueue = post.approvalStatus === 'approved' && post.forApprovalOnly === false;
       await postService.updateScheduledPost(post.id, {
         scheduledDate: scheduleDate,
-        // Keep existing queue behavior: approved+forApprovalOnly=false is already in queue.
-        // Only force release to queue when it is still approval-only.
-        ...(isAlreadyScheduledInQueue ? {} : { forApprovalOnly: false }),
+        ...(isLinkedIn
+          ? {}
+          : isAlreadyScheduledInQueue
+            ? {}
+            : { forApprovalOnly: false }),
       });
       onScheduleSuccess?.();
       onClose();
@@ -212,7 +239,9 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
   const client = post.client;
   const isApproved = post.approvalStatus === 'approved';
   const isRoteiro = (post.postType ?? post.post_type) === 'roteiro';
+  const isLinkedIn = (post.postingPlatform ?? 'instagram') === 'linkedin';
   const isInPublishingQueue = isApproved && post.forApprovalOnly === false;
+  const needsInternal = post.requiresInternalApproval === true && post.internalApprovalStatus !== 'approved';
   const hasScheduleChanged = Boolean(scheduleDate) && scheduleDate !== initialScheduleDate;
   const clientAvatarUrl = client
     ? imageUrlService.getPublicUrl(client.profilePicture || client.logoUrl)
@@ -338,7 +367,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
               }
               sx={{ fontFamily: '"Poppins", sans-serif' }}
             />
-            {isInPublishingQueue && (
+            {isInPublishingQueue && !isLinkedIn && (
               <Chip
                 label="Publicação automática ativa"
                 size="small"
@@ -347,7 +376,84 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                 sx={{ fontFamily: '"Poppins", sans-serif' }}
               />
             )}
+            {isLinkedIn && (
+              <Chip
+                size="small"
+                icon={
+                  <SocialPlatformIcons.LinkedInBrandIcon
+                    sx={{ fontSize: '16px !important', color: '#0A66C2 !important' }}
+                  />
+                }
+                label="LinkedIn"
+                sx={{
+                  fontFamily: '"Poppins", sans-serif',
+                  height: 20,
+                  fontSize: '0.6875rem',
+                  fontWeight: 600,
+                  bgcolor: 'rgba(10, 102, 194, 0.12)',
+                  color: '#0A66C2',
+                  border: 'none',
+                  borderRadius: '9999px',
+                  '& .MuiChip-icon': { ml: '6px' },
+                }}
+              />
+            )}
           </Box>
+
+          {needsInternal && (
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                border: `1px solid ${alpha(theme.palette.secondary.main, 0.45)}`,
+                bgcolor: alpha(theme.palette.secondary.main, 0.06),
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, fontFamily: '"Poppins", sans-serif' }}>
+                Pré-aprovação interna
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+                {post.internalApprovalStatus === 'rejected'
+                  ? 'Conteúdo reprovado na revisão interna. Ajuste e registre nova decisão, ou aprove se já estiver ok.'
+                  : 'A equipe precisa aprovar antes de incluir este post no link enviado ao cliente.'}
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                label="Comentário (opcional)"
+                value={internalComment}
+                onChange={(e) => setInternalComment(e.target.value)}
+                multiline
+                minRows={2}
+                sx={{ mb: 1.5, fontFamily: '"Poppins", sans-serif' }}
+              />
+              {internalError && (
+                <Alert severity="error" sx={{ mb: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+                  {internalError}
+                </Alert>
+              )}
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Button
+                  variant="contained"
+                  color="success"
+                  disabled={internalBusy}
+                  onClick={() => handleInternalDecision('approved')}
+                  sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                >
+                  {internalBusy ? <CircularProgress size={20} color="inherit" /> : 'Aprovar internamente'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  disabled={internalBusy}
+                  onClick={() => handleInternalDecision('rejected')}
+                  sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                >
+                  Reprovar internamente
+                </Button>
+              </Box>
+            </Box>
+          )}
 
           {post.approvalStatus === 'pending' && (onRemoveFromApproval || onDeletePost) && (
             <Box
@@ -395,7 +501,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
             </Box>
           )}
 
-          {isApproved && !isRoteiro && (
+          {isApproved && !isRoteiro && !isLinkedIn && (
             <Box
               sx={{
                 p: 2,
@@ -447,6 +553,12 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
           {isApproved && isRoteiro && (
             <Alert severity="info" sx={{ fontFamily: '"Poppins", sans-serif' }}>
               Roteiro aprovado. Este tipo de conteúdo é de aprovação interna e não entra na fila de postagem automática.
+            </Alert>
+          )}
+
+          {isApproved && isLinkedIn && (
+            <Alert severity="info" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+              Conteúdo LinkedIn aprovado pelo cliente. Não há publicação automática no sistema; use a data como referência para postar manualmente no LinkedIn.
             </Alert>
           )}
 

@@ -5,12 +5,14 @@ import {
   Paper,
   Skeleton,
   useMediaQuery,
+  Tooltip,
 } from '@mui/material';
 import {
   Schedule as AwaitingIcon,
   CheckCircle as ApprovedIcon,
   EventAvailable as ScheduledIcon,
   Build as AdjustmentsIcon,
+  FactCheck as InternalIcon,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import ApprovalKanbanCard, {
@@ -20,6 +22,7 @@ import ApprovalKanbanCard, {
 import { type ApprovalStatus, normalizeApprovalStatus } from '../types';
 
 const COLORS = {
+  internal: '#8b5cf6',
   awaiting: '#f59e0b',
   approved: '#10b981',
   scheduled: '#2563eb',
@@ -35,6 +38,10 @@ export interface ApprovalKanbanPostInput extends ApprovalKanbanPost {
   approvalStatus?: ApprovalStatus;
   requiresApproval?: boolean;
   forApprovalOnly?: boolean;
+  requiresInternalApproval?: boolean;
+  internalApprovalStatus?: 'pending' | 'approved' | 'rejected' | null;
+  internalApprovalComment?: string | null;
+  postingPlatform?: 'instagram' | 'linkedin';
   clientId?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -48,8 +55,21 @@ interface ApprovalKanbanProps {
   loading?: boolean;
 }
 
-const COLUMNS: { id: ApprovalKanbanColumn; title: string; icon: React.ReactNode }[] = [
-  { id: 'awaiting', title: 'Aguardando aprovação', icon: <AwaitingIcon /> },
+const COLUMNS: { id: ApprovalKanbanColumn; title: string; icon: React.ReactNode; hint?: string }[] = [
+  {
+    id: 'internal',
+    title: 'Pré-aprovação interna',
+    icon: <InternalIcon />,
+    hint:
+      'O gestor aprova pelo link de revisão interna. Quando aprovado, o cartão passa para "Aguardando cliente". O link enviado ao cliente não é criado automaticamente: gere-o na página Aprovações.',
+  },
+  {
+    id: 'awaiting',
+    title: 'Aguardando cliente',
+    icon: <AwaitingIcon />,
+    hint:
+      'Conteúdo liberado após a pré-aprovação interna (se houver). Use "Gerar link ao cliente" na página Aprovações para o cliente aprovar ou pedir ajustes.',
+  },
   { id: 'approved', title: 'Aprovados', icon: <ApprovedIcon /> },
   { id: 'scheduled', title: 'Aprovados/Agendados', icon: <ScheduledIcon /> },
   { id: 'adjustments', title: 'Ajustes', icon: <AdjustmentsIcon /> },
@@ -82,6 +102,12 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
   const getPostColumn = (post: ApprovalKanbanPostInput): ApprovalKanbanColumn | null => {
     const normalizedStatus = normalizeApprovalStatus(post.approvalStatus);
     const isRoteiro = (post.postType ?? post.post_type) === 'roteiro';
+    const reqInt = post.requiresInternalApproval === true;
+    const intOk = post.internalApprovalStatus === 'approved';
+
+    if (reqInt && !intOk) {
+      return 'internal';
+    }
 
     if (normalizedStatus === 'pending') return 'awaiting';
     if (normalizedStatus === 'rejected') return 'adjustments';
@@ -108,7 +134,7 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0, 1fr))',
           gap: 2,
           alignItems: 'flex-start',
         }}
@@ -158,7 +184,7 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0, 1fr))',
         gap: 2,
         alignItems: 'flex-start',
       }}
@@ -203,20 +229,42 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
               >
                 {col.icon}
               </Box>
-              <Typography
-                variant="subtitle2"
-                fontWeight={600}
-                sx={{
-                  flex: 1,
-                  color: TEXT_PRIMARY,
-                  fontSize: '0.875rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  fontFamily: '"Poppins", sans-serif',
-                }}
-              >
-                {col.title}
-              </Typography>
+              {col.hint ? (
+                <Tooltip title={col.hint} arrow placement="top">
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight={600}
+                    component="span"
+                    sx={{
+                      flex: 1,
+                      color: TEXT_PRIMARY,
+                      fontSize: '0.875rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      fontFamily: '"Poppins", sans-serif',
+                      cursor: 'help',
+                      borderBottom: `1px dotted ${TEXT_SECONDARY}`,
+                    }}
+                  >
+                    {col.title}
+                  </Typography>
+                </Tooltip>
+              ) : (
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={600}
+                  sx={{
+                    flex: 1,
+                    color: TEXT_PRIMARY,
+                    fontSize: '0.875rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    fontFamily: '"Poppins", sans-serif',
+                  }}
+                >
+                  {col.title}
+                </Typography>
+              )}
               <Box
                 component="span"
                 sx={{
@@ -259,7 +307,8 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
                 >
                   {col.icon}
                   <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                    {col.id === 'awaiting' && 'Nenhum item aguardando aprovação.'}
+                    {col.id === 'internal' && 'Nenhum item em revisão interna.'}
+                    {col.id === 'awaiting' && 'Nenhum item aguardando o cliente.'}
                     {col.id === 'approved' && 'Nenhum item aprovado.'}
                     {col.id === 'scheduled' && 'Nenhum item aprovado e agendado.'}
                     {col.id === 'adjustments' && 'Nenhum item com ajuste solicitado.'}
