@@ -32,7 +32,7 @@ import {
 import { clientService } from '../services/supabaseClient';
 import { Client } from '../types';
 import ConnectInstagram from './ConnectInstagram';
-import { InstagramAuthData } from '../services/instagramAuthService';
+import { getAuthorizationUrl, InstagramAuthData } from '../services/instagramAuthService';
 import { subscriptionLimitsService } from '../services/subscriptionLimitsService';
 import SubscriptionLimitsAlert from './SubscriptionLimitsAlert';
 
@@ -62,7 +62,6 @@ const ClientManager: React.FC<ClientManagerProps> = ({
 }) => {
   const theme = useTheme();
   const [name, setName] = useState<string>('');
-  const [instagram, setInstagram] = useState<string>('');
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [appId, setAppId] = useState<string>('');
   const [accessToken, setAccessToken] = useState<string>('');
@@ -74,9 +73,32 @@ const ClientManager: React.FC<ClientManagerProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [currentTab, setCurrentTab] = useState<number>(0);
 
+  const startInstagramOAuthForClient = (clientId: string) => {
+    localStorage.setItem('current_client_id', clientId);
+    localStorage.removeItem('instagram_auth_temp_data');
+    localStorage.removeItem('instagram_auth_error');
+    localStorage.removeItem('instagram_auth_success');
+
+    const authUrl = getAuthorizationUrl(clientId);
+    const width = 600;
+    const height = 700;
+    const left = window.innerWidth / 2 - width / 2;
+    const top = window.innerHeight / 2 - height / 2;
+
+    const popup = window.open(
+      authUrl,
+      'instagram-auth',
+      `width=${width},height=${height},top=${top},left=${left}`,
+    );
+
+    if (!popup) {
+      throw new Error('Cliente criado, mas não foi possível abrir o popup do Instagram. Habilite popups e tente novamente.');
+    }
+  };
+
   const handleAddClient = async () => {
-    if (!name || !instagram) {
-      setError('Nome e usuário do Instagram são obrigatórios');
+    if (!name) {
+      setError('Nome do cliente é obrigatório');
       return;
     }
 
@@ -93,14 +115,17 @@ const ClientManager: React.FC<ClientManagerProps> = ({
         return;
       }
 
+      // O @ do Instagram passa a vir da API após o OAuth.
       const clientData = {
         name,
-        instagram,
+        instagram: name.trim().toLowerCase().replace(/\s+/g, '_'),
         logoUrl,
         appId,
         accessToken,
         userId
       };
+
+      let createdClient: Client | null = null;
 
       // Se temos onClientAdded (usado no StoryCalendar), usar ela
       if (onClientAdded) {
@@ -108,6 +133,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
       } else {
         // Caso contrário, criar o cliente e notificar via onAddClient
         const newClient = await clientService.addClient(clientData);
+        createdClient = newClient;
         if (onAddClient) {
           onAddClient(newClient);
         }
@@ -115,11 +141,14 @@ const ClientManager: React.FC<ClientManagerProps> = ({
 
       // Limpar formulário
       setName('');
-      setInstagram('');
       setLogoUrl('');
       setAppId('');
       setAccessToken('');
       setUserId('');
+
+      if (createdClient?.id) {
+        startInstagramOAuthForClient(createdClient.id);
+      }
 
       // Se addOnly, o componente pai deve fechar o modal
       // Não precisamos fazer nada aqui, apenas limpar o formulário
@@ -244,14 +273,10 @@ const ClientManager: React.FC<ClientManagerProps> = ({
           
           <TextField
             fullWidth
-            label="Usuário do Instagram"
+            label="Instagram"
             variant="outlined"
-            value={instagram}
-            onChange={(e) => setInstagram(e.target.value)}
-            required
-            InputProps={{
-              startAdornment: <InputAdornment position="start">@</InputAdornment>,
-            }}
+            value="Será preenchido automaticamente após conectar via OAuth"
+            disabled
           />
           
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
@@ -260,9 +285,9 @@ const ClientManager: React.FC<ClientManagerProps> = ({
               color="primary"
               startIcon={<AddIcon />}
               onClick={handleAddClient}
-              disabled={loading || !name || !instagram}
+              disabled={loading || !name}
             >
-              {loading ? <CircularProgress size={24} /> : 'Adicionar Cliente'}
+              {loading ? <CircularProgress size={24} /> : 'Criar e conectar Instagram'}
             </Button>
           </Box>
         </Box>
@@ -448,14 +473,10 @@ const ClientManager: React.FC<ClientManagerProps> = ({
             <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 12px)' } }}>
               <TextField
                 fullWidth
-                label="Usuário do Instagram"
+                label="Instagram"
                 variant="outlined"
-                value={instagram}
-                onChange={(e) => setInstagram(e.target.value)}
-                required
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">@</InputAdornment>,
-                }}
+                value="Será preenchido automaticamente após conectar via OAuth"
+                disabled
               />
             </Box>
             
@@ -465,15 +486,15 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                 color="primary"
                 startIcon={<AddIcon />}
                 onClick={handleAddClient}
-                disabled={loading || !name || !instagram}
+                disabled={loading || !name}
               >
-                {loading ? <CircularProgress size={24} /> : 'Adicionar Cliente'}
+                {loading ? <CircularProgress size={24} /> : 'Criar e conectar Instagram'}
               </Button>
             </Box>
           </Box>
           
           <Typography variant="body2" color="text.secondary" sx={{ mt: 4 }}>
-            Após adicionar o cliente, você poderá conectar a conta do Instagram diretamente no card do cliente. O logo será obtido automaticamente quando a conta for conectada.
+            Ao criar, o OAuth do Instagram abrirá automaticamente. O @ e a foto serão preenchidos pela API após a autorização.
           </Typography>
         </Box>
       )}

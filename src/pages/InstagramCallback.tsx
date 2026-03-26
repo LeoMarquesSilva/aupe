@@ -4,6 +4,17 @@ import { useNavigate } from 'react-router-dom';
 import InstagramAccountSelector from '../components/InstagramAccountSelector';
 import { clientService } from '../services/supabaseClient';
 
+const getClientIdFromCallback = (): string | null => {
+  const urlParams = new URLSearchParams(window.location.search);
+  // Instagram deve retornar o `state` enviado na autorização; `client_id` é fallback legado.
+  const rawClientId = urlParams.get('state') || urlParams.get('client_id');
+  if (!rawClientId) return null;
+
+  const clientId = rawClientId.trim();
+  if (!clientId) return null;
+  return clientId;
+};
+
 const InstagramCallback: React.FC = () => {
   const theme = useTheme();
   const [loading, setLoading] = useState<boolean>(true);
@@ -44,6 +55,11 @@ const InstagramCallback: React.FC = () => {
         
         if (!code) {
           throw new Error('Código de autorização não encontrado na URL. Por favor, tente novamente.');
+        }
+
+        const callbackClientId = getClientIdFromCallback();
+        if (!callbackClientId) {
+          throw new Error('ID do cliente não encontrado no callback. Feche e inicie a conexão novamente pelo cliente correto.');
         }
         
         console.log('✅ Código de autorização recebido, iniciando seletor de contas');
@@ -124,21 +140,11 @@ const InstagramCallback: React.FC = () => {
     try {
       console.log('💾 Salvando dados no Supabase usando clientService...');
       
-      // MODIFICAÇÃO: Buscar o cliente ID de múltiplas fontes
-      const urlParams = new URLSearchParams(window.location.search);
-      const clientId = urlParams.get('state') ||                    // Primeiro: da URL (parâmetro state)
-                      localStorage.getItem('current_client_id') ||   // Segundo: do localStorage
-                      urlParams.get('client_id');                   // Terceiro: parâmetro client_id direto
-      
-      console.log('🔍 Tentativas de encontrar clientId:', {
-        fromState: urlParams.get('state'),
-        fromLocalStorage: localStorage.getItem('current_client_id'),
-        fromClientId: urlParams.get('client_id'),
-        finalClientId: clientId
-      });
+      const clientId = getClientIdFromCallback();
+      console.log('🔍 ClientId do callback:', { clientId });
       
       if (!clientId) {
-        throw new Error('ID do cliente não encontrado. Certifique-se de que o cliente foi selecionado corretamente.');
+        throw new Error('ID do cliente não encontrado no callback. Feche e conecte novamente pelo cliente desejado.');
       }
       
       console.log('✅ Cliente ID encontrado:', clientId);
@@ -179,7 +185,7 @@ const InstagramCallback: React.FC = () => {
           type: 'INSTAGRAM_AUTH_ERROR',
           error: userMessage,
           data: instagramData,
-          clientId: localStorage.getItem('current_client_id') || 'unknown'
+          clientId: getClientIdFromCallback() || 'unknown'
         }, window.location.origin);
       }
       

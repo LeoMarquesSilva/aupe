@@ -587,6 +587,7 @@ export const clientService = {
       const updateData = {
         instagram_account_id: authData.instagramAccountId,
         access_token: authData.accessToken,
+        instagram: authData.username,
         instagram_username: authData.username,
         profile_picture: authData.profilePicture,
         token_expiry: authData.tokenExpiry instanceof Date ? authData.tokenExpiry.toISOString() : authData.tokenExpiry,
