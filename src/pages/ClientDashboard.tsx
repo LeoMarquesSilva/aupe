@@ -46,12 +46,12 @@ import {
 } from '@mui/icons-material';
 import { clientService, postService } from '../services/supabaseClient';
 import { Client } from '../types';
-import ClientManager from '../components/ClientManager';
 import EditClientDialog from '../components/EditClientDialog';
 import ConnectInstagram from '../components/ConnectInstagram';
 import SmartImage from '../components/SmartImage';
 import { imageUrlService } from '../services/imageUrlService';
-import { InstagramAuthData } from '../services/instagramAuthService';
+import { getAuthorizationUrl, InstagramAuthData } from '../services/instagramAuthService';
+import { subscriptionLimitsService } from '../services/subscriptionLimitsService';
 
 const ClientDashboard: React.FC = () => {
   const theme = useTheme();
@@ -63,7 +63,7 @@ const ClientDashboard: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [clientDialogOpen, setClientDialogOpen] = useState<boolean>(false);
+  const [creatingClient, setCreatingClient] = useState<boolean>(false);
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
   const [connectInstagramOpen, setConnectInstagramOpen] = useState<boolean>(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -140,16 +140,64 @@ const ClientDashboard: React.FC = () => {
     client.instagram.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
-  // Função para lidar com a adição de um novo cliente
-  const handleAddClient = (client: Client) => {
-    setClients(prevClients => [...prevClients, client]);
-    setClientDialogOpen(false);
-    setSelectedClient(null);
-    // Atualizar estatísticas
-    setClientStats(prev => ({
-      ...prev,
-      [client.id]: { scheduled: 0, posted: 0, draft: 0 }
-    }));
+  const handleNewClientViaOAuth = async () => {
+    if (creatingClient) return;
+    setCreatingClient(true);
+    setError(null);
+
+    try {
+      const limitCheck = await subscriptionLimitsService.canCreateClient();
+      if (!limitCheck.allowed) {
+        setError(limitCheck.message || 'Limite de contas atingido. Faça upgrade do plano.');
+        return;
+      }
+
+      const placeholder = `novo_${Date.now()}`;
+      const newClient = await clientService.addClient({
+        name: placeholder,
+        instagram: placeholder,
+      });
+
+      setClients(prev => [...prev, newClient]);
+      setClientStats(prev => ({ ...prev, [newClient.id]: { scheduled: 0, posted: 0, draft: 0 } }));
+
+      localStorage.setItem('current_client_id', newClient.id);
+      localStorage.removeItem('instagram_auth_temp_data');
+      localStorage.removeItem('instagram_auth_error');
+      localStorage.removeItem('instagram_auth_success');
+
+      const authUrl = getAuthorizationUrl(newClient.id);
+      const w = 600, h = 700;
+      const left = window.innerWidth / 2 - w / 2;
+      const top = window.innerHeight / 2 - h / 2;
+
+      const popup = window.open(authUrl, 'instagram-auth', `width=${w},height=${h},top=${top},left=${left}`);
+      if (!popup) {
+        setError('Popup bloqueado. Habilite popups e tente novamente.');
+        return;
+      }
+
+      const onMessage = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+        if (event.data?.type === 'INSTAGRAM_AUTH_SUCCESS') {
+          window.removeEventListener('message', onMessage);
+          fetchClients();
+        }
+      };
+      window.addEventListener('message', onMessage);
+
+      const poll = setInterval(() => {
+        if (!popup || popup.closed) {
+          clearInterval(poll);
+          window.removeEventListener('message', onMessage);
+          fetchClients();
+        }
+      }, 800);
+    } catch (err: any) {
+      setError(err.message || 'Erro ao criar cliente.');
+    } finally {
+      setCreatingClient(false);
+    }
   };
 
   // Função para lidar com a atualização de um cliente
@@ -308,10 +356,11 @@ const ClientDashboard: React.FC = () => {
           <Button 
             variant="contained" 
             color="primary"
-            startIcon={<PersonAddIcon />}
-            onClick={() => setClientDialogOpen(true)}
+            startIcon={creatingClient ? <CircularProgress size={20} color="inherit" /> : <PersonAddIcon />}
+            onClick={handleNewClientViaOAuth}
+            disabled={creatingClient}
           >
-            Novo Cliente
+            {creatingClient ? 'Criando...' : 'Novo Cliente'}
           </Button>
         </Box>
       </Box>
@@ -356,11 +405,12 @@ const ClientDashboard: React.FC = () => {
           
           <Button 
             variant="contained" 
-            startIcon={<PersonAddIcon />}
-            onClick={() => setClientDialogOpen(true)}
+            startIcon={creatingClient ? <CircularProgress size={20} color="inherit" /> : <PersonAddIcon />}
+            onClick={handleNewClientViaOAuth}
+            disabled={creatingClient}
             size="large"
           >
-            Adicionar Cliente
+            {creatingClient ? 'Criando...' : 'Adicionar Cliente'}
           </Button>
         </Paper>
       )}
@@ -821,40 +871,6 @@ const ClientDashboard: React.FC = () => {
         </Grid>
       )}
       
-      {/* Diálogo para gerenciar clientes */}
-      <Dialog
-        open={clientDialogOpen}
-        onClose={() => {
-          setClientDialogOpen(false);
-          setSelectedClient(null);
-        }}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <PersonAddIcon sx={{ mr: 1 }} />
-            Adicionar Novo Cliente
-          </Box>
-        </DialogTitle>
-        <DialogContent dividers>
-          <ClientManager 
-            clients={clients} 
-            onAddClient={handleAddClient} 
-            onSelectClient={() => {}} 
-            addOnly={true}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => {
-            setClientDialogOpen(false);
-            setSelectedClient(null);
-          }}>
-            Fechar
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {/* Modal de edição de cliente */}
       <EditClientDialog
         open={editDialogOpen}

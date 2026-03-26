@@ -188,9 +188,20 @@ serve(async (req) => {
         auth: { autoRefreshToken: false, persistSession: false },
       });
 
+      // Buscar nome atual do cliente; se for placeholder, sobrescrever com username
+      const { data: existingClient } = await adminClient
+        .from('clients')
+        .select('name')
+        .eq('id', clientId)
+        .maybeSingle();
+
+      const isPlaceholder = !existingClient?.name || existingClient.name.startsWith('novo_');
+      const clientName = isPlaceholder ? finalUsername : existingClient.name;
+
       const { error: updateError } = await adminClient
         .from('clients')
         .update({
+          name: clientName,
           instagram_account_id: instagramAccountId,
           access_token: longLivedToken,
           instagram: finalUsername,
