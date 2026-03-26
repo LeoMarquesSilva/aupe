@@ -2,90 +2,127 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 
-// Constantes para autenticação
-const META_APP_ID = '1087259016929287';
-const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873';
-const META_REDIRECT_URI = 'https://aupedigital.com.br/callback';
+const DEFAULT_APP_ID = '1087259016929287';
 
-// Endpoint para trocar o código por tokens e completar o fluxo de autenticação
+function instagramAppId() {
+  return process.env.INSTAGRAM_APP_ID || DEFAULT_APP_ID;
+}
+
+function instagramAppSecret() {
+  return process.env.INSTAGRAM_APP_SECRET || '';
+}
+
+const META_REDIRECT_URI = process.env.INSTAGRAM_REDIRECT_URI || 'https://aupedigital.com.br/callback';
+
+// Business Login for Instagram — troca code → long-lived (Node 18+ fetch/FormData)
 router.post('/auth', async (req, res) => {
   try {
     const { code, redirectUri } = req.body;
-    
+    const appId = instagramAppId();
+    const appSecret = instagramAppSecret();
+
     if (!code) {
       return res.status(400).json({ message: 'Código de autorização não fornecido' });
     }
-    
-    console.log('Código recebido:', code);
-    console.log('URL de redirecionamento:', redirectUri || META_REDIRECT_URI);
-    
-    // Usar a URL de redirecionamento fornecida pelo cliente ou a padrão
-    const finalRedirectUri = redirectUri || META_REDIRECT_URI;
-    
-    try {
-      // 1. Trocar o código por um token de acesso de curta duração
-      const shortLivedToken = await exchangeCodeForToken(code, finalRedirectUri);
-      console.log('Token de curta duração obtido');
-      
-      // 2. Converter para token de longa duração (60 dias)
-      const { accessToken, expiresIn } = await getLongLivedToken(shortLivedToken);
-      console.log('Token de longa duração obtido, expira em:', expiresIn, 'segundos');
-      
-      // 3. Buscar as páginas do Facebook vinculadas
-      const pages = await getFacebookPages(accessToken);
-      console.log('Páginas do Facebook obtidas:', pages.length);
-      
-      if (pages.length === 0) {
-        return res.status(400).json({ 
-          message: 'Nenhuma página do Facebook encontrada. Você precisa ter uma página do Facebook vinculada à sua conta.' 
-        });
-      }
-      
-      // Encontrar a primeira página com uma conta do Instagram vinculada
-      const pageWithInstagram = pages.find(page => page.instagram_business_account);
-      
-      if (!pageWithInstagram) {
-        return res.status(400).json({ 
-          message: 'Nenhuma conta do Instagram Business encontrada. Você precisa vincular uma conta do Instagram à sua página do Facebook.' 
-        });
-      }
-      
-      console.log('Página com Instagram encontrada:', pageWithInstagram.name);
-      console.log('Token da página obtido, este token não expira a menos que as permissões sejam revogadas');
-      
-      // 4. Buscar dados da conta do Instagram
-      const instagramAccountId = pageWithInstagram.instagram_business_account.id;
-      const instagramData = await getInstagramAccountData(instagramAccountId, pageWithInstagram.access_token);
-      console.log('Dados da conta do Instagram obtidos:', instagramData.username);
-      
-      // Calcular data de expiração do token
-      // Para tokens de página, definimos uma data bem no futuro, pois eles não expiram automaticamente
-      const tokenExpiry = new Date();
-      tokenExpiry.setFullYear(tokenExpiry.getFullYear() + 1); // Definir para 1 ano no futuro
-      
-      // Retornar todos os dados necessários
-      return res.json({
-        instagramAccountId,
-        accessToken: pageWithInstagram.access_token, // Usamos o token da página, não o token do usuário
-        username: instagramData.username,
-        profilePicture: instagramData.profile_picture_url,
-        tokenExpiry: tokenExpiry.toISOString(), // Convertendo para string para transmissão JSON
-        pageId: pageWithInstagram.id,
-        pageName: pageWithInstagram.name,
-        expiresIn: 31536000 // Aproximadamente 1 ano em segundos
-      });
-    } catch (error) {
-      console.error('Erro detalhado no fluxo de autenticação:', error);
-      if (error.response) {
-        console.error('Resposta de erro:', error.response.data);
-      }
-      throw error;
+    if (!appSecret) {
+      return res.status(500).json({ message: 'INSTAGRAM_APP_SECRET não configurado' });
     }
+
+    const finalRedirectUri = redirectUri || META_REDIRECT_URI;
+    const cleanCode = String(code).trim().replace(/#_$/, '').replace(/#$/, '');
+
+    const form = new FormData();
+    form.append('client_id', appId);
+    form.append('client_secret', appSecret);
+    form.append('grant_type', 'authorization_code');
+    form.append('redirect_uri', finalRedirectUri);
+    form.append('code', cleanCode);
+
+    const shortRes = await fetch('https://api.instagram.com/oauth/access_token', {
+      method: 'POST',
+      body: form,
+    });
+    const shortJson = await shortRes.json();
+
+    if (!shortRes.ok) {
+      return res.status(400).json({
+        message: shortJson.error_message || 'Falha OAuth Instagram',
+        details: shortJson,
+      });
+    }
+
+    const row = Array.isArray(shortJson.data) ? shortJson.data[0] : shortJson;
+    const shortLivedToken = row?.access_token;
+    const scopedUserId = row?.user_id != null ? String(row.user_id) : '';
+
+    if (!shortLivedToken) {
+      return res.status(502).json({ message: 'Resposta sem access_token', details: shortJson });
+    }
+
+    const longUrl = new URL('https://graph.instagram.com/access_token');
+    longUrl.searchParams.set('grant_type', 'ig_exchange_token');
+    longUrl.searchParams.set('client_secret', appSecret);
+    longUrl.searchParams.set('access_token', shortLivedToken);
+
+    const longRes = await fetch(longUrl.toString());
+    const longJson = await longRes.json();
+
+    if (!longRes.ok || !longJson.access_token) {
+      return res.status(502).json({
+        message: longJson.error?.message || 'Falha token longo',
+        details: longJson,
+      });
+    }
+
+    const longLivedToken = longJson.access_token;
+    const expiresIn = Number(longJson.expires_in) || 5184000;
+
+    let username = '';
+    let profilePicture = '';
+    let instagramAccountId = scopedUserId;
+
+    const profileUrl = new URL(`https://graph.facebook.com/v21.0/${scopedUserId}`);
+    profileUrl.searchParams.set('fields', 'id,username,profile_picture_url,followers_count,media_count');
+    profileUrl.searchParams.set('access_token', longLivedToken);
+    const profRes = await fetch(profileUrl.toString());
+    const profJson = await profRes.json();
+
+    if (profRes.ok && profJson && !profJson.error) {
+      username = profJson.username || '';
+      profilePicture = profJson.profile_picture_url || '';
+      if (profJson.id) instagramAccountId = String(profJson.id);
+    } else {
+      const meUrl = new URL('https://graph.instagram.com/v21.0/me');
+      meUrl.searchParams.set('fields', 'id,username,profile_picture_url,followers_count,media_count');
+      meUrl.searchParams.set('access_token', longLivedToken);
+      const meRes = await fetch(meUrl.toString());
+      const meJson = await meRes.json();
+      if (meRes.ok && meJson && !meJson.error) {
+        username = meJson.username || '';
+        profilePicture = meJson.profile_picture_url || '';
+        if (meJson.id) instagramAccountId = String(meJson.id);
+      }
+    }
+
+    const tokenExpiry = new Date(Date.now() + expiresIn * 1000);
+
+    return res.json({
+      instagramAccountId,
+      accessToken: longLivedToken,
+      username: username || `user_${scopedUserId}`,
+      profilePicture,
+      tokenExpiry: tokenExpiry.toISOString(),
+      pageId: null,
+      pageName: 'Instagram',
+      expiresIn,
+      issuedAt: new Date().toISOString(),
+      authMethod: 'instagram_business_login',
+    });
   } catch (error) {
     console.error('Erro no fluxo de autenticação do Instagram:', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       message: error.message || 'Erro interno no servidor durante a autenticação',
-      details: error.response?.data || 'Sem detalhes adicionais'
+      details: error.response?.data || 'Sem detalhes adicionais',
     });
   }
 });
@@ -147,45 +184,6 @@ router.post('/verify-token', async (req, res) => {
   }
 });
 
-// Função para trocar o código por um token de acesso de curta duração
-async function exchangeCodeForToken(code, redirectUri) {
-  try {
-    console.log('Trocando código por token com URL de redirecionamento:', redirectUri);
-    const response = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
-      params: {
-        client_id: META_APP_ID,
-        client_secret: META_APP_SECRET,
-        redirect_uri: redirectUri,
-        code
-      }
-    });
-    return response.data.access_token;
-  } catch (error) {
-    console.error('Erro ao trocar código por token:', error.response?.data || error);
-    throw new Error(error.response?.data?.error?.message || 'Falha ao obter token de acesso');
-  }
-}
-
-// Função para converter token de curta duração para longa duração (60 dias)
-async function getLongLivedToken(shortLivedToken) {
-  try {
-    const response = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
-      params: {
-        grant_type: 'fb_exchange_token',
-        client_id: META_APP_ID,
-        client_secret: META_APP_SECRET,
-        fb_exchange_token: shortLivedToken
-      }
-    });
-    return {
-      accessToken: response.data.access_token,
-      expiresIn: response.data.expires_in
-    };
-  } catch (error) {
-    console.error('Erro ao obter token de longa duração:', error.response?.data || error);
-    throw new Error(error.response?.data?.error?.message || 'Falha ao obter token de longa duração');
-  }
-}
 
 // Função para buscar páginas do Facebook vinculadas à conta
 async function getFacebookPages(accessToken) {
@@ -257,7 +255,7 @@ async function verifyToken(accessToken) {
       const debugResponse = await axios.get(`https://graph.facebook.com/debug_token`, {
         params: {
           input_token: accessToken,
-          access_token: `${META_APP_ID}|${META_APP_SECRET}`
+          access_token: `${instagramAppId()}|${instagramAppSecret()}`
         }
       });
       return debugResponse.data.data.is_valid;

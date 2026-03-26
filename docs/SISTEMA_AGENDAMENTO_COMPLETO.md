@@ -38,6 +38,7 @@
 **INSERT:**
 - Condição: `NEW.immediate = true`
 - Payload: `type: 'INSERT'`, `record` com `client_data` (access_token, instagram_account_id, etc.)
+- **OAuth Instagram (Business Login):** o contrato do N8N não muda — continuam `access_token` e `instagram_account_id` na tabela `clients` / `client_data` (token long-lived IG User em vez de Page token, quando a conexão usa o fluxo `www.instagram.com/oauth/authorize`).
 
 **UPDATE:**
 - Condição: `OLD.status != NEW.status` E `NEW.status IN ('sent_to_n8n', 'posted', 'failed')`

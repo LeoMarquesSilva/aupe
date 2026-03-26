@@ -45,6 +45,7 @@ const columnMapping: Record<string, string> = {
   'tokenExpiry': 'token_expiry',
   'pageId': 'page_id',
   'pageName': 'page_name',
+  'instagramLongLivedIssuedAt': 'instagram_long_lived_issued_at',
   'username': 'instagram_username',
   'fullName': 'full_name',
   'avatarUrl': 'avatar_url',
@@ -115,7 +116,7 @@ const convertFromDbFormat = (obj: Record<string, any>) => {
       const jsKey = reverseMapping[key] || key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
       
       // Converter strings de data para objetos Date
-      if ((key === 'token_expiry' || key === 'created_at' || key === 'updated_at' || key === 'posted_at' || key === 'last_retry_at' || key === 'expires_at' || key === 'approval_responded_at') && obj[key]) {
+      if ((key === 'token_expiry' || key === 'instagram_long_lived_issued_at' || key === 'created_at' || key === 'updated_at' || key === 'posted_at' || key === 'last_retry_at' || key === 'expires_at' || key === 'approval_responded_at') && obj[key]) {
         try {
           result[jsKey] = new Date(obj[key]);
         } catch (e) {
@@ -253,6 +254,7 @@ export const clientService = {
           tokenExpiry: client.token_expiry ? new Date(client.token_expiry) : undefined,
           pageId: client.page_id,
           pageName: client.page_name,
+          instagramLongLivedIssuedAt: client.instagram_long_lived_issued_at || undefined,
           isActive: client.is_active !== false,
         };
         
@@ -313,6 +315,7 @@ export const clientService = {
         tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
         pageId: data.page_id,
         pageName: data.page_name,
+        instagramLongLivedIssuedAt: data.instagram_long_lived_issued_at || undefined,
         isActive: data.is_active !== false,
       };
       
@@ -459,7 +462,7 @@ export const clientService = {
           if (typeof value === 'boolean') return true;
           
           // Pular campos do Instagram para não sobrescrever
-          if (['instagramAccountId', 'username', 'profilePicture', 'tokenExpiry', 'pageId', 'pageName'].includes(key)) {
+          if (['instagramAccountId', 'username', 'profilePicture', 'tokenExpiry', 'pageId', 'pageName', 'instagramLongLivedIssuedAt'].includes(key)) {
             return false; // Não incluir estes campos no update
           }
           
@@ -513,6 +516,7 @@ export const clientService = {
         tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
         pageId: data.page_id,
         pageName: data.page_name,
+        instagramLongLivedIssuedAt: data.instagram_long_lived_issued_at || undefined,
         isActive: data.is_active !== false,
       };
       
@@ -575,7 +579,8 @@ export const clientService = {
         profile_picture: authData.profilePicture,
         token_expiry: authData.tokenExpiry instanceof Date ? authData.tokenExpiry.toISOString() : authData.tokenExpiry,
         page_id: authData.pageId,
-        page_name: authData.pageName
+        page_name: authData.pageName,
+        instagram_long_lived_issued_at: authData.issuedAt ?? null,
       };
       
       console.log('Dados que serão salvos no banco:', updateData);
@@ -611,7 +616,8 @@ export const clientService = {
         profilePicture: data.profile_picture,
         tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
         pageId: data.page_id,
-        pageName: data.page_name
+        pageName: data.page_name,
+        instagramLongLivedIssuedAt: data.instagram_long_lived_issued_at || undefined,
       };
       
       console.log('Cliente convertido manualmente:', convertedClient);
@@ -628,20 +634,14 @@ export const clientService = {
   // Verificar se o token do Instagram ainda é válido
   async verifyInstagramToken(accessToken: string): Promise<boolean> {
     try {
-      // Verificar o token usando a API do Facebook
-      const META_APP_ID = '1087259016929287';
-      const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873';
-      
-      // Fazer uma chamada para a API do Facebook para verificar o token
-      const response = await fetch(`https://graph.facebook.com/debug_token?input_token=${accessToken}&access_token=${META_APP_ID}|${META_APP_SECRET}`);
-      const data = await response.json();
-      
-      if (!response.ok) {
-        console.error('Erro ao verificar token:', data);
-        return false;
-      }
-      
-      return data.data?.is_valid || false;
+      const r = await fetch(
+        `https://graph.facebook.com/v21.0/me?fields=id&access_token=${encodeURIComponent(accessToken)}`,
+      );
+      if (r.ok) return true;
+      const r2 = await fetch(
+        `https://graph.instagram.com/v21.0/me?fields=id&access_token=${encodeURIComponent(accessToken)}`,
+      );
+      return r2.ok;
     } catch (err) {
       console.error('Erro ao verificar token do Instagram:', err);
       return false;
@@ -665,7 +665,8 @@ export const clientService = {
         profilePicture: null,
         tokenExpiry: null,
         pageId: null,
-        pageName: null
+        pageName: null,
+        instagramLongLivedIssuedAt: null,
       });
       
       // Atualizar diretamente no banco de dados usando os campos mapeados corretamente
@@ -696,7 +697,8 @@ export const clientService = {
         profilePicture: data.profile_picture,
         tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
         pageId: data.page_id,
-        pageName: data.page_name
+        pageName: data.page_name,
+        instagramLongLivedIssuedAt: data.instagram_long_lived_issued_at || undefined,
       };
       
       return convertedClient;

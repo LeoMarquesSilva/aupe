@@ -23,6 +23,8 @@ export interface Client {
   tokenExpiry?: Date;
   pageId?: string;
   pageName?: string;
+  /** Emissão do token long-lived Instagram (refresh Meta). */
+  instagramLongLivedIssuedAt?: string;
 }
 
 export interface Post {

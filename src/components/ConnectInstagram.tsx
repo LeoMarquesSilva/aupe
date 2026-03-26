@@ -27,7 +27,6 @@ import {
 import { getAuthorizationUrl, InstagramAuthData } from '../services/instagramAuthService';
 import { clientService } from '../services/supabaseClient';
 import { Client } from '../types';
-import axios from 'axios';
 import { supabase } from '../services/supabaseClient';
 import InstagramConnectionFix from './InstagramConnectionFix';
 
@@ -51,10 +50,6 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
   const [showDebugInfo, setShowDebugInfo] = useState<boolean>(false);
   const [needsFix, setNeedsFix] = useState<boolean>(false);
   const [initialCheckDone, setInitialCheckDone] = useState<boolean>(false);
-
-  // Constantes para autenticação
-  const META_APP_ID = '1087259016929287';
-  const META_APP_SECRET = '8a664b53de209acea8e0efb5d554e873';
 
   // Função para adicionar logs de debug
   const addDebug = (message: string) => {
@@ -154,7 +149,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
           addDebug('Cliente não tem dados de autenticação completos do Instagram');
           
           // Verificar se tem token mas falta outros dados (precisa de correção)
-          if (client.accessToken && (!client.instagramAccountId || !client.username || !client.pageId)) {
+          if (client.accessToken && (!client.instagramAccountId || !client.username)) {
             addDebug('Cliente tem token mas falta dados importantes. Recomendando correção.');
             setNeedsFix(true);
           } else {
@@ -207,46 +202,34 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     try {
       addDebug('Iniciando verificação do token...');
       
-      // Verificar token diretamente com a API do Facebook
-      const response = await axios.get('https://graph.facebook.com/debug_token', {
-        params: {
-          input_token: token,
-          access_token: `${META_APP_ID}|${META_APP_SECRET}`
-        }
-      });
-      
-      const tokenData = response.data.data;
-      addDebug(`Token válido: ${tokenData.is_valid}, Tipo: ${tokenData.type}`);
-      
-      // Salvar informações do token para exibição
-      setTokenInfo(tokenData);
-      
-      if (!tokenData.is_valid) {
+      const r = await fetch(
+        `https://graph.facebook.com/v21.0/me?fields=id&access_token=${encodeURIComponent(token)}`,
+      );
+      const ok = r.ok || (await fetch(
+        `https://graph.instagram.com/v21.0/me?fields=id&access_token=${encodeURIComponent(token)}`,
+      )).ok;
+
+      setTokenInfo({ is_valid: ok, source: 'graph_me' });
+      addDebug(`Token válido (Graph me): ${ok}`);
+
+      if (!ok) {
         addDebug('Token inválido, solicitando reconexão');
         setError('O token de acesso não é mais válido. Por favor, reconecte sua conta.');
         setConnected(false);
-        
-        // Remover dados de autenticação do Supabase
         await clientService.removeInstagramAuth(client.id);
-        
         setInstagramData(null);
         onConnectionUpdate(client.id, null);
         return;
       }
-      
-      // Verificar se o token tem data de expiração
-      if (tokenData.expires_at) {
-        const expiryDate = new Date(tokenData.expires_at * 1000);
-        addDebug(`Token expira em: ${expiryDate.toLocaleString()}`);
-        
+
+      if (client.tokenExpiry) {
+        const expiryDate = new Date(client.tokenExpiry);
         const now = new Date();
-        
-        // Se o token expira em menos de 7 dias, mostrar aviso
         if (expiryDate.getTime() - now.getTime() < 7 * 24 * 60 * 60 * 1000) {
-          setError(`O token expirará em ${Math.ceil((expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))} dias. Recomendamos reconectar sua conta.`);
+          setError(
+            `O token expirará em até ${Math.ceil((expiryDate.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))} dias. Recomendamos reconectar ou aguardar renovação automática.`,
+          );
         }
-      } else {
-        addDebug('Token não tem data de expiração (não expira automaticamente)');
       }
       
       // Se chegou até aqui, o token é válido
@@ -544,7 +527,9 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
                 />
               </Box>
               <Typography variant="body2" color="text.secondary">
-                Conectado via {instagramData?.pageName}
+                {instagramData?.pageName
+                  ? `Conectado via ${instagramData.pageName}`
+                  : 'Conectado com Instagram (OAuth)'}
               </Typography>
             </Box>
           </Box>
