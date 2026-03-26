@@ -260,15 +260,15 @@ const router = createBrowserRouter([
   // Rotas protegidas - Checkout Stripe
   {
     path: "/checkout",
-    element: <ProtectedCallbackLayout><Checkout /></ProtectedCallbackLayout>,
+    element: <ProtectedPageLayout><Checkout /></ProtectedPageLayout>,
   },
   {
     path: "/checkout/success",
-    element: <ProtectedCallbackLayout><CheckoutSuccess /></ProtectedCallbackLayout>,
+    element: <ProtectedPageLayout><CheckoutSuccess /></ProtectedPageLayout>,
   },
   {
     path: "/checkout/cancel",
-    element: <ProtectedCallbackLayout><CheckoutCancel /></ProtectedCallbackLayout>,
+    element: <ProtectedPageLayout><CheckoutCancel /></ProtectedPageLayout>,
   },
   
   // Rota catch-all - redireciona para dashboard se logado, senão para login
