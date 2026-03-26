@@ -33,13 +33,15 @@ interface InstagramAccountSelectorProps {
   onClose: () => void;
   onAccountSelected: (authData: any) => void;
   authCode: string;
+  clientId?: string;
 }
 
 const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
   open,
   onClose,
   onAccountSelected,
-  authCode
+  authCode,
+  clientId,
 }) => {
   const theme = useTheme();
   const [accounts, setAccounts] = useState<AvailableInstagramAccount[]>([]);
@@ -61,8 +63,8 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
       setLoading(true);
       setError(null);
       
-      console.log('Carregando contas do Instagram disponíveis...');
-      const availableAccounts = await getAvailableInstagramAccounts(authCode);
+      console.log('Carregando contas do Instagram disponíveis...', { clientId });
+      const availableAccounts = await getAvailableInstagramAccounts(authCode, clientId);
       
       setAccounts(availableAccounts);
       console.log(`${availableAccounts.length} contas encontradas`);

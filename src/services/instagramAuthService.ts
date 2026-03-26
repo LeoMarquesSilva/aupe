@@ -25,6 +25,7 @@ export interface AvailableInstagramAccount {
   mediaCount?: number;
   issuedAt?: string;
   tokenExpiry?: Date;
+  savedToDb?: boolean;
 }
 
 const DEFAULT_INSTAGRAM_APP_ID = '1087259016929287';
@@ -92,11 +93,13 @@ function normalizeAuthPayload(data: Record<string, unknown>): InstagramAuthData 
 
 /**
  * Troca o authorization code por token long-lived via Edge Function (secret só no servidor).
+ * Se clientId fornecido, a Edge Function salva diretamente no banco (service role, bypass RLS).
  */
 export async function exchangeInstagramAuthCode(
   code: string,
   redirectUriOverride?: string,
-): Promise<InstagramAuthData> {
+  clientId?: string,
+): Promise<InstagramAuthData & { savedToDb?: boolean }> {
   const { supabase } = await import('./supabaseClient');
   const {
     data: { session },
@@ -125,7 +128,7 @@ export async function exchangeInstagramAuthCode(
       Authorization: `Bearer ${session.access_token}`,
       apikey: anonKey,
     },
-    body: JSON.stringify({ code: cleanCode, redirectUri }),
+    body: JSON.stringify({ code: cleanCode, redirectUri, ...(clientId ? { clientId } : {}) }),
   });
 
   const data = await res.json().catch(() => ({}));
@@ -134,12 +137,18 @@ export async function exchangeInstagramAuthCode(
     throw new Error(msg);
   }
 
-  return normalizeAuthPayload(data as Record<string, unknown>);
+  const parsed = data as Record<string, unknown>;
+  return { ...normalizeAuthPayload(parsed), savedToDb: parsed.savedToDb === true };
 }
 
-/** Lista contas — fluxo atual = uma conta via Business Login (sem Facebook Page). */
-export const getAvailableInstagramAccounts = async (code: string): Promise<AvailableInstagramAccount[]> => {
-  const auth = await exchangeInstagramAuthCode(code);
+/** Lista contas — fluxo atual = uma conta via Business Login (sem Facebook Page).
+ *  Se clientId fornecido, a Edge Function já salva no banco (server-side).
+ */
+export const getAvailableInstagramAccounts = async (
+  code: string,
+  clientId?: string,
+): Promise<AvailableInstagramAccount[]> => {
+  const auth = await exchangeInstagramAuthCode(code, undefined, clientId);
   return [
     {
       instagramAccountId: auth.instagramAccountId,
@@ -152,6 +161,7 @@ export const getAvailableInstagramAccounts = async (code: string): Promise<Avail
       mediaCount: undefined,
       issuedAt: auth.issuedAt,
       tokenExpiry: auth.tokenExpiry,
+      savedToDb: auth.savedToDb,
     },
   ];
 };

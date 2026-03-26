@@ -1,4 +1,5 @@
 // Edge Function: troca code OAuth (Business Login for Instagram) → token long-lived
+// Se clientId fornecido, salva diretamente no banco (service role, bypass RLS).
 // Segredos: INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET (Instagram App ID/Secret do painel Meta)
 // Requer JWT do usuário (Supabase Auth).
 
@@ -35,6 +36,7 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   const appId = Deno.env.get('INSTAGRAM_APP_ID') || '';
   const appSecret = Deno.env.get('INSTAGRAM_APP_SECRET') || '';
 
@@ -59,7 +61,7 @@ serve(async (req) => {
     return jsonResponse({ message: 'Sessão inválida' }, 401);
   }
 
-  let body: { code?: string; redirectUri?: string };
+  let body: { code?: string; redirectUri?: string; clientId?: string };
   try {
     body = await req.json();
   } catch {
@@ -77,6 +79,8 @@ serve(async (req) => {
   if (!redirectUri) {
     return jsonResponse({ message: 'redirectUri é obrigatório se INSTAGRAM_REDIRECT_URI não estiver definido' }, 400);
   }
+
+  const clientId = body.clientId?.trim() || null;
 
   try {
     const form = new FormData();
@@ -174,11 +178,43 @@ serve(async (req) => {
 
     const tokenExpiry = new Date(Date.now() + expiresIn * 1000).toISOString();
     const issuedAt = new Date().toISOString();
+    const finalUsername = username || `user_${scopedUserId}`;
+
+    // --- Salvar no banco se clientId fornecido (service role bypassa RLS) ---
+    let savedToDb = false;
+    if (clientId && supabaseServiceKey) {
+      const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+
+      const { error: updateError } = await adminClient
+        .from('clients')
+        .update({
+          instagram_account_id: instagramAccountId,
+          access_token: longLivedToken,
+          instagram: finalUsername,
+          instagram_username: finalUsername,
+          profile_picture: profilePicture,
+          token_expiry: tokenExpiry,
+          page_id: null,
+          page_name: 'Instagram',
+          instagram_long_lived_issued_at: issuedAt,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', clientId);
+
+      if (updateError) {
+        console.error('Erro ao salvar dados no banco (service role):', updateError);
+      } else {
+        savedToDb = true;
+        console.log(`Instagram auth salvo no banco para client ${clientId}`);
+      }
+    }
 
     return jsonResponse({
       instagramAccountId,
       accessToken: longLivedToken,
-      username: username || `user_${scopedUserId}`,
+      username: finalUsername,
       profilePicture,
       tokenExpiry,
       pageId: null,
@@ -189,6 +225,7 @@ serve(async (req) => {
       mediaCount,
       authMethod: 'instagram_business_login',
       requestedScopes: IG_SCOPES,
+      savedToDb,
     });
   } catch (e) {
     console.error(e);
