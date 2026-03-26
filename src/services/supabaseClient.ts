@@ -611,7 +611,9 @@ export const clientService = {
         throw new Error(`Erro do Supabase: ${error.message}`);
       }
       if (!data) {
-        throw new Error('Cliente não encontrado para sua organização ao salvar autenticação Instagram.');
+        throw new Error(
+          'Este cliente não pertence à sua organização atual. Selecione um cliente da sua organização ou peça ao admin para transferi-lo.',
+        );
       }
       
       console.log('Dados salvos com sucesso no banco:', data);

@@ -160,22 +160,30 @@ const InstagramCallback: React.FC = () => {
       
     } catch (error) {
       console.error('❌ Erro ao salvar no Supabase:', error);
-      
-      // Mesmo com erro no Supabase, manter os dados no localStorage
-      // para que o usuário não perca a conexão
-      console.log('📝 Dados mantidos no localStorage como fallback');
+      const message = (error as Error).message || 'Falha ao salvar autenticação';
+      const isOrgMismatch =
+        message.includes('não pertence à sua organização') ||
+        message.includes('organização atual');
+      const userMessage = isOrgMismatch
+        ? 'Não foi possível salvar: este cliente está em outra organização. Abra o cliente correto ou peça ao admin para transferi-lo para sua organização.'
+        : message;
+
+      // Só manter fallback local quando não for erro de autorização multi-tenant.
+      if (!isOrgMismatch) {
+        console.log('📝 Dados mantidos no localStorage como fallback');
+      }
       
       // Notificar a janela pai sobre o erro
       if (window.opener) {
         window.opener.postMessage({
           type: 'INSTAGRAM_AUTH_ERROR',
-          error: (error as Error).message,
+          error: userMessage,
           data: instagramData,
           clientId: localStorage.getItem('current_client_id') || 'unknown'
         }, window.location.origin);
       }
       
-      throw error;
+      throw new Error(userMessage);
     }
   };
   
