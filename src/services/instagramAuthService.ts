@@ -100,19 +100,20 @@ export async function exchangeInstagramAuthCode(
   redirectUriOverride?: string,
   clientId?: string,
 ): Promise<InstagramAuthData & { savedToDb?: boolean }> {
-  const { supabase } = await import('./supabaseClient');
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session?.access_token) {
-    throw new Error('Faça login na plataforma para conectar o Instagram.');
-  }
-
   const supabaseUrl = (process.env.REACT_APP_SUPABASE_URL || '').replace(/\/$/, '');
   const anonKey = process.env.REACT_APP_SUPABASE_KEY || '';
   if (!supabaseUrl || !anonKey) {
     throw new Error('Supabase não configurado (REACT_APP_SUPABASE_URL / REACT_APP_SUPABASE_KEY).');
+  }
+
+  // Tentar obter sessão, mas não falhar se não existir (popup pode ter sessão stale)
+  let bearerToken: string | null = null;
+  try {
+    const { supabase } = await import('./supabaseClient');
+    const { data: { session } } = await supabase.auth.getSession();
+    bearerToken = session?.access_token || null;
+  } catch {
+    console.warn('Não foi possível obter sessão Supabase — prosseguindo sem JWT');
   }
 
   const cleanCode = code.trim().replace(/#_$/, '').replace(/#$/, '');
@@ -121,13 +122,17 @@ export async function exchangeInstagramAuthCode(
     throw new Error('redirect_uri ausente: defina REACT_APP_INSTAGRAM_REDIRECT_URI ou use /callback na mesma origem.');
   }
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    apikey: anonKey,
+  };
+  if (bearerToken) {
+    headers['Authorization'] = `Bearer ${bearerToken}`;
+  }
+
   const res = await fetch(`${supabaseUrl}/functions/v1/instagram-oauth-exchange`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: anonKey,
-    },
+    headers,
     body: JSON.stringify({ code: cleanCode, redirectUri, ...(clientId ? { clientId } : {}) }),
   });
 

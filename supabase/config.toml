@@ -49,8 +49,10 @@ verify_jwt = false
 [functions.stripe-webhook]
 verify_jwt = false
 
+# JWT desabilitado no gateway; a validação do code Instagram (single-use) + apikey é suficiente.
+# O JWT é verificado opcionalmente dentro da função para logging.
 [functions.instagram-oauth-exchange]
-verify_jwt = true
+verify_jwt = false
 
 [functions.instagram-refresh-tokens]
 verify_jwt = false

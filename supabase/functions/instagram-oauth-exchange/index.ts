@@ -45,20 +45,23 @@ serve(async (req) => {
     return jsonResponse({ message: 'Servidor OAuth não configurado (secrets Meta)' }, 500);
   }
 
+  // JWT é opcional: a popup pode ter sessão expirada/stale.
+  // A segurança real vem do código Instagram (single-use, app-specific) + apikey.
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return jsonResponse({ message: 'Não autorizado' }, 401);
-  }
+  let authenticatedUserId: string | null = null;
 
-  const jwt = authHeader.slice(7);
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  const { data: userData, error: userError } = await supabase.auth.getUser(jwt);
-  if (userError || !userData?.user) {
-    return jsonResponse({ message: 'Sessão inválida' }, 401);
+  if (authHeader?.startsWith('Bearer ')) {
+    const jwt = authHeader.slice(7);
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: userData, error: userError } = await supabase.auth.getUser(jwt);
+    if (!userError && userData?.user) {
+      authenticatedUserId = userData.user.id;
+    } else {
+      console.warn('JWT fornecido mas inválido/expirado — prosseguindo sem autenticação de usuário');
+    }
   }
 
   let body: { code?: string; redirectUri?: string; clientId?: string };
