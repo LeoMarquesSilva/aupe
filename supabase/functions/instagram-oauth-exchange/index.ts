@@ -153,9 +153,19 @@ serve(async (req) => {
     }
 
     // 2) Trocar short-lived por long-lived (GET com fallback POST)
-    const longJson = await exchangeLongLivedToken(shortLivedToken, appSecret);
-    const longLivedToken = longJson.access_token as string;
-    const expiresIn = Number(longJson.expires_in) || 5184000;
+    let longLivedToken = shortLivedToken;
+    let expiresIn = 3600;
+    let tokenType = 'short_lived';
+    let longLivedError = '';
+    try {
+      const longJson = await exchangeLongLivedToken(shortLivedToken, appSecret);
+      longLivedToken = longJson.access_token as string;
+      expiresIn = Number(longJson.expires_in) || 5184000;
+      tokenType = 'long_lived';
+    } catch (longErr) {
+      longLivedError = (longErr as Error).message;
+      console.warn('Step 2 WARN: long-lived falhou:', longLivedError);
+    }
 
     // 3) Buscar perfil do Instagram
     let username = '';
@@ -222,6 +232,7 @@ serve(async (req) => {
           instagram_username: finalUsername,
           profile_picture: profilePicture,
           token_expiry: tokenExpiry,
+          token_type: tokenType,
           page_id: null,
           page_name: 'Instagram',
           instagram_long_lived_issued_at: issuedAt,
@@ -250,6 +261,8 @@ serve(async (req) => {
       followersCount,
       mediaCount,
       savedToDb,
+      tokenType,
+      ...(longLivedError ? { longLivedError } : {}),
     });
   } catch (e) {
     const errMsg = (e as Error).message || 'Erro interno desconhecido';

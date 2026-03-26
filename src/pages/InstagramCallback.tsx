@@ -11,10 +11,11 @@ const getClientIdFromCallback = (): string | null => {
 
 const InstagramCallback: React.FC = () => {
   const theme = useTheme();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'warning' | 'error'>('loading');
   const [message, setMessage] = useState('Conectando conta do Instagram...');
   const [username, setUsername] = useState('');
   const [profilePic, setProfilePic] = useState('');
+  const [warningDetail, setWarningDetail] = useState('');
 
   useEffect(() => {
     const process = async () => {
@@ -48,8 +49,19 @@ const InstagramCallback: React.FC = () => {
 
         setUsername(result.username);
         setProfilePic(result.profilePicture);
-        setStatus('success');
-        setMessage(`@${result.username} conectado com sucesso!`);
+
+        if (result.tokenType === 'short_lived') {
+          setStatus('warning');
+          setMessage(`@${result.username} conectado, mas com token temporário (1h).`);
+          setWarningDetail(
+            result.longLivedError
+              ? `Erro ao obter token longo: ${result.longLivedError}. Verifique se a conta é Business/Creator e se o App Meta está em modo Live.`
+              : 'Não foi possível obter token de longa duração. A conta pode precisar ser reconectada em breve.',
+          );
+        } else {
+          setStatus('success');
+          setMessage(`@${result.username} conectado com sucesso!`);
+        }
 
         // Salvar no localStorage para fallback da janela pai
         localStorage.setItem('instagram_auth_success', 'true');
@@ -67,7 +79,9 @@ const InstagramCallback: React.FC = () => {
           // COOP pode bloquear postMessage — janela pai usa fallback via localStorage
         }
 
-        setTimeout(() => closeWindow(), 2500);
+        if (result.tokenType !== 'short_lived') {
+          setTimeout(() => closeWindow(), 2500);
+        }
       } catch (err) {
         const msg = (err as Error).message || 'Erro desconhecido';
         setStatus('error');
@@ -146,6 +160,37 @@ const InstagramCallback: React.FC = () => {
             <Typography variant="body2" color="text.secondary">
               Fechando janela...
             </Typography>
+          </Box>
+        </Box>
+      )}
+
+      {status === 'warning' && (
+        <Box sx={{ maxWidth: 450, width: '100%' }}>
+          {profilePic && (
+            <Avatar
+              src={profilePic}
+              sx={{ width: 80, height: 80, mx: 'auto', mb: 2, border: `3px solid ${theme.palette.warning.main}` }}
+            >
+              <InstagramIcon />
+            </Avatar>
+          )}
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+              {message}
+            </Typography>
+            {warningDetail && (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                {warningDetail}
+              </Typography>
+            )}
+          </Alert>
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+            <Button variant="contained" onClick={handleRetry}>
+              Tentar Novamente
+            </Button>
+            <Button variant="outlined" onClick={() => closeWindow()}>
+              Fechar
+            </Button>
           </Box>
         </Box>
       )}

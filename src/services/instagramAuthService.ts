@@ -99,7 +99,7 @@ export async function exchangeInstagramAuthCode(
   code: string,
   redirectUriOverride?: string,
   clientId?: string,
-): Promise<InstagramAuthData & { savedToDb?: boolean }> {
+): Promise<InstagramAuthData & { savedToDb?: boolean; tokenType?: string; longLivedError?: string }> {
   const supabaseUrl = (process.env.REACT_APP_SUPABASE_URL || '').replace(/\/$/, '');
   const anonKey = process.env.REACT_APP_SUPABASE_KEY || '';
   if (!supabaseUrl || !anonKey) {
@@ -143,7 +143,12 @@ export async function exchangeInstagramAuthCode(
   }
 
   const parsed = data as Record<string, unknown>;
-  return { ...normalizeAuthPayload(parsed), savedToDb: parsed.savedToDb === true };
+  return {
+    ...normalizeAuthPayload(parsed),
+    savedToDb: parsed.savedToDb === true,
+    tokenType: (parsed.tokenType as string) || 'long_lived',
+    longLivedError: (parsed.longLivedError as string) || undefined,
+  };
 }
 
 /** Lista contas — fluxo atual = uma conta via Business Login (sem Facebook Page).
