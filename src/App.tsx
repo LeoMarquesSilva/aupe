@@ -18,6 +18,7 @@ import Signup from './pages/Signup';
 import ResetPassword from './pages/ResetPassword';
 import EmailConfirmation from './pages/EmailConfirmation'; // ✅ Nova importação
 import Landing from './pages/Landing';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
 // Pages - Protected
 import CreatePost from './pages/CreatePost';
@@ -157,6 +158,10 @@ const router = createBrowserRouter([
   {
     path: "/super-admin/login",
     element: <PublicLayout><SuperAdminLogin /></PublicLayout>,
+  },
+  {
+    path: "/privacy-policy",
+    element: <PublicLayout><PrivacyPolicy /></PublicLayout>,
   },
   {
     path: "/view/:token",
