@@ -207,7 +207,6 @@ const ClientDashboard: React.FC = () => {
         client.id === updatedClient.id ? updatedClient : client
       )
     );
-    setClientDialogOpen(false);
     setSelectedClient(null);
   };
 
