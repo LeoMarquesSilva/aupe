@@ -566,6 +566,18 @@ export const clientService = {
     try {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
+      
+      // Alinhar com o restante do sistema: proteger por organização, não por user_id direto.
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile?.organization_id) {
+        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        throw new Error('Organização não encontrada. Entre em contato com o suporte.');
+      }
 
       console.log('=== SALVANDO DADOS DO INSTAGRAM ===');
       console.log('Cliente ID:', clientId);
@@ -590,13 +602,16 @@ export const clientService = {
         .from('clients')
         .update(updateData)
         .eq('id', clientId)
-        .eq('user_id', user.id) // ✅ MANTER PROTEÇÃO - só o dono pode conectar Instagram
+        .eq('organization_id', profile.organization_id)
         .select('*')
-        .single();
+        .maybeSingle();
       
       if (error) {
         console.error('ERRO no Supabase:', error);
         throw new Error(`Erro do Supabase: ${error.message}`);
+      }
+      if (!data) {
+        throw new Error('Cliente não encontrado para sua organização ao salvar autenticação Instagram.');
       }
       
       console.log('Dados salvos com sucesso no banco:', data);
