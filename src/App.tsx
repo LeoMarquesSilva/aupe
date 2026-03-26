@@ -124,13 +124,11 @@ const SuperAdminPageLayout = ({ children }: { children: React.ReactNode }) => (
   </ProtectedRoute>
 );
 
-// Componente para callback que precisa de autenticação
-const ProtectedCallbackLayout = ({ children }: { children: React.ReactNode }) => (
-  <ProtectedRoute>
-    <CallbackLayout>
-      {children}
-    </CallbackLayout>
-  </ProtectedRoute>
+// Componente para callback público (popup OAuth não deve exigir novo login)
+const PublicCallbackLayout = ({ children }: { children: React.ReactNode }) => (
+  <CallbackLayout>
+    {children}
+  </CallbackLayout>
 );
 
 // Configuração do router com autenticação
@@ -252,11 +250,11 @@ const router = createBrowserRouter([
   // Rotas protegidas - Callbacks do Instagram
   {
     path: "/api/instagram-auth/callback",
-    element: <ProtectedCallbackLayout><InstagramCallback /></ProtectedCallbackLayout>,
+    element: <PublicCallbackLayout><InstagramCallback /></PublicCallbackLayout>,
   },
   {
     path: "/callback",
-    element: <ProtectedCallbackLayout><InstagramCallback /></ProtectedCallbackLayout>,
+    element: <PublicCallbackLayout><InstagramCallback /></PublicCallbackLayout>,
   },
   
   // Rotas protegidas - Checkout Stripe
