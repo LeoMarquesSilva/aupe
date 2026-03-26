@@ -25,28 +25,42 @@ async function exchangeLongLivedToken(shortLivedToken: string, appSecret: string
   });
 
   // Tentar GET primeiro (docs oficiais), fallback para POST se falhar
-  const getUrl = `https://graph.instagram.com/access_token?${params.toString()}`;
-  const getRes = await fetch(getUrl);
-  const getJson = await getRes.json();
-
-  if (getRes.ok && getJson.access_token) {
-    return getJson;
+  let getJson: Record<string, unknown> = {};
+  try {
+    const getUrl = `https://graph.instagram.com/access_token?${params.toString()}`;
+    const getRes = await fetch(getUrl);
+    getJson = await getRes.json();
+    if (getRes.ok && getJson.access_token) {
+      console.log('Long-lived via GET OK');
+      return getJson;
+    }
+    console.warn('Long-lived GET falhou:', getRes.status, JSON.stringify(getJson));
+  } catch (e) {
+    console.error('Long-lived GET exception:', e);
   }
 
-  console.warn('Long-lived GET falhou, tentando POST...', getJson);
-
-  const postRes = await fetch('https://graph.instagram.com/access_token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params.toString(),
-  });
-  const postJson = await postRes.json();
-
-  if (!postRes.ok || !postJson.access_token) {
-    throw new Error(postJson?.error?.message || getJson?.error?.message || 'Falha ao obter token longo');
+  let postJson: Record<string, unknown> = {};
+  try {
+    const postRes = await fetch('https://graph.instagram.com/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+    postJson = await postRes.json();
+    if (postRes.ok && postJson.access_token) {
+      console.log('Long-lived via POST OK');
+      return postJson;
+    }
+    console.warn('Long-lived POST falhou:', postRes.status, JSON.stringify(postJson));
+  } catch (e) {
+    console.error('Long-lived POST exception:', e);
   }
 
-  return postJson;
+  const errMsg =
+    (postJson?.error as Record<string, unknown>)?.message ||
+    (getJson?.error as Record<string, unknown>)?.message ||
+    'Falha ao obter token longo (GET e POST falharam)';
+  throw new Error(String(errMsg));
 }
 
 serve(async (req) => {
@@ -238,7 +252,9 @@ serve(async (req) => {
       savedToDb,
     });
   } catch (e) {
-    console.error('Erro na Edge Function:', e);
-    return jsonResponse({ message: (e as Error).message || 'Erro interno' }, 500);
+    const errMsg = (e as Error).message || 'Erro interno desconhecido';
+    const errStack = (e as Error).stack || '';
+    console.error('Erro na Edge Function:', errMsg, errStack);
+    return jsonResponse({ message: errMsg, stack: errStack.substring(0, 500) }, 500);
   }
 });

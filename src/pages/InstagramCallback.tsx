@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, CircularProgress, Alert, Button, Avatar, useTheme } from '@mui/material';
 import { Instagram as InstagramIcon } from '@mui/icons-material';
-import { exchangeInstagramAuthCode } from '../services/instagramAuthService';
+import { exchangeInstagramAuthCode, getAuthorizationUrl } from '../services/instagramAuthService';
 
 const getClientIdFromCallback = (): string | null => {
   const urlParams = new URLSearchParams(window.location.search);
@@ -92,9 +92,12 @@ const InstagramCallback: React.FC = () => {
   };
 
   const handleRetry = () => {
-    setStatus('loading');
-    setMessage('Conectando conta do Instagram...');
-    window.location.reload();
+    const clientId = getClientIdFromCallback();
+    if (clientId) {
+      window.location.href = getAuthorizationUrl(clientId);
+    } else {
+      closeWindow();
+    }
   };
 
   return (
