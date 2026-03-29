@@ -582,9 +582,32 @@ export const clientService = {
       console.log('=== SALVANDO DADOS DO INSTAGRAM ===');
       console.log('Cliente ID:', clientId);
       console.log('Dados recebidos:', authData);
-      
+
+      const isPlaceholderClientName = (n: string | null | undefined): boolean => {
+        const t = (n || '').trim();
+        return !t || /^novo_\d+$/.test(t);
+      };
+
+      const deriveClientDisplayName = (auth: InstagramAuthData): string => {
+        const pn = (auth.profileName || '').trim();
+        if (pn) return pn;
+        const u = (auth.username || '').replace(/^@+/, '').trim();
+        return u ? `@${u}` : 'Cliente Instagram';
+      };
+
+      const { data: existingRow, error: existingErr } = await supabase
+        .from('clients')
+        .select('name')
+        .eq('id', clientId)
+        .eq('organization_id', profile.organization_id)
+        .maybeSingle();
+
+      if (existingErr) {
+        console.error('Erro ao ler nome do cliente:', existingErr);
+      }
+
       // Preparar dados para update - usando EXATAMENTE os nomes das colunas do banco
-      const updateData = {
+      const updateData: Record<string, unknown> = {
         instagram_account_id: authData.instagramAccountId,
         access_token: authData.accessToken,
         instagram: authData.username,
@@ -595,7 +618,11 @@ export const clientService = {
         page_name: authData.pageName,
         instagram_long_lived_issued_at: authData.issuedAt ?? null,
       };
-      
+
+      if (isPlaceholderClientName(existingRow?.name)) {
+        updateData.name = deriveClientDisplayName(authData);
+      }
+
       console.log('Dados que serão salvos no banco:', updateData);
       
       // Fazer o update diretamente
@@ -673,13 +700,25 @@ export const clientService = {
       if (!user) throw new Error('Usuário não autenticado');
 
       console.log('Removendo dados de autenticação do Instagram para o cliente:', clientId);
-      
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profile?.organization_id) {
+        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        throw new Error('Organização não encontrada. Entre em contato com o suporte.');
+      }
+
       // Usar o convertToDbFormat para garantir que os campos sejam mapeados corretamente
       const updateData = convertToDbFormat({
         id: clientId,
         instagramAccountId: null,
         accessToken: null,
         username: null,
+        instagram: null,
         profilePicture: null,
         tokenExpiry: null,
         pageId: null,
@@ -692,7 +731,7 @@ export const clientService = {
         .from('clients')
         .update(updateData)
         .eq('id', clientId)
-        .eq('user_id', user.id) // ✅ MANTER PROTEÇÃO - só o dono pode desconectar
+        .eq('organization_id', profile.organization_id)
         .select()
         .single();
       

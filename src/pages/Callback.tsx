@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, CircularProgress, Alert, Button, useTheme } from '@mui/material';
 import InstagramAccountSelector from '../components/InstagramAccountSelector';
-import { getAuthorizationUrl } from '../services/instagramAuthService';
+import { getAuthorizationUrl, InstagramAuthData } from '../services/instagramAuthService';
+import { clientService } from '../services/supabaseClient';
 
 const Callback: React.FC = () => {
   const theme = useTheme();
@@ -11,6 +12,38 @@ const Callback: React.FC = () => {
   const [showAccountSelector, setShowAccountSelector] = useState<boolean>(false);
   const [authCode, setAuthCode] = useState<string | null>(null);
   const [oauthClientId, setOauthClientId] = useState<string | null>(null);
+  const [closing, setClosing] = useState<boolean>(false);
+
+  const normalizeAuthPayload = (raw: Record<string, unknown>): InstagramAuthData => {
+    const tokenExpiryRaw = raw.tokenExpiry;
+    const tokenExpiry =
+      typeof tokenExpiryRaw === 'string'
+        ? new Date(tokenExpiryRaw)
+        : tokenExpiryRaw instanceof Date
+          ? tokenExpiryRaw
+          : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+
+    return {
+      instagramAccountId: String(raw.instagramAccountId || ''),
+      accessToken: String(raw.accessToken || ''),
+      username: String(raw.username || ''),
+      profilePicture: String(raw.profilePicture || ''),
+      tokenExpiry,
+      pageId: (raw.pageId as string) ?? null,
+      pageName: (raw.pageName as string) ?? null,
+      issuedAt: typeof raw.issuedAt === 'string' ? raw.issuedAt : undefined,
+      profileName: typeof raw.profileName === 'string' ? raw.profileName : undefined,
+    };
+  };
+
+  const tryCloseWindow = () => {
+    // Tentar fechar mesmo sem opener; popups abertas por script normalmente podem fechar.
+    try {
+      window.close();
+    } catch {
+      /* noop */
+    }
+  };
 
   useEffect(() => {
     const processCallback = async () => {
@@ -63,18 +96,13 @@ const Callback: React.FC = () => {
     processCallback();
   }, []);
 
-  const handleAccountSelected = (instagramData: Record<string, unknown>) => {
+  const handleAccountSelected = async (instagramData: Record<string, unknown>) => {
     console.log('Conta selecionada:', instagramData);
 
-    const tokenExpiry = instagramData.tokenExpiry;
+    const normalized = normalizeAuthPayload(instagramData);
     const serializable = {
-      ...instagramData,
-      tokenExpiry:
-        tokenExpiry instanceof Date
-          ? tokenExpiry.toISOString()
-          : typeof tokenExpiry === 'string'
-            ? tokenExpiry
-            : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+      ...normalized,
+      tokenExpiry: normalized.tokenExpiry.toISOString(),
     };
 
     localStorage.setItem('instagram_auth_temp_data', JSON.stringify(serializable));
@@ -82,6 +110,21 @@ const Callback: React.FC = () => {
 
     const clientId =
       oauthClientId || localStorage.getItem('current_client_id') || '';
+
+    if (!clientId) {
+      setError('Cliente de destino não encontrado (state ausente). Feche e tente conectar novamente.');
+      return;
+    }
+
+    try {
+      // Persistência principal: salva direto no backend nesta própria janela callback.
+      await clientService.saveInstagramAuth(clientId, normalized);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Falha ao salvar dados Instagram no cliente';
+      setError(msg);
+      localStorage.setItem('instagram_auth_error', msg);
+      return;
+    }
 
     try {
       if (window.opener) {
@@ -94,14 +137,20 @@ const Callback: React.FC = () => {
       // COOP pode bloquear postMessage — janela pai usa localStorage
     }
 
+    setClosing(true);
     setSuccess(true);
     setShowAccountSelector(false);
 
+    // Fechar automaticamente em qualquer cenário.
     setTimeout(() => {
-      if (window.opener && window.opener !== window) {
-        window.close();
-      }
-    }, 2000);
+      tryCloseWindow();
+      // fallback visual caso o browser bloqueie close
+      setTimeout(() => {
+        if (!window.closed) {
+          window.location.replace('/');
+        }
+      }, 700);
+    }, 1200);
   };
 
   const handleSelectorClose = () => {
@@ -198,6 +247,11 @@ const Callback: React.FC = () => {
             </Typography>
             Conta Instagram conectada. Fechando…
           </Alert>
+          {!closing && (
+            <Button variant="outlined" onClick={handleClose}>
+              Fechar agora
+            </Button>
+          )}
         </Box>
       )}
 

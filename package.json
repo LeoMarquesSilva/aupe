@@ -57,10 +57,11 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "dev": "react-scripts start",
+    "start": "node scripts/cra-dev-start.js",
+    "dev": "node scripts/cra-dev-start.js",
     "build": "react-scripts build",
     "build:ci": "react-scripts build",
+    "serve:build": "node scripts/serve-build-with-api.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -91,6 +92,8 @@
     "@types/react-dom": "^18.3.7",
     "@types/react-resizable": "^3.0.4",
     "@types/react-router-dom": "^5.3.3",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
     "http-proxy-middleware": "^2.0.9",
     "webpack": "^5.102.1",
     "webpack-cli": "^6.0.1"

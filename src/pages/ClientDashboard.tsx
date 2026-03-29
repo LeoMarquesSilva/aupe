@@ -199,6 +199,7 @@ const ClientDashboard: React.FC = () => {
                 pageId: (raw.pageId as string) ?? null,
                 pageName: (raw.pageName as string) ?? null,
                 issuedAt: typeof raw.issuedAt === 'string' ? raw.issuedAt : undefined,
+                profileName: typeof raw.profileName === 'string' ? raw.profileName : undefined,
               };
               await clientService.saveInstagramAuth(cid, authData);
             } catch (e: unknown) {
@@ -236,6 +237,7 @@ const ClientDashboard: React.FC = () => {
                   pageId: (raw.pageId as string) ?? null,
                   pageName: (raw.pageName as string) ?? null,
                   issuedAt: typeof raw.issuedAt === 'string' ? raw.issuedAt : undefined,
+                  profileName: typeof raw.profileName === 'string' ? raw.profileName : undefined,
                 };
                 await clientService.saveInstagramAuth(newClient.id, authData);
               } catch {
@@ -270,16 +272,19 @@ const ClientDashboard: React.FC = () => {
   const handleInstagramConnectionUpdate = (clientId: string, instagramData: InstagramAuthData | null) => {
     setClients(prevClients => 
       prevClients.map(client => {
-        if (client.id === clientId) {
+        if (client.id === clientId && instagramData) {
           return {
             ...client,
-            instagramAccountId: instagramData?.instagramAccountId,
-            accessToken: instagramData?.accessToken,
-            username: instagramData?.username,
-            profilePicture: instagramData?.profilePicture,
-            tokenExpiry: instagramData?.tokenExpiry,
-            pageId: instagramData?.pageId,
-            pageName: instagramData?.pageName
+            name: instagramData.clientName ?? client.name,
+            instagram: instagramData.username || client.instagram,
+            instagramAccountId: instagramData.instagramAccountId,
+            accessToken: instagramData.accessToken,
+            username: instagramData.username,
+            profilePicture: instagramData.profilePicture,
+            tokenExpiry: instagramData.tokenExpiry,
+            pageId: instagramData.pageId,
+            pageName: instagramData.pageName,
+            instagramLongLivedIssuedAt: instagramData.issuedAt,
           };
         }
         return client;

@@ -26,7 +26,12 @@ import {
   PhotoLibrary as MediaIcon,
   Facebook as FacebookIcon
 } from '@mui/icons-material';
-import { AvailableInstagramAccount, getAvailableInstagramAccounts, connectSpecificInstagramAccount } from '../services/instagramAuthService';
+import {
+  AvailableInstagramAccount,
+  getAvailableInstagramAccounts,
+  connectSpecificInstagramAccount,
+  getInstagramOAuthDebugSnapshot,
+} from '../services/instagramAuthService';
 
 interface InstagramAccountSelectorProps {
   open: boolean;
@@ -51,6 +56,25 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [hasSelectedAccount, setHasSelectedAccount] = useState(false); // Novo estado
 
+  const normalizeAuthErrorMessage = (rawMessage: string): string => {
+    if (!rawMessage) return 'Erro ao carregar contas do Instagram';
+    // Mensagem antiga vista em bundles antigos: guia para causa raiz real.
+    if (rawMessage.includes('REACT_APP_FACEBOOK_APP_SECRET')) {
+      return (
+        'Fluxo OAuth recebeu erro de configuração de secret. No fluxo atual, o correto é configurar ' +
+        'FACEBOOK_APP_ID + FACEBOOK_APP_SECRET no servidor (.env/Vercel) e usar /api/facebook-oauth-token. ' +
+        'Se esta mensagem continuar igual à antiga, faça hard refresh (Ctrl+F5) para limpar bundle em cache.'
+      );
+    }
+    if (rawMessage.toLowerCase().includes('authorization code has been used')) {
+      return (
+        'O Facebook informou que o código OAuth já foi usado. Isso pode acontecer por dupla execução em modo dev. ' +
+        'Já aplicamos deduplicação automática; feche esta janela e clique em "Conectar Instagram" novamente.'
+      );
+    }
+    return rawMessage;
+  };
+
   // Carregar contas disponíveis quando o diálogo abrir
   useEffect(() => {
     if (open && authCode && !hasSelectedAccount) {
@@ -70,8 +94,15 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
       console.log(`${availableAccounts.length} contas encontradas`);
       
     } catch (err: any) {
-      console.error('Erro ao carregar contas:', err);
-      setError(err.message || 'Erro ao carregar contas do Instagram');
+      const snapshot = getInstagramOAuthDebugSnapshot();
+      console.error('Erro ao carregar contas:', err, {
+        oauthDebug: snapshot,
+        oauthDebugTagOnWindow:
+          typeof window !== 'undefined'
+            ? (window as unknown as { __IG_AUTH_DEBUG_TAG__?: string }).__IG_AUTH_DEBUG_TAG__
+            : undefined,
+      });
+      setError(normalizeAuthErrorMessage(err.message || ''));
     } finally {
       setLoading(false);
     }
@@ -159,12 +190,16 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
             <Typography>Carregando suas contas do Instagram...</Typography>
           </Box>
         ) : error ? (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
+          <Alert severity="error" sx={{ mb: 2 }} component="div">
+            <Typography component="div" variant="body2">
+              {error}
+            </Typography>
           </Alert>
         ) : accounts.length === 0 ? (
-          <Alert severity="warning">
-            Não foi possível obter contas. Verifique: Página do Facebook + Instagram Business vinculado, escopos do app e URI de redirecionamento em Facebook Login.
+          <Alert severity="warning" component="div">
+            <Typography component="div" variant="body2">
+              Não foi possível obter contas. Verifique: Página do Facebook + Instagram Business vinculado, escopos do app e URI de redirecionamento em Facebook Login.
+            </Typography>
           </Alert>
         ) : (
           <Box>
@@ -209,8 +244,15 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
                         
                         <ListItemText
                           sx={{ ml: 2 }}
+                          primaryTypographyProps={{ component: 'div' }}
+                          secondaryTypographyProps={{ component: 'div' }}
                           primary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', mb: 0.5 }}>
+                              {account.profileName ? (
+                                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                  {account.profileName}
+                                </Typography>
+                              ) : null}
                               <Typography variant="h6" sx={{ mr: 1 }}>
                                 @{account.username}
                               </Typography>
@@ -231,7 +273,7 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
                             <Box>
                               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                                 <FacebookIcon sx={{ fontSize: 16, mr: 0.5, color: '#1877F2' }} />
-                                <Typography variant="body2" color="text.secondary">
+                                <Typography component="span" variant="body2" color="text.secondary">
                                   {account.pageName}
                                 </Typography>
                               </Box>
@@ -268,20 +310,24 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
             </List>
             
             {connecting && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              <Alert severity="info" sx={{ mt: 2 }} component="div">
+                <Typography component="div" variant="subtitle2" sx={{ mb: 1 }}>
                   Conectando conta selecionada...
                 </Typography>
-                Por favor, aguarde enquanto processamos sua seleção.
+                <Typography component="div" variant="body2">
+                  Por favor, aguarde enquanto processamos sua seleção.
+                </Typography>
               </Alert>
             )}
 
             {hasSelectedAccount && !connecting && (
-              <Alert severity="success" sx={{ mt: 2 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  ✅ Conta conectada!
+              <Alert severity="success" sx={{ mt: 2 }} component="div">
+                <Typography component="div" variant="subtitle2" sx={{ mb: 1 }}>
+                  Conta conectada
                 </Typography>
-                Esta janela será fechada automaticamente...
+                <Typography component="div" variant="body2">
+                  Esta janela será fechada automaticamente...
+                </Typography>
               </Alert>
             )}
           </Box>

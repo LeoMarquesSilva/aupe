@@ -202,32 +202,24 @@ const ClientManager: React.FC<ClientManagerProps> = ({
   };
 
   const handleConnectionUpdate = (clientId: string, instagramData: InstagramAuthData | null) => {
-    // Atualizar cliente com dados do Instagram
-    if (instagramData) {
+    // Dados já persistidos em `saveInstagramAuth` no filho — não chamar `updateClient` aqui
+    // (evita regravar `name` placeholder antigo da lista em memória).
+    if (instagramData && onClientUpdated) {
       const clientToUpdate = clients.find(c => c.id === clientId);
       if (clientToUpdate) {
-        const updatedClient: Client = {
+        onClientUpdated({
           ...clientToUpdate,
+          name: instagramData.clientName ?? clientToUpdate.name,
+          instagram: instagramData.username || clientToUpdate.instagram,
           instagramAccountId: instagramData.instagramAccountId,
           accessToken: instagramData.accessToken,
           username: instagramData.username,
           profilePicture: instagramData.profilePicture,
           tokenExpiry: instagramData.tokenExpiry,
           pageId: instagramData.pageId,
-          pageName: instagramData.pageName
-        };
-        
-        clientService.updateClient(updatedClient)
-          .then((updated) => {
-            console.log('Cliente atualizado com dados do Instagram');
-            // Notificar o componente pai sobre a atualização
-            if (onClientUpdated) {
-              onClientUpdated(updated);
-            }
-          })
-          .catch(err => {
-            console.error('Erro ao atualizar cliente com dados do Instagram:', err);
-          });
+          pageName: instagramData.pageName,
+          instagramLongLivedIssuedAt: instagramData.issuedAt,
+        });
       }
     }
   };

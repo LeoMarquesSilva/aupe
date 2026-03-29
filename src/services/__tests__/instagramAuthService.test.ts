@@ -20,7 +20,7 @@ describe('instagramAuthService (Facebook Login / Graph)', () => {
   it('getInstagramAppId exige variável de ambiente', () => {
     delete process.env.REACT_APP_FACEBOOK_APP_ID;
     delete process.env.REACT_APP_INSTAGRAM_APP_ID;
-    expect(() => getInstagramAppId()).toThrow(/REACT_APP_INSTAGRAM_APP_ID/);
+    expect(() => getInstagramAppId()).toThrow(/REACT_APP_FACEBOOK_APP_ID/);
   });
 
   it('getInstagramAppId usa REACT_APP_INSTAGRAM_APP_ID', () => {
@@ -45,8 +45,16 @@ describe('instagramAuthService (Facebook Login / Graph)', () => {
     expect(url).toContain('state=client-uuid');
   });
 
-  it('getInstagramRedirectUri reads env', () => {
+  it('getInstagramRedirectUri reads env when origin is not localhost', () => {
+    const prev = window.location;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      writable: true,
+      value: { ...prev, origin: 'https://app.deployed.test' },
+    });
     process.env.REACT_APP_INSTAGRAM_REDIRECT_URI = 'https://fixed/callback';
+    delete process.env.REACT_APP_FACEBOOK_REDIRECT_URI;
     expect(getInstagramRedirectUri()).toBe('https://fixed/callback');
+    Object.defineProperty(window, 'location', { configurable: true, writable: true, value: prev });
   });
 });

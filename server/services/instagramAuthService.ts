@@ -54,13 +54,31 @@ interface FacebookPagesResponse {
   };
 }
 
-// Constantes para autenticação
-const META_APP_ID = '1087259016929287';
-const META_REDIRECT_URI = 'https://aupedigital.com.br/callback';
+// Alinhado a server/routes/instagram.js — não hardcodar App ID / secret
+function getMetaAppId(): string {
+  const id = (process.env.INSTAGRAM_APP_ID || '').trim();
+  if (!id) throw new Error('INSTAGRAM_APP_ID não configurado');
+  return id;
+}
 
-// Configuração da URL base da API
-// Como estamos rodando no cliente, usamos a URL atual ou uma URL fixa
-const API_BASE_URL = window.location.origin;
+function getMetaAppSecret(): string {
+  const s = (process.env.INSTAGRAM_APP_SECRET || '').trim();
+  if (!s) throw new Error('INSTAGRAM_APP_SECRET não configurado');
+  return s;
+}
+
+const getMetaRedirectUri = (): string =>
+  process.env.INSTAGRAM_REDIRECT_URI || 'https://aupedigital.com.br/callback';
+
+function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  return (process.env.SERVER_PUBLIC_URL || process.env.APP_URL || 'http://localhost:3000').replace(
+    /\/$/,
+    ''
+  );
+}
 
 // Função para gerar a URL de autorização
 export const getAuthorizationUrl = (): string => {
@@ -74,7 +92,7 @@ export const getAuthorizationUrl = (): string => {
   
   const state = generateRandomState();
   
-  return `https://www.facebook.com/v21.0/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(META_REDIRECT_URI)}&scope=${scopes}&response_type=code&state=${state}`;
+  return `https://www.facebook.com/v21.0/dialog/oauth?client_id=${getMetaAppId()}&redirect_uri=${encodeURIComponent(getMetaRedirectUri())}&scope=${scopes}&response_type=code&state=${state}`;
 };
 
 // Gera state aleatório para proteção CSRF
@@ -99,9 +117,9 @@ export const getAvailableInstagramAccounts = async (code: string): Promise<Avail
     // 1. Trocar o código por um token de acesso de curta duração
     const tokenResponse = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
       params: {
-        client_id: META_APP_ID,
-        client_secret: '8a664b53de209acea8e0efb5d554e873',
-        redirect_uri: META_REDIRECT_URI,
+        client_id: getMetaAppId(),
+        client_secret: getMetaAppSecret(),
+        redirect_uri: getMetaRedirectUri(),
         code
       }
     });
@@ -113,8 +131,8 @@ export const getAvailableInstagramAccounts = async (code: string): Promise<Avail
     const longLivedTokenResponse = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
       params: {
         grant_type: 'fb_exchange_token',
-        client_id: META_APP_ID,
-        client_secret: '8a664b53de209acea8e0efb5d554e873',
+        client_id: getMetaAppId(),
+        client_secret: getMetaAppSecret(),
         fb_exchange_token: shortLivedToken
       }
     });
@@ -252,7 +270,7 @@ export const completeInstagramAuth = async (code: string): Promise<InstagramAuth
 // Função para buscar páginas do Facebook vinculadas à conta
 export const getFacebookPages = async (accessToken: string): Promise<FacebookPage[]> => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/instagram/pages`, {
+    const response = await axios.get(`${getApiBaseUrl()}/instagram/pages`, {
       params: { accessToken }
     });
     return response.data.pages || [];
@@ -265,7 +283,7 @@ export const getFacebookPages = async (accessToken: string): Promise<FacebookPag
 // Função para buscar dados da conta do Instagram
 export const getInstagramAccountData = async (instagramAccountId: string, accessToken: string): Promise<InstagramAccountData> => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/instagram/account`, {
+    const response = await axios.get(`${getApiBaseUrl()}/instagram/account`, {
       params: { instagramAccountId, accessToken }
     });
     return response.data;
@@ -280,7 +298,7 @@ export const verifyToken = async (accessToken: string): Promise<boolean> => {
   try {
     try {
       // Tentar usar a API do servidor primeiro
-      const response = await axios.post(`${API_BASE_URL}/instagram/verify-token`, { accessToken });
+      const response = await axios.post(`${getApiBaseUrl()}/instagram/verify-token`, { accessToken });
       return response.data.isValid;
     } catch (serverError) {
       console.error('Erro ao chamar API do servidor para verificar token:', serverError);

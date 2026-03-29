@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Box, 
   Button, 
@@ -50,6 +50,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
   const [showDebugInfo, setShowDebugInfo] = useState<boolean>(false);
   const [needsFix, setNeedsFix] = useState<boolean>(false);
   const [initialCheckDone, setInitialCheckDone] = useState<boolean>(false);
+  const authHandledRef = useRef(false);
 
   // Função para adicionar logs de debug
   const addDebug = (message: string) => {
@@ -250,6 +251,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     setLoading(true);
     setError(null);
     setDebugLog([]);
+    authHandledRef.current = false;
     addDebug('Iniciando processo de conexão...');
     
     try {
@@ -288,6 +290,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         if (event.origin !== window.location.origin) return;
 
         if (event.data.type === 'INSTAGRAM_AUTH_SUCCESS') {
+          authHandledRef.current = true;
           const msgClientId = event.data.clientId as string | undefined;
           if (msgClientId && msgClientId !== client.id) {
             addDebug('Mensagem ignorada: clientId diferente do cliente atual');
@@ -297,6 +300,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
           window.removeEventListener('message', handleMessage);
           void handleAuthSuccess(event.data.data);
         } else if (event.data.type === 'INSTAGRAM_AUTH_ERROR') {
+          authHandledRef.current = true;
           addDebug(`❌ Recebido erro da janela popup: ${event.data.error}`);
           
           // Remover listener
@@ -319,9 +323,9 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
           // Remover listener
           window.removeEventListener('message', handleMessage);
           
-          // Se ainda estiver carregando, processar via localStorage (fallback)
-          if (loading) {
-            handlePopupClosed();
+          // Sempre tentar fallback se ainda não tratamos por postMessage.
+          if (!authHandledRef.current) {
+            void handlePopupClosed();
           }
         }
       }, 500);
@@ -354,10 +358,13 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       pageId: (raw.pageId as string) ?? null,
       pageName: (raw.pageName as string) ?? null,
       issuedAt: typeof raw.issuedAt === 'string' ? raw.issuedAt : undefined,
+      profileName: typeof raw.profileName === 'string' ? raw.profileName : undefined,
+      clientName: typeof raw.clientName === 'string' ? raw.clientName : undefined,
     };
   };
 
   const handleAuthSuccess = async (raw: InstagramAuthData | Record<string, unknown>) => {
+    authHandledRef.current = true;
     try {
       const authData = normalizeAuthPayload(raw as Record<string, unknown>);
       addDebug(`Salvando autenticação: @${authData.username}`);
@@ -371,6 +378,8 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         pageId: savedClient.pageId || null,
         pageName: savedClient.pageName || null,
         issuedAt: savedClient.instagramLongLivedIssuedAt,
+        profileName: authData.profileName,
+        clientName: savedClient.name,
       };
       setInstagramData(mapped);
       setConnected(true);
@@ -390,6 +399,10 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
 
   // Função chamada quando o popup é fechado (mantida como fallback)
   const handlePopupClosed = async () => {
+    if (authHandledRef.current) {
+      setLoading(false);
+      return;
+    }
     try {
       addDebug('Processando resultado da autenticação via fallback...');
       
@@ -412,6 +425,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         // Limpar dados temporários
         localStorage.removeItem('instagram_auth_temp_data');
         localStorage.removeItem('instagram_auth_success');
+        authHandledRef.current = true;
         
       } else {
         // Verificar se houve erro
