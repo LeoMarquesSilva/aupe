@@ -3,6 +3,7 @@ import { Box, Typography, CircularProgress, Alert, Button, useTheme } from '@mui
 import InstagramAccountSelector from '../components/InstagramAccountSelector';
 import { getAuthorizationUrl, InstagramAuthData } from '../services/instagramAuthService';
 import { clientService } from '../services/supabaseClient';
+import { devLog, logClientError } from '../utils/clientLogger';
 
 const Callback: React.FC = () => {
   const theme = useTheme();
@@ -80,7 +81,7 @@ const Callback: React.FC = () => {
         const state = urlParams.get('state')?.trim() || null;
         setOauthClientId(state);
 
-        console.log('Processando callback Facebook/Graph:', {
+        devLog('Processando callback Facebook/Graph:', {
           hasCode: !!code,
           error: errParam,
           errorDescription,
@@ -104,7 +105,7 @@ const Callback: React.FC = () => {
         setAuthCode(code);
         setShowAccountSelector(true);
       } catch (err) {
-        console.error('Erro no callback Facebook/Graph:', err);
+        logClientError('Erro no callback Facebook/Graph', err);
         const errorMessage = (err as Error).message || 'Erro desconhecido durante a autenticação';
         setError(errorMessage);
         localStorage.setItem('instagram_auth_error', errorMessage);
@@ -122,9 +123,12 @@ const Callback: React.FC = () => {
   }, []);
 
   const handleAccountSelected = async (instagramData: Record<string, unknown>) => {
-    console.log('Conta selecionada:', instagramData);
-
     const normalized = normalizeAuthPayload(instagramData);
+    devLog('Conta selecionada (sem token):', {
+      instagramAccountId: normalized.instagramAccountId,
+      username: normalized.username,
+      hasAccessToken: Boolean(normalized.accessToken),
+    });
     const serializable = {
       ...normalized,
       tokenExpiry: normalized.tokenExpiry.toISOString(),

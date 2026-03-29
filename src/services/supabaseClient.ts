@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Client, ScheduledPost, PostStatus } from '../types';
 import { InstagramAuthData } from '../services/instagramAuthService';
 import { fixInstagramConnection } from 'services/instagramFixService';
+import { isClientVerboseLogging, devLog, devWarn, logClientError } from '../utils/clientLogger';
 
 // Usar variáveis de ambiente para as credenciais do Supabase
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
@@ -9,9 +10,7 @@ const supabaseKey = process.env.REACT_APP_SUPABASE_KEY || '';
 
 // Verificar se as variáveis de ambiente estão definidas (apenas warning, não erro)
 if (!supabaseUrl || !supabaseKey) {
-  if (process.env.NODE_ENV === 'development') {
-    console.warn('⚠️ Variáveis de ambiente do Supabase não estão definidas!');
-  }
+  devWarn('⚠️ Variáveis de ambiente do Supabase não estão definidas!');
 }
 
 // Criar cliente Supabase mesmo sem variáveis (para evitar erro no build)
@@ -22,7 +21,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   (window as any).__supabase = supabase;
 }
 
-const isDevLog = process.env.NODE_ENV === 'development';
+const verboseClient = isClientVerboseLogging();
 
 function redactInstagramAuthForLog(a: InstagramAuthData): Omit<InstagramAuthData, 'accessToken'> & { accessToken: string } {
   return { ...a, accessToken: '[REDACTED]' };
@@ -139,7 +138,7 @@ const convertFromDbFormat = (obj: Record<string, any>) => {
         try {
           result[jsKey] = new Date(obj[key]);
         } catch (e) {
-          console.error('Erro ao converter data:', e);
+          logClientError('Erro ao converter data:', e);
           result[jsKey] = obj[key];
         }
       } else {
@@ -165,7 +164,7 @@ const getCurrentUser = async () => {
     error,
   } = await supabase.auth.getUser();
   if (error || !user) {
-    console.error('Erro ao obter usuário atual:', error || sessionError);
+    logClientError('Erro ao obter usuário atual:', error || sessionError);
     throw new Error('Usuário não autenticado');
   }
   return user;
@@ -186,13 +185,13 @@ export const userProfileService = {
         .single();
 
       if (error) {
-        console.error('Erro ao buscar perfil do usuário:', error);
+        logClientError('Erro ao buscar perfil do usuário:', error);
         return null;
       }
 
       return data;
     } catch (error) {
-      console.error('Erro ao buscar perfil do usuário:', error);
+      logClientError('Erro ao buscar perfil do usuário:', error);
       return null;
     }
   },
@@ -211,13 +210,13 @@ export const userProfileService = {
         .single();
 
       if (error) {
-        console.error('Erro ao atualizar perfil:', error);
+        logClientError('Erro ao atualizar perfil:', error);
         throw new Error(`Não foi possível atualizar o perfil: ${error.message}`);
       }
 
       return data;
     } catch (error) {
-      console.error('Erro ao atualizar perfil:', error);
+      logClientError('Erro ao atualizar perfil:', error);
       throw error;
     }
   }
@@ -239,12 +238,12 @@ export const clientService = {
         .single();
 
       if (profileError || !profile) {
-        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        logClientError('❌ Erro ao buscar perfil do usuário:', profileError);
         throw new Error('Perfil do usuário não encontrado');
       }
 
       if (!profile.organization_id) {
-        console.warn('⚠️ Usuário não possui organization_id');
+        devWarn('⚠️ Usuário não possui organization_id');
         return []; // Retornar array vazio se não tiver organização
       }
 
@@ -255,7 +254,7 @@ export const clientService = {
         .order('name');
       
       if (error) {
-        console.error('Erro ao buscar clientes:', error);
+        logClientError('Erro ao buscar clientes:', error);
         throw new Error('Não foi possível buscar os clientes');
       }
       
@@ -263,7 +262,7 @@ export const clientService = {
       return (data || []).map(client => {
         // Verificar se o cliente tem app_id mas não tem instagram_account_id
         if (client.app_id && !client.instagram_account_id) {
-          console.log(`Cliente ${client.id} tem app_id mas não tem instagram_account_id. Usando app_id como instagram_account_id.`);
+          devLog(`Cliente ${client.id} tem app_id mas não tem instagram_account_id. Usando app_id como instagram_account_id.`);
           client.instagram_account_id = client.app_id;
         }
         
@@ -290,7 +289,7 @@ export const clientService = {
         return convertedClient;
       });
     } catch (error) {
-      console.error('Erro ao buscar clientes:', error);
+      logClientError('Erro ao buscar clientes:', error);
       throw error;
     }
   },
@@ -308,7 +307,7 @@ export const clientService = {
         .single();
 
       if (profileError || !profile?.organization_id) {
-        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        logClientError('❌ Erro ao buscar perfil do usuário:', profileError);
         return null;
       }
 
@@ -322,10 +321,10 @@ export const clientService = {
       if (error) {
         if (error.code === 'PGRST116') {
           // Cliente não encontrado
-          console.warn('Cliente não encontrado:', clientId);
+          devWarn('Cliente não encontrado:', clientId);
           return null;
         }
-        console.error('Erro ao buscar cliente por ID:', error);
+        logClientError('Erro ao buscar cliente por ID:', error);
         throw new Error('Não foi possível buscar o cliente');
       }
       
@@ -350,7 +349,7 @@ export const clientService = {
       
       return convertedClient;
     } catch (error) {
-      console.error('Erro ao buscar cliente por ID:', error);
+      logClientError('Erro ao buscar cliente por ID:', error);
       throw error;
     }
   },
@@ -369,7 +368,7 @@ export const clientService = {
         .single();
 
       if (profileError || !profile?.organization_id) {
-        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        logClientError('❌ Erro ao buscar perfil do usuário:', profileError);
         throw new Error('Organização não encontrada. Entre em contato com o suporte.');
       }
 
@@ -387,8 +386,8 @@ export const clientService = {
       // Garantir que organization_id está presente
       clientData.organization_id = profile.organization_id;
 
-      if (isDevLog) {
-        console.log('Tentando adicionar cliente com dados (token redigido):', redactClientDataForLog(clientData as Record<string, unknown>));
+      if (verboseClient) {
+        devLog('Tentando adicionar cliente com dados (token redigido):', redactClientDataForLog(clientData as Record<string, unknown>));
       }
 
       const { data, error } = await supabase
@@ -398,7 +397,7 @@ export const clientService = {
         .single();
       
       if (error) {
-        console.error('Erro detalhado ao adicionar cliente:', error);
+        logClientError('Erro detalhado ao adicionar cliente:', error);
         throw new Error(`Não foi possível adicionar o cliente: ${error.message}`);
       }
       
@@ -425,7 +424,7 @@ export const clientService = {
       
       return convertedClient;
     } catch (err) {
-      console.error('Erro ao adicionar cliente:', err);
+      logClientError('Erro ao adicionar cliente:', err);
       throw err;
     }
   },
@@ -444,11 +443,11 @@ export const clientService = {
         .single();
 
       if (profileError || !profile?.organization_id) {
-        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        logClientError('❌ Erro ao buscar perfil do usuário:', profileError);
         throw new Error('Organização não encontrada. Entre em contato com o suporte.');
       }
 
-      console.log(`🔄 Atualizando foto de perfil do cliente ${clientId}`);
+      devLog(`🔄 Atualizando foto de perfil do cliente ${clientId}`);
       
       const updateData: any = {
         profile_picture: profilePicture,
@@ -467,13 +466,13 @@ export const clientService = {
         .eq('organization_id', profile.organization_id); // ✅ FILTRAR POR ORGANIZAÇÃO
       
       if (error) {
-        console.error('❌ Erro ao atualizar foto de perfil:', error);
+        logClientError('❌ Erro ao atualizar foto de perfil:', error);
         throw new Error(`Não foi possível atualizar a foto de perfil: ${error.message}`);
       }
       
-      console.log(`✅ Foto de perfil do cliente ${clientId} atualizada com sucesso`);
+      devLog(`✅ Foto de perfil do cliente ${clientId} atualizada com sucesso`);
     } catch (err) {
-      console.error('❌ Erro ao atualizar foto de perfil:', err);
+      logClientError('❌ Erro ao atualizar foto de perfil:', err);
       throw err;
     }
   },
@@ -505,8 +504,8 @@ export const clientService = {
       // Converter camelCase para snake_case com mapeamento específico
       const clientData = convertToDbFormat(filteredClient);
 
-      if (isDevLog) {
-        console.log(
+      if (verboseClient) {
+        devLog(
           'Atualizando cliente com dados (SEM campos do Instagram, token redigido):',
           redactClientDataForLog(clientData as Record<string, unknown>),
         );
@@ -520,7 +519,7 @@ export const clientService = {
         .single();
 
       if (profileError || !profile?.organization_id) {
-        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        logClientError('❌ Erro ao buscar perfil do usuário:', profileError);
         throw new Error('Organização não encontrada. Entre em contato com o suporte.');
       }
 
@@ -533,7 +532,7 @@ export const clientService = {
         .single();
       
       if (error) {
-        console.error('Erro ao atualizar cliente:', error);
+        logClientError('Erro ao atualizar cliente:', error);
         throw new Error(`Não foi possível atualizar o cliente: ${error.message}`);
       }
       
@@ -558,7 +557,7 @@ export const clientService = {
       
       return convertedClient;
     } catch (err) {
-      console.error('Erro ao atualizar cliente:', err);
+      logClientError('Erro ao atualizar cliente:', err);
       throw err;
     }
   },
@@ -577,7 +576,7 @@ export const clientService = {
         .single();
 
       if (profileError || !profile?.organization_id) {
-        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        logClientError('❌ Erro ao buscar perfil do usuário:', profileError);
         throw new Error('Organização não encontrada. Entre em contato com o suporte.');
       }
 
@@ -588,11 +587,11 @@ export const clientService = {
         .eq('organization_id', profile.organization_id); // ✅ FILTRAR POR ORGANIZAÇÃO
       
       if (error) {
-        console.error('Erro ao excluir cliente:', error);
+        logClientError('Erro ao excluir cliente:', error);
         throw new Error(`Não foi possível excluir o cliente: ${error.message}`);
       }
     } catch (error) {
-      console.error('Erro ao excluir cliente:', error);
+      logClientError('Erro ao excluir cliente:', error);
       throw error;
     }
   },
@@ -611,14 +610,14 @@ export const clientService = {
         .single();
 
       if (profileError || !profile?.organization_id) {
-        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        logClientError('❌ Erro ao buscar perfil do usuário:', profileError);
         throw new Error('Organização não encontrada. Entre em contato com o suporte.');
       }
 
-      if (isDevLog) {
-        console.log('=== SALVANDO DADOS DO INSTAGRAM ===');
-        console.log('Cliente ID:', clientId);
-        console.log('Dados recebidos (token redigido):', redactInstagramAuthForLog(authData));
+      if (verboseClient) {
+        devLog('=== SALVANDO DADOS DO INSTAGRAM ===');
+        devLog('Cliente ID:', clientId);
+        devLog('Dados recebidos (token redigido):', redactInstagramAuthForLog(authData));
       }
 
       const isPlaceholderClientName = (n: string | null | undefined): boolean => {
@@ -641,7 +640,7 @@ export const clientService = {
         .maybeSingle();
 
       if (existingErr) {
-        console.error('Erro ao ler nome do cliente:', existingErr);
+        logClientError('Erro ao ler nome do cliente:', existingErr);
       }
 
       // Preparar dados para update - usando EXATAMENTE os nomes das colunas do banco
@@ -661,8 +660,8 @@ export const clientService = {
         updateData.name = deriveClientDisplayName(authData);
       }
 
-      if (isDevLog) {
-        console.log('Dados que serão salvos no banco (token redigido):', redactClientDataForLog(updateData as Record<string, unknown>));
+      if (verboseClient) {
+        devLog('Dados que serão salvos no banco (token redigido):', redactClientDataForLog(updateData as Record<string, unknown>));
       }
 
       // Fazer o update diretamente
@@ -675,7 +674,7 @@ export const clientService = {
         .maybeSingle();
       
       if (error) {
-        console.error('ERRO no Supabase:', error);
+        logClientError('ERRO no Supabase:', error);
         throw new Error(`Erro do Supabase: ${error.message}`);
       }
       if (!data) {
@@ -684,8 +683,8 @@ export const clientService = {
         );
       }
       
-      if (isDevLog && data) {
-        console.log('Dados salvos com sucesso no banco (token redigido):', redactClientRowForLog(data as Record<string, unknown>));
+      if (verboseClient && data) {
+        devLog('Dados salvos com sucesso no banco (token redigido):', redactClientRowForLog(data as Record<string, unknown>));
       }
 
       // Conversão manual para garantir que funcione
@@ -707,15 +706,15 @@ export const clientService = {
         instagramLongLivedIssuedAt: data.instagram_long_lived_issued_at || undefined,
       };
       
-      if (isDevLog) {
-        console.log('Cliente convertido (token redigido):', { ...convertedClient, accessToken: '[REDACTED]' });
-        console.log('=== DADOS SALVOS E CONVERTIDOS COM SUCESSO ===');
+      if (verboseClient) {
+        devLog('Cliente convertido (token redigido):', { ...convertedClient, accessToken: '[REDACTED]' });
+        devLog('=== DADOS SALVOS E CONVERTIDOS COM SUCESSO ===');
       }
 
       return convertedClient;
       
     } catch (err: any) {
-      console.error('ERRO FATAL ao salvar dados do Instagram:', err);
+      logClientError('ERRO FATAL ao salvar dados do Instagram:', err);
       throw err;
     }
   },
@@ -732,7 +731,7 @@ export const clientService = {
       );
       return r2.ok;
     } catch (err) {
-      console.error('Erro ao verificar token do Instagram:', err);
+      logClientError('Erro ao verificar token do Instagram:', err);
       return false;
     }
   },
@@ -743,7 +742,7 @@ export const clientService = {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
 
-      console.log('Removendo dados de autenticação do Instagram para o cliente:', clientId);
+      devLog('Removendo dados de autenticação do Instagram para o cliente:', clientId);
 
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -752,7 +751,7 @@ export const clientService = {
         .single();
 
       if (profileError || !profile?.organization_id) {
-        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        logClientError('❌ Erro ao buscar perfil do usuário:', profileError);
         throw new Error('Organização não encontrada. Entre em contato com o suporte.');
       }
 
@@ -780,7 +779,7 @@ export const clientService = {
         .single();
       
       if (error) {
-        console.error('Erro ao remover dados de autenticação:', error);
+        logClientError('Erro ao remover dados de autenticação:', error);
         throw new Error(`Não foi possível remover os dados de autenticação: ${error.message}`);
       }
       
@@ -804,7 +803,7 @@ export const clientService = {
       
       return convertedClient;
     } catch (err) {
-      console.error('Erro ao remover dados de autenticação do Instagram:', err);
+      logClientError('Erro ao remover dados de autenticação do Instagram:', err);
       throw err;
     }
   },
@@ -815,7 +814,7 @@ export const clientService = {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
 
-      console.log('Corrigindo dados de autenticação do Instagram para clientes existentes...');
+      devLog('Corrigindo dados de autenticação do Instagram para clientes existentes...');
       
       // Buscar todos os clientes do usuário que têm app_id mas não têm instagram_account_id
       const { data, error } = await supabase
@@ -826,15 +825,15 @@ export const clientService = {
         .not('app_id', 'is', null);
       
       if (error) {
-        console.error('Erro ao buscar clientes:', error);
+        logClientError('Erro ao buscar clientes:', error);
         throw new Error('Não foi possível buscar os clientes');
       }
       
-      console.log(`Encontrados ${data?.length || 0} clientes para corrigir`);
+      devLog(`Encontrados ${data?.length || 0} clientes para corrigir`);
       
       // Para cada cliente, copiar app_id para instagram_account_id
       for (const client of data || []) {
-        console.log(`Corrigindo cliente ${client.id}: copiando app_id (${client.app_id}) para instagram_account_id`);
+        devLog(`Corrigindo cliente ${client.id}: copiando app_id (${client.app_id}) para instagram_account_id`);
         
         const { error: updateError } = await supabase
           .from('clients')
@@ -843,15 +842,15 @@ export const clientService = {
           .eq('user_id', user.id);
         
         if (updateError) {
-          console.error(`Erro ao corrigir cliente ${client.id}:`, updateError);
+          logClientError(`Erro ao corrigir cliente ${client.id}:`, updateError);
         } else {
-          console.log(`Cliente ${client.id} corrigido com sucesso`);
+          devLog(`Cliente ${client.id} corrigido com sucesso`);
         }
       }
       
-      console.log('Correção concluída');
+      devLog('Correção concluída');
     } catch (err) {
-      console.error('Erro ao corrigir dados de autenticação:', err);
+      logClientError('Erro ao corrigir dados de autenticação:', err);
       throw err;
     }
   }
@@ -880,14 +879,14 @@ export const postService = {
         .single();
       
       if (error) {
-        console.error('Erro ao salvar post agendado:', error);
+        logClientError('Erro ao salvar post agendado:', error);
         throw new Error('Não foi possível salvar o post agendado');
       }
       
       // Converter snake_case para camelCase com mapeamento específico
       return convertFromDbFormat(data);
     } catch (error) {
-      console.error('Erro ao salvar post agendado:', error);
+      logClientError('Erro ao salvar post agendado:', error);
       throw error;
     }
   },
@@ -906,12 +905,12 @@ export const postService = {
         .single();
 
       if (profileError || !profile) {
-        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        logClientError('❌ Erro ao buscar perfil do usuário:', profileError);
         return [];
       }
 
       if (!profile.organization_id) {
-        console.warn('⚠️ Usuário não possui organization_id');
+        devWarn('⚠️ Usuário não possui organization_id');
         return [];
       }
 
@@ -923,12 +922,12 @@ export const postService = {
         .single();
 
       if (clientError || !client) {
-        console.error('❌ Cliente não encontrado:', clientError);
+        logClientError('❌ Cliente não encontrado:', clientError);
         return [];
       }
 
       if (client.organization_id !== profile.organization_id) {
-        console.warn('⚠️ Cliente não pertence à organização do usuário');
+        devWarn('⚠️ Cliente não pertence à organização do usuário');
         return [];
       }
 
@@ -940,14 +939,14 @@ export const postService = {
         .order('scheduled_date', { ascending: true });
       
       if (error) {
-        console.error('Erro ao buscar posts agendados:', error);
+        logClientError('Erro ao buscar posts agendados:', error);
         throw new Error('Não foi possível buscar os posts agendados');
       }
       
       // Converter snake_case para camelCase com mapeamento específico
       return (data || []).map(post => convertFromDbFormat(post));
     } catch (error) {
-      console.error('Erro ao buscar posts agendados:', error);
+      logClientError('Erro ao buscar posts agendados:', error);
       throw error;
     }
   },
@@ -966,12 +965,12 @@ export const postService = {
         .single();
 
       if (profileError || !profile) {
-        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        logClientError('❌ Erro ao buscar perfil do usuário:', profileError);
         return [];
       }
 
       if (!profile.organization_id) {
-        console.warn('⚠️ Usuário não possui organization_id');
+        devWarn('⚠️ Usuário não possui organization_id');
         return [];
       }
 
@@ -985,7 +984,7 @@ export const postService = {
         .order('scheduled_date', { ascending: true });
       
       if (error) {
-        console.error('Erro ao buscar todos os posts agendados:', error);
+        logClientError('Erro ao buscar todos os posts agendados:', error);
         throw new Error('Não foi possível buscar os posts agendados');
       }
       
@@ -998,7 +997,7 @@ export const postService = {
         return result;
       });
     } catch (error) {
-      console.error('Erro ao buscar todos os posts agendados:', error);
+      logClientError('Erro ao buscar todos os posts agendados:', error);
       throw error;
     }
   },
@@ -1021,7 +1020,7 @@ export const postService = {
         .single();
       
       if (error) {
-        console.error('Erro ao atualizar post agendado:', error);
+        logClientError('Erro ao atualizar post agendado:', error);
         throw new Error('Não foi possível atualizar o post agendado');
       }
       
@@ -1032,7 +1031,7 @@ export const postService = {
       // Converter snake_case para camelCase com mapeamento específico
       return convertFromDbFormat(data);
     } catch (error) {
-      console.error('Erro ao atualizar post agendado:', error);
+      logClientError('Erro ao atualizar post agendado:', error);
       throw error;
     }
   },
@@ -1050,7 +1049,7 @@ export const postService = {
         .select();
       
       if (error) {
-        console.error('❌ Erro detalhado ao excluir post agendado:', error);
+        logClientError('❌ Erro detalhado ao excluir post agendado:', error);
         // Mensagem de erro mais detalhada
         if (error.code === '42501') {
           throw new Error('Você não tem permissão para excluir este post. Apenas administradores e moderadores podem excluir posts da sua organização.');
@@ -1063,13 +1062,13 @@ export const postService = {
       
       // Verificar se algum registro foi deletado
       if (!data || data.length === 0) {
-        console.warn('⚠️ Nenhum post foi deletado. Pode não existir ou você não tem permissão.');
+        devWarn('⚠️ Nenhum post foi deletado. Pode não existir ou você não tem permissão.');
         throw new Error('Post não encontrado ou você não tem permissão para excluí-lo.');
       }
       
-      console.log('✅ Post excluído com sucesso:', postId);
+      devLog('✅ Post excluído com sucesso:', postId);
     } catch (error) {
-      console.error('Erro ao excluir post agendado:', error);
+      logClientError('Erro ao excluir post agendado:', error);
       throw error;
     }
   },
@@ -1124,7 +1123,7 @@ export const postService = {
       const dbData = convertToDbFormat(filteredPostData) as Record<string, unknown>;
       dbData.organization_id = profile.organization_id;
 
-      console.log('Salvando post no Supabase (com campos de Reels):', dbData);
+      devLog('Salvando post no Supabase (com campos de Reels):', dbData);
 
       const { data, error } = await supabase
         .from('scheduled_posts')
@@ -1133,16 +1132,16 @@ export const postService = {
         .single();
 
       if (error) {
-        console.error('Erro ao salvar post agendado:', error);
+        logClientError('Erro ao salvar post agendado:', error);
         throw new Error(`Não foi possível salvar o post: ${error.message}`);
       }
 
-      console.log('Post salvo com sucesso:', data);
+      devLog('Post salvo com sucesso:', data);
 
       // Converter de volta para camelCase
       return convertFromDbFormat(data) as ScheduledPost;
     } catch (error) {
-      console.error('Erro ao salvar post agendado:', error);
+      logClientError('Erro ao salvar post agendado:', error);
       throw error;
     }
   },
@@ -1175,7 +1174,7 @@ export const postService = {
 
       const dbData = convertToDbFormat(updateData);
 
-      console.log(`Atualizando post ${postId} para status ${status}:`, dbData);
+      devLog(`Atualizando post ${postId} para status ${status}:`, dbData);
 
       const { data, error } = await supabase
         .from('scheduled_posts')
@@ -1186,7 +1185,7 @@ export const postService = {
         .single();
 
       if (error) {
-        console.error('Erro ao atualizar status do post:', error);
+        logClientError('Erro ao atualizar status do post:', error);
         throw new Error(`Não foi possível atualizar o post: ${error.message}`);
       }
 
@@ -1194,10 +1193,10 @@ export const postService = {
         throw new Error('Post não encontrado ou não foi possível atualizar');
       }
 
-      console.log('Status do post atualizado:', data);
+      devLog('Status do post atualizado:', data);
       return convertFromDbFormat(data) as ScheduledPost;
     } catch (error) {
-      console.error('Erro ao atualizar status do post:', error);
+      logClientError('Erro ao atualizar status do post:', error);
       throw error;
     }
   },
@@ -1219,7 +1218,7 @@ export const postService = {
         .order('scheduled_date', { ascending: true });
 
       if (error) {
-        console.error('Erro ao buscar posts por status:', error);
+        logClientError('Erro ao buscar posts por status:', error);
         throw new Error('Não foi possível buscar os posts');
       }
 
@@ -1231,7 +1230,7 @@ export const postService = {
         return result;
       });
     } catch (error) {
-      console.error('Erro ao buscar posts por status:', error);
+      logClientError('Erro ao buscar posts por status:', error);
       throw error;
     }
   },
@@ -1264,7 +1263,7 @@ export const postService = {
         lastRetryAt: new Date().toISOString()
       });
     } catch (error) {
-      console.error('Erro ao reprocessar post:', error);
+      logClientError('Erro ao reprocessar post:', error);
       throw error;
     }
   },
@@ -1283,12 +1282,12 @@ export const postService = {
         .single();
 
       if (profileError || !profile) {
-        console.error('❌ Erro ao buscar perfil do usuário:', profileError);
+        logClientError('❌ Erro ao buscar perfil do usuário:', profileError);
         return [];
       }
 
       if (!profile.organization_id) {
-        console.warn('⚠️ Usuário não possui organization_id');
+        devWarn('⚠️ Usuário não possui organization_id');
         return [];
       }
 
@@ -1302,7 +1301,7 @@ export const postService = {
         .order('scheduled_date', { ascending: true });
 
       if (error) {
-        console.error('Erro ao buscar posts com cliente:', error);
+        logClientError('Erro ao buscar posts com cliente:', error);
         throw new Error('Não foi possível buscar os posts');
       }
 
@@ -1314,7 +1313,7 @@ export const postService = {
         return result;
       });
     } catch (error) {
-      console.error('Erro ao buscar posts com cliente:', error);
+      logClientError('Erro ao buscar posts com cliente:', error);
       throw error;
     }
   }
@@ -1330,7 +1329,7 @@ export const authService = {
     });
 
     if (error) {
-      console.error('Erro ao fazer login:', error);
+      logClientError('Erro ao fazer login:', error);
       throw error;
     }
 
@@ -1350,7 +1349,7 @@ export const authService = {
     });
 
     if (error) {
-      console.error('Erro ao criar conta:', error);
+      logClientError('Erro ao criar conta:', error);
       throw error;
     }
 
@@ -1362,7 +1361,7 @@ export const authService = {
     const { error } = await supabase.auth.signOut();
 
     if (error) {
-      console.error('Erro ao fazer logout:', error);
+      logClientError('Erro ao fazer logout:', error);
       throw error;
     }
   },
@@ -1374,7 +1373,7 @@ export const authService = {
     });
 
     if (error) {
-      console.error('Erro ao resetar senha:', error);
+      logClientError('Erro ao resetar senha:', error);
       throw error;
     }
   },
@@ -1386,7 +1385,7 @@ export const authService = {
     });
 
     if (error) {
-      console.error('Erro ao atualizar senha:', error);
+      logClientError('Erro ao atualizar senha:', error);
       throw error;
     }
   },
@@ -1396,7 +1395,7 @@ export const authService = {
     const { data: { user }, error } = await supabase.auth.getUser();
 
     if (error) {
-      console.error('Erro ao obter usuário atual:', error);
+      logClientError('Erro ao obter usuário atual:', error);
       return null;
     }
 
@@ -1408,7 +1407,7 @@ export const authService = {
     const { data: { session }, error } = await supabase.auth.getSession();
 
     if (error) {
-      console.error('Erro ao obter sessão atual:', error);
+      logClientError('Erro ao obter sessão atual:', error);
       return null;
     }
 
@@ -1429,7 +1428,7 @@ export const migrationService = {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
 
-      console.log('Migrando clientes existentes para o usuário atual...');
+      devLog('Migrando clientes existentes para o usuário atual...');
 
       // Buscar clientes que não têm user_id definido
       const { data: clientsWithoutUser, error: fetchError } = await supabase
@@ -1438,16 +1437,16 @@ export const migrationService = {
         .is('user_id', null);
 
       if (fetchError) {
-        console.error('Erro ao buscar clientes sem usuário:', fetchError);
+        logClientError('Erro ao buscar clientes sem usuário:', fetchError);
         throw new Error('Não foi possível buscar clientes para migração');
       }
 
       if (!clientsWithoutUser || clientsWithoutUser.length === 0) {
-        console.log('Nenhum cliente encontrado para migração');
+        devLog('Nenhum cliente encontrado para migração');
         return;
       }
 
-      console.log(`Encontrados ${clientsWithoutUser.length} clientes para migrar`);
+      devLog(`Encontrados ${clientsWithoutUser.length} clientes para migrar`);
 
       // Atualizar cada cliente para associá-lo ao usuário atual
       for (const client of clientsWithoutUser) {
@@ -1457,15 +1456,15 @@ export const migrationService = {
           .eq('id', client.id);
 
         if (updateError) {
-          console.error(`Erro ao migrar cliente ${client.id}:`, updateError);
+          logClientError(`Erro ao migrar cliente ${client.id}:`, updateError);
         } else {
-          console.log(`Cliente ${client.name} (${client.id}) migrado com sucesso`);
+          devLog(`Cliente ${client.name} (${client.id}) migrado com sucesso`);
         }
       }
 
-      console.log('Migração de clientes concluída');
+      devLog('Migração de clientes concluída');
     } catch (error) {
-      console.error('Erro durante migração de clientes:', error);
+      logClientError('Erro durante migração de clientes:', error);
       throw error;
     }
   },
@@ -1476,7 +1475,7 @@ export const migrationService = {
       const user = await getCurrentUser();
       if (!user) throw new Error('Usuário não autenticado');
 
-      console.log('Migrando posts existentes para o usuário atual...');
+      devLog('Migrando posts existentes para o usuário atual...');
 
       // Buscar posts que não têm user_id definido
       const { data: postsWithoutUser, error: fetchError } = await supabase
@@ -1485,16 +1484,16 @@ export const migrationService = {
         .is('user_id', null);
 
       if (fetchError) {
-        console.error('Erro ao buscar posts sem usuário:', fetchError);
+        logClientError('Erro ao buscar posts sem usuário:', fetchError);
         throw new Error('Não foi possível buscar posts para migração');
       }
 
       if (!postsWithoutUser || postsWithoutUser.length === 0) {
-        console.log('Nenhum post encontrado para migração');
+        devLog('Nenhum post encontrado para migração');
         return;
       }
 
-      console.log(`Encontrados ${postsWithoutUser.length} posts para migrar`);
+      devLog(`Encontrados ${postsWithoutUser.length} posts para migrar`);
 
       // Atualizar cada post para associá-lo ao usuário atual
       for (const post of postsWithoutUser) {
@@ -1504,15 +1503,15 @@ export const migrationService = {
           .eq('id', post.id);
 
         if (updateError) {
-          console.error(`Erro ao migrar post ${post.id}:`, updateError);
+          logClientError(`Erro ao migrar post ${post.id}:`, updateError);
         } else {
-          console.log(`Post ${post.id} migrado com sucesso`);
+          devLog(`Post ${post.id} migrado com sucesso`);
         }
       }
 
-      console.log('Migração de posts concluída');
+      devLog('Migração de posts concluída');
     } catch (error) {
-      console.error('Erro durante migração de posts:', error);
+      logClientError('Erro durante migração de posts:', error);
       throw error;
     }
   }

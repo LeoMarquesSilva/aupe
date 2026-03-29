@@ -33,6 +33,7 @@ import { supabaseVideoStorageService, VideoUploadResult } from '../services/supa
 import { authService } from '../services/supabaseClient';
 import { ReelVideo } from '../types';
 import { detectVideoFormat, VideoFormatInfo } from '../services/videoFormatValidator';
+import { devLog, devWarn, logClientError } from '../utils/clientLogger';
 import VideoConversionDialog from './VideoConversionDialog';
 
 interface VideoUploaderProps {
@@ -137,7 +138,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
 
   // Função para validar arquivo antes do upload
   const validateFile = (file: File) => {
-    console.log('🔍 Validando arquivo:', {
+    devLog('🔍 Validando arquivo:', {
       name: file.name,
       type: file.type,
       size: file.size,
@@ -257,7 +258,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
       }, 1500);
 
     } catch (error) {
-      console.error('Erro no upload:', error);
+      logClientError('Erro no upload:', error);
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido no upload';
       setError(`Erro no upload: ${errorMessage}`);
       onChange(null);
@@ -270,14 +271,14 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
 
   // Função para processar arquivo selecionado (com detecção de formato)
   const handleFileSelect = useCallback(async (file: File) => {
-    console.log('🎬 Arquivo selecionado:', file.name, file.type, formatFileSize(file.size));
+    devLog('🎬 Arquivo selecionado:', file.name, file.type, formatFileSize(file.size));
 
     if (!validateFile(file)) return;
 
     // Detectar formato/codec do vídeo antes do upload
     try {
       const formatInfo = await detectVideoFormat(file);
-      console.log('🔍 Formato detectado:', formatInfo);
+      devLog('🔍 Formato detectado:', formatInfo);
 
       if (!formatInfo.isCompatible) {
         // HEVC detectado — mostrar dialog de conversão
@@ -288,7 +289,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
       }
     } catch (err) {
       // Se a detecção falhar, prosseguir normalmente
-      console.warn('Falha na detecção de formato, prosseguindo com upload:', err);
+      devWarn('Falha na detecção de formato, prosseguindo com upload:', err);
     }
 
     await uploadFile(file);
@@ -325,7 +326,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
     if (!video || metadataProcessed === video.id) return;
     
     const videoElement = e.target as HTMLVideoElement;
-    console.log('📐 Dimensões do vídeo carregadas:', {
+    devLog('📐 Dimensões do vídeo carregadas:', {
       width: videoElement.videoWidth,
       height: videoElement.videoHeight,
       duration: videoElement.duration
@@ -379,7 +380,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      console.log('📁 Arquivo selecionado via input:', file.name, file.type);
+      devLog('📁 Arquivo selecionado via input:', file.name, file.type);
       handleFileSelect(file);
     }
   };
@@ -404,7 +405,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-    console.log('🗑️ Vídeo removido');
+    devLog('🗑️ Vídeo removido');
   };
 
   // ✅ Função para controlar reprodução com melhor tratamento
@@ -418,7 +419,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
       } else {
         // ✅ Aguardar o vídeo carregar antes de reproduzir
         if (videoRef.current.readyState < 2) {
-          console.log('🔄 Aguardando vídeo carregar...');
+          devLog('🔄 Aguardando vídeo carregar...');
           await new Promise((resolve) => {
             const handleCanPlay = () => {
               videoRef.current?.removeEventListener('canplay', handleCanPlay);
@@ -432,7 +433,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
         setIsPlaying(true);
       }
     } catch (error) {
-      console.error('❌ Erro ao reproduzir vídeo:', error);
+      logClientError('❌ Erro ao reproduzir vídeo:', error);
       setError('Erro ao reproduzir vídeo. Tente novamente.');
     }
   }, [isPlaying]);
@@ -553,7 +554,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
                   onPause={handleVideoPause}
                   onEnded={handleVideoEnded}
                   onError={(e) => {
-                    console.error('❌ Erro ao carregar vídeo:', e);
+                    logClientError('❌ Erro ao carregar vídeo:', e);
                     setError('Erro ao carregar preview do vídeo');
                   }}
                   muted

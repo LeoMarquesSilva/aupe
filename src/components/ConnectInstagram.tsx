@@ -29,6 +29,7 @@ import { clientService } from '../services/supabaseClient';
 import { Client } from '../types';
 import { supabase } from '../services/supabaseClient';
 import InstagramConnectionFix from './InstagramConnectionFix';
+import { logClientError } from '../utils/clientLogger';
 
 interface ConnectInstagramProps {
   client: Client;
@@ -58,7 +59,6 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     
     const timestamp = new Date().toTimeString().split(' ')[0];
     const logMessage = `${timestamp}: ${message}`;
-    console.log(logMessage);
     setDebugLog(prev => [...prev, logMessage]);
   };
 
@@ -161,7 +161,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
           setInstagramData(null);
         }
       } catch (err: any) {
-        console.error('Erro ao verificar autenticação do Instagram:', err);
+        logClientError('Erro ao verificar autenticação do Instagram', err);
         addDebug(`Erro ao verificar autenticação: ${err.message}`);
         setError('Erro ao verificar dados de autenticação');
       } finally {
@@ -238,7 +238,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       addDebug('Token verificado com sucesso');
       
     } catch (err: any) {
-      console.error('Erro ao verificar token:', err);
+      logClientError('Erro ao verificar token', err);
       addDebug(`Erro na verificação do token: ${err.message}`);
       setError('Não foi possível verificar o token. Tente novamente mais tarde.');
     } finally {
@@ -335,7 +335,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       const errorMessage = err.message || 'Erro ao iniciar processo de conexão';
       setError(errorMessage);
       addDebug(`Erro: ${errorMessage}`);
-      console.error('Erro ao conectar Instagram:', err);
+      logClientError('Erro ao conectar Instagram', err);
     }
   };
 
@@ -389,7 +389,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       addDebug('Dados salvos no Supabase e pai notificado');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao salvar conexão Instagram';
-      console.error('Erro ao processar sucesso da autenticação:', err);
+      logClientError('Erro ao processar sucesso da autenticação', err);
       addDebug(`Erro: ${msg}`);
       setError(msg);
     } finally {
@@ -441,7 +441,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         setLoading(false);
       }
     } catch (err: any) {
-      console.error('Erro ao processar dados de autenticação:', err);
+      logClientError('Erro ao processar dados de autenticação', err);
       addDebug(`Erro ao processar dados: ${err.message}`);
       setError('Erro ao processar dados de autenticação');
       setLoading(false);
@@ -464,7 +464,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       onConnectionUpdate(client.id, null);
       addDebug('Conta desconectada com sucesso');
     } catch (err: any) {
-      console.error('Erro ao desconectar conta:', err);
+      logClientError('Erro ao desconectar conta', err);
       addDebug(`Erro ao desconectar conta: ${err.message}`);
       setError('Erro ao desconectar conta. Por favor, tente novamente.');
     }

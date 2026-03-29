@@ -32,6 +32,7 @@ import {
   connectSpecificInstagramAccount,
   getInstagramOAuthDebugSnapshot,
 } from '../services/instagramAuthService';
+import { devLog, logClientError } from '../utils/clientLogger';
 
 interface InstagramAccountSelectorProps {
   open: boolean;
@@ -87,15 +88,16 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
       setLoading(true);
       setError(null);
       
-      console.log('Carregando contas do Instagram disponíveis...', { clientId });
+      devLog('Carregando contas do Instagram disponíveis...', { clientId });
       const availableAccounts = await getAvailableInstagramAccounts(authCode, clientId);
       
       setAccounts(availableAccounts);
-      console.log(`${availableAccounts.length} contas encontradas`);
+      devLog(`${availableAccounts.length} contas encontradas`);
       
     } catch (err: any) {
       const snapshot = getInstagramOAuthDebugSnapshot();
-      console.error('Erro ao carregar contas:', err, {
+      logClientError('Erro ao carregar contas', err);
+      devLog('OAuth debug snapshot (apenas verbose)', {
         oauthDebug: snapshot,
         oauthDebugTagOnWindow:
           typeof window !== 'undefined'
@@ -111,7 +113,7 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
   const handleAccountSelect = async (account: AvailableInstagramAccount) => {
     // Evitar seleções múltiplas
     if (connecting || hasSelectedAccount) {
-      console.log('⏳ Já processando uma conta, ignorando nova seleção');
+      devLog('⏳ Já processando uma conta, ignorando nova seleção');
       return;
     }
 
@@ -121,10 +123,10 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
       setError(null);
       setHasSelectedAccount(true); // Marcar como selecionado
       
-      console.log(`Conectando conta: @${account.username}`);
+      devLog(`Conectando conta: @${account.username}`);
       const authData = await connectSpecificInstagramAccount(account);
       
-      console.log('Conta conectada com sucesso!');
+      devLog('Conta conectada com sucesso!');
       
       // Chamar callback de sucesso
       onAccountSelected(authData);
@@ -132,7 +134,7 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
       // NÃO chamar onClose() aqui - deixar o componente pai gerenciar
       
     } catch (err: any) {
-      console.error('Erro ao conectar conta:', err);
+      logClientError('Erro ao conectar conta', err);
       setError(err.message || 'Erro ao conectar conta do Instagram');
       setHasSelectedAccount(false); // Reset em caso de erro
     } finally {
@@ -144,7 +146,7 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
   const handleClose = () => {
     // Só permitir fechar se não estiver processando uma conta
     if (connecting || hasSelectedAccount) {
-      console.log('⏳ Não é possível fechar - processando conta');
+      devLog('⏳ Não é possível fechar - processando conta');
       return;
     }
     

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { supabase } from 'services/supabaseClient';
+import { devLog, devWarn, logClientError } from '../utils/clientLogger';
 
 /**
  * Corrige dados de autenticação Instagram: tenta Facebook Page + IG (legado),
@@ -7,7 +8,7 @@ import { supabase } from 'services/supabaseClient';
  */
 export async function fixInstagramConnection(clientId: string) {
   try {
-    console.log(`Iniciando correção da conexão do Instagram para o cliente ${clientId}...`);
+    devLog(`Iniciando correção da conexão do Instagram para o cliente ${clientId}...`);
 
     const { data: client, error: fetchError } = await supabase
       .from('clients')
@@ -67,7 +68,7 @@ export async function fixInstagramConnection(clientId: string) {
         return { success: true, message: 'Conexão corrigida (Facebook Page)', data: updatedClient };
       }
     } catch (e) {
-      console.warn('Fluxo Facebook Page não aplicável:', e);
+      devWarn('Fluxo Facebook Page não aplicável:', e);
     }
 
     // 2) Instagram Login: perfil com o próprio token
@@ -133,7 +134,7 @@ export async function fixInstagramConnection(clientId: string) {
     };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error('Erro ao corrigir conexão do Instagram:', error);
+    logClientError('Erro ao corrigir conexão do Instagram', error);
     return {
       success: false,
       message: `Falha ao corrigir a conexão com Instagram: ${message}`,

@@ -1,15 +1,21 @@
 import axios from 'axios';
+import {
+  isClientVerboseLogging,
+  devInfo,
+  logClientError,
+  redactOAuthLikeStringSnippet,
+} from '../utils/clientLogger';
 
 const IG_AUTH_DEBUG_TAG = 'ig-auth-debug-2026-03-29a';
 const IG_AUTH_DEBUG_PREFIX = '[IG_AUTH_DEBUG]';
 
 function logAuthDebug(step: string, payload?: unknown): void {
-  if (process.env.NODE_ENV !== 'development') return;
+  if (!isClientVerboseLogging()) return;
   if (payload === undefined) {
-    console.info(`${IG_AUTH_DEBUG_PREFIX} ${IG_AUTH_DEBUG_TAG} ${step}`);
+    devInfo(`${IG_AUTH_DEBUG_PREFIX} ${IG_AUTH_DEBUG_TAG} ${step}`);
     return;
   }
-  console.info(`${IG_AUTH_DEBUG_PREFIX} ${IG_AUTH_DEBUG_TAG} ${step}`, payload);
+  devInfo(`${IG_AUTH_DEBUG_PREFIX} ${IG_AUTH_DEBUG_TAG} ${step}`, payload);
 }
 
 // Em React StrictMode (dev), efeitos podem disparar duas vezes; evita consumir o mesmo code duas vezes.
@@ -152,7 +158,8 @@ async function exchangeLongLivedUserAccessToken(
         status: r.status,
         ok: r.ok,
         contentType: r.headers.get('content-type') || '',
-        bodyPreview: raw.slice(0, 300),
+        bodyLength: raw.length,
+        bodyPreviewRedacted: redactOAuthLikeStringSnippet(raw, 300),
       });
       // `serve -s build` e SPAs costumam devolver index.html com 200 para /api/* — não é JSON.
       const looksLikeHtml =
@@ -466,7 +473,7 @@ export const getAvailableInstagramAccounts = async (
         });
       } catch (err: unknown) {
         const ax = err as { response?: { data?: unknown } };
-        console.error(`Erro ao buscar IG da página ${page.name}:`, ax.response?.data || err);
+        logClientError(`Erro ao buscar IG da página ${page.name}`, ax.response?.data || err);
       }
     }
 
@@ -534,7 +541,7 @@ export const getFacebookPages = async (_accessToken: string): Promise<unknown[]>
     });
     return response.data.pages || [];
   } catch (error: unknown) {
-    console.error('Erro ao buscar páginas do Facebook:', error);
+    logClientError('Erro ao buscar páginas do Facebook', error);
     return [];
   }
 };

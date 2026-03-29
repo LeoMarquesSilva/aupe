@@ -51,6 +51,7 @@ import { clientService } from '../services/supabaseClient';
 import { pdfExportService } from '../services/pdfExportService';
 import { formatDistanceToNow, subDays, isAfter, parseISO, startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { devLog, logClientError } from '../utils/clientLogger';
 
 // Importar componentes
 import ClientHeader from '../components/ClientHeader';
@@ -152,16 +153,14 @@ const SingleClientDashboard: React.FC = () => {
     scheduled: number;
   }>({ published: 0, scheduled: 0 });
 
-  // Debug client data
   useEffect(() => {
     if (client) {
-      console.log('=== DEBUG CLIENT DATA ===');
-      console.log('Client object:', client);
-      console.log('accessToken:', client.accessToken);
-      console.log('instagramAccountId:', client.instagramAccountId);
-      console.log('username:', client.username);
-      console.log('hasInstagramAuth:', Boolean(client.accessToken && client.instagramAccountId));
-      console.log('========================');
+      devLog('Cliente (debug, sem token)', {
+        id: client.id,
+        username: client.username,
+        instagramAccountId: client.instagramAccountId,
+        hasInstagramAuth: Boolean(client.accessToken && client.instagramAccountId),
+      });
     }
   }, [client]);
 
@@ -208,7 +207,7 @@ const SingleClientDashboard: React.FC = () => {
       
       setScheduledPosts(postsWithUsers);
     } catch (err: any) {
-      console.error('Erro ao buscar posts agendados:', err);
+      logClientError('Erro ao buscar posts agendados', err);
     }
   }, [clientId]);
 
@@ -224,21 +223,21 @@ const SingleClientDashboard: React.FC = () => {
           throw new Error('Cliente não encontrado');
         }
         
-        console.log('Cliente carregado:', clientData);
-        console.log('Tem accessToken?', !!clientData.accessToken);
-        console.log('Tem instagramAccountId?', !!clientData.instagramAccountId);
+        devLog('Cliente carregado', { id: clientData.id, name: clientData.name, hasAccessToken: !!clientData.accessToken, hasIgId: !!clientData.instagramAccountId });
+        devLog('Tem accessToken?', !!clientData.accessToken);
+        devLog('Tem instagramAccountId?', !!clientData.instagramAccountId);
         
         setClient(clientData);
         
         if (clientData.accessToken && clientData.instagramAccountId) {
-          console.log('Cliente autenticado, carregando dados do Instagram...');
+          devLog('Cliente autenticado, carregando dados do Instagram...');
           await loadInstagramDataWithCache(clientData.id);
         } else {
-          console.log('Cliente não autenticado com Instagram');
+          devLog('Cliente não autenticado com Instagram');
           setLoading(false);
         }
       } catch (err: any) {
-        console.error('Erro ao buscar cliente:', err);
+        logClientError('Erro ao buscar cliente', err);
         setError(err.message);
         setLoading(false);
       }
@@ -257,7 +256,7 @@ const SingleClientDashboard: React.FC = () => {
     
     try {
       setSyncInProgress(forceRefresh);
-      console.log(forceRefresh ? 'Forçando sincronização...' : 'Usando sincronização inteligente...');
+      devLog(forceRefresh ? 'Forçando sincronização...' : 'Usando sincronização inteligente...');
       
       // ✅ USAR O NOVO MÉTODO QUE JÁ RESOLVE TUDO
       const result = await instagramCacheService.getDataWithCache(clientId, forceRefresh);
@@ -292,10 +291,10 @@ const SingleClientDashboard: React.FC = () => {
         setInsightsPermissionError(false);
       }
       
-      console.log(`📊 Dashboard atualizado: ${result.posts.length} posts, fonte: ${result.isFromCache ? 'cache' : 'API'}`);
+      devLog(`📊 Dashboard atualizado: ${result.posts.length} posts, fonte: ${result.isFromCache ? 'cache' : 'API'}`);
       
     } catch (err: any) {
-      console.error('Erro ao carregar dados do Instagram:', err);
+      logClientError('Erro ao carregar dados do Instagram', err);
       setError('Não foi possível carregar os dados do Instagram. Verifique a conexão.');
       
       // Em caso de erro, tentar usar dados em cache se existirem
@@ -304,10 +303,10 @@ const SingleClientDashboard: React.FC = () => {
         if (cachedDataFallback.posts.length > 0) {
           setCachedData(cachedDataFallback);
           await generateDashboardData(cachedDataFallback.posts);
-          console.log('📋 Usando dados em cache como fallback');
+          devLog('📋 Usando dados em cache como fallback');
         }
       } catch (cacheError) {
-        console.error('Erro ao buscar dados em cache:', cacheError);
+        logClientError('Erro ao buscar dados em cache', cacheError);
       }
     } finally {
       setLoading(false);
@@ -335,13 +334,13 @@ const SingleClientDashboard: React.FC = () => {
         recent_posts: posts.slice(0, 10)
       });
       
-      console.log('📊 Dados do dashboard gerados:', {
+      devLog('📊 Dados do dashboard gerados:', {
         posts: posts.length,
         totalReach: summary.total_reach,
         totalEngagement: summary.total_engagement
       });
     } catch (err: any) {
-      console.error('Erro ao gerar dados do dashboard:', err);
+      logClientError('Erro ao gerar dados do dashboard', err);
     }
   };
 
@@ -372,7 +371,7 @@ const SingleClientDashboard: React.FC = () => {
   const handleForceRefresh = async () => {
     if (!clientId || syncInProgress) return;
     
-    console.log('🔄 Usuário solicitou atualização manual');
+    devLog('🔄 Usuário solicitou atualização manual');
     setError(null); // Limpar erros anteriores
     await loadInstagramDataWithCache(clientId, true);
   };
@@ -384,7 +383,7 @@ const SingleClientDashboard: React.FC = () => {
     if (!clientId || syncInProgress) return;
     
     try {
-      console.log('🗑️ Limpando cache...');
+      devLog('🗑️ Limpando cache...');
       await instagramCacheService.clearCache(clientId);
       setCachedData(null);
       setDashboardData(null);
@@ -393,7 +392,7 @@ const SingleClientDashboard: React.FC = () => {
       // Recarregar dados
       await loadInstagramDataWithCache(clientId, true);
     } catch (err: any) {
-      console.error('Erro ao limpar cache:', err);
+      logClientError('Erro ao limpar cache', err);
       setError('Não foi possível limpar o cache.');
     }
   };
@@ -418,7 +417,7 @@ const SingleClientDashboard: React.FC = () => {
   
   const handleApplyFilters = (newFilters: PostsFilter) => {
     setFilters(newFilters);
-    console.log('🔍 Filtros aplicados:', newFilters);
+    devLog('🔍 Filtros aplicados:', newFilters);
     
     // Regenerar dashboard com novos filtros se necessário
     if (cachedData?.posts) {
@@ -434,7 +433,7 @@ const SingleClientDashboard: React.FC = () => {
     
     setFilters(defaultFilters);
     setSearchQuery('');
-    console.log('🔄 Filtros resetados');
+    devLog('🔄 Filtros resetados');
     
     // Regenerar dashboard sem filtros
     if (cachedData?.posts) {
@@ -443,7 +442,7 @@ const SingleClientDashboard: React.FC = () => {
   };
   
   const handleEditClient = () => {
-    console.log('✏️ Editar cliente:', client);
+    devLog('✏️ Editar cliente', { id: client.id, username: client.username });
     // TODO: Implementar modal de edição ou navegar para página de edição
     navigate(`/clients/${clientId}/edit`);
   };
@@ -456,12 +455,12 @@ const SingleClientDashboard: React.FC = () => {
     if (!client) return;
     
     try {
-      console.log('🔌 Desconectando Instagram...');
+      devLog('🔌 Desconectando Instagram...');
       
       // Usar o clientService ao invés de consulta direta
       const updatedClient = await clientService.removeInstagramAuth(client.id);
       
-      console.log('✅ Instagram desconectado, cliente atualizado:', updatedClient);
+      devLog('✅ Instagram desconectado', { id: updatedClient.id, username: updatedClient.username });
       
       // Atualizar estado local
       setClient(updatedClient);
@@ -473,7 +472,7 @@ const SingleClientDashboard: React.FC = () => {
       
       setError(null);
     } catch (err: any) {
-      console.error('❌ Erro ao desconectar Instagram:', err);
+      logClientError('Erro ao desconectar Instagram', err);
       setError('Não foi possível desconectar a conta do Instagram.');
     }
   };
@@ -481,12 +480,12 @@ const SingleClientDashboard: React.FC = () => {
   const handleExportData = () => {
     const posts = cachedData?.posts || [];
     if (posts.length === 0) {
-      console.log('⚠️ Nenhum post para exportar');
+      devLog('⚠️ Nenhum post para exportar');
       return;
     }
     
     try {
-      console.log('📤 Exportando dados...', posts.length, 'posts');
+      devLog('📤 Exportando dados...', posts.length, 'posts');
       
       // Criar CSV com dados mais completos
       const headers = [
@@ -543,9 +542,9 @@ const SingleClientDashboard: React.FC = () => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      console.log('✅ Dados exportados:', fileName);
+      devLog('✅ Dados exportados:', fileName);
     } catch (err) {
-      console.error('❌ Erro ao exportar dados:', err);
+      logClientError('Erro ao exportar dados', err);
       setError('Não foi possível exportar os dados.');
     }
   };
@@ -586,7 +585,7 @@ const SingleClientDashboard: React.FC = () => {
         options: exportOptions
       });
     } catch (err) {
-      console.error('❌ Erro ao gerar PDF:', err);
+      logClientError('Erro ao gerar PDF', err);
       setError('Não foi possível gerar o relatório PDF.');
     }
   };
@@ -1423,9 +1422,9 @@ const SingleClientDashboard: React.FC = () => {
                 if (error) throw error;
                 
                 setScheduledPosts(prev => prev.filter(p => p.id !== postId));
-                console.log('✅ Post agendado excluído:', postId);
+                devLog('✅ Post agendado excluído:', postId);
               } catch (err: any) {
-                console.error('❌ Erro ao excluir post:', err);
+                logClientError('Erro ao excluir post', err);
                 setError('Não foi possível excluir o post agendado.');
               }
             }}
