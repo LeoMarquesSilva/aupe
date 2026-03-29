@@ -181,7 +181,33 @@ const ClientDashboard: React.FC = () => {
         if (event.origin !== window.location.origin) return;
         if (event.data?.type === 'INSTAGRAM_AUTH_SUCCESS') {
           window.removeEventListener('message', onMessage);
-          fetchClients();
+          void (async () => {
+            try {
+              const cid = (event.data.clientId as string) || newClient.id;
+              const raw = event.data.data as Record<string, unknown>;
+              const authData: InstagramAuthData = {
+                instagramAccountId: String(raw.instagramAccountId || ''),
+                accessToken: String(raw.accessToken || ''),
+                username: String(raw.username || ''),
+                profilePicture: String(raw.profilePicture || ''),
+                tokenExpiry:
+                  typeof raw.tokenExpiry === 'string'
+                    ? new Date(raw.tokenExpiry)
+                    : raw.tokenExpiry instanceof Date
+                      ? raw.tokenExpiry
+                      : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+                pageId: (raw.pageId as string) ?? null,
+                pageName: (raw.pageName as string) ?? null,
+                issuedAt: typeof raw.issuedAt === 'string' ? raw.issuedAt : undefined,
+              };
+              await clientService.saveInstagramAuth(cid, authData);
+            } catch (e: unknown) {
+              const msg = e instanceof Error ? e.message : 'Erro ao salvar Instagram';
+              setError(msg);
+            } finally {
+              fetchClients();
+            }
+          })();
         }
       };
       window.addEventListener('message', onMessage);
@@ -190,7 +216,37 @@ const ClientDashboard: React.FC = () => {
         if (!popup || popup.closed) {
           clearInterval(poll);
           window.removeEventListener('message', onMessage);
-          fetchClients();
+          void (async () => {
+            const authSuccess = localStorage.getItem('instagram_auth_success');
+            const savedData = localStorage.getItem('instagram_auth_temp_data');
+            if (authSuccess && savedData) {
+              try {
+                const raw = JSON.parse(savedData) as Record<string, unknown>;
+                const authData: InstagramAuthData = {
+                  instagramAccountId: String(raw.instagramAccountId || ''),
+                  accessToken: String(raw.accessToken || ''),
+                  username: String(raw.username || ''),
+                  profilePicture: String(raw.profilePicture || ''),
+                  tokenExpiry:
+                    typeof raw.tokenExpiry === 'string'
+                      ? new Date(raw.tokenExpiry)
+                      : raw.tokenExpiry instanceof Date
+                        ? raw.tokenExpiry
+                        : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+                  pageId: (raw.pageId as string) ?? null,
+                  pageName: (raw.pageName as string) ?? null,
+                  issuedAt: typeof raw.issuedAt === 'string' ? raw.issuedAt : undefined,
+                };
+                await clientService.saveInstagramAuth(newClient.id, authData);
+              } catch {
+                /* já tratado em postMessage ou usuário cancelou */
+              } finally {
+                localStorage.removeItem('instagram_auth_temp_data');
+                localStorage.removeItem('instagram_auth_success');
+              }
+            }
+            fetchClients();
+          })();
         }
       }, 800);
     } catch (err: any) {

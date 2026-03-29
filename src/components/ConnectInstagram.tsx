@@ -288,14 +288,14 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
         if (event.origin !== window.location.origin) return;
 
         if (event.data.type === 'INSTAGRAM_AUTH_SUCCESS') {
-          addDebug('✅ Recebida confirmação de sucesso da janela popup');
-          
-          // Remover listener
+          const msgClientId = event.data.clientId as string | undefined;
+          if (msgClientId && msgClientId !== client.id) {
+            addDebug('Mensagem ignorada: clientId diferente do cliente atual');
+            return;
+          }
+          addDebug('Recebida confirmação de sucesso da janela popup');
           window.removeEventListener('message', handleMessage);
-          
-          // Processar sucesso
-          handleAuthSuccess(event.data.data, event.data.updatedClient);
-          
+          void handleAuthSuccess(event.data.data);
         } else if (event.data.type === 'INSTAGRAM_AUTH_ERROR') {
           addDebug(`❌ Recebido erro da janela popup: ${event.data.error}`);
           
@@ -335,31 +335,55 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     }
   };
 
-  // Nova função para processar sucesso da autenticação
-  const handleAuthSuccess = (authData: InstagramAuthData, updatedClient?: any) => {
+  const normalizeAuthPayload = (raw: Record<string, unknown>): InstagramAuthData => {
+    let tokenExpiry: Date;
+    const te = raw.tokenExpiry;
+    if (typeof te === 'string') {
+      tokenExpiry = new Date(te);
+    } else if (te instanceof Date) {
+      tokenExpiry = te;
+    } else {
+      tokenExpiry = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+    }
+    return {
+      instagramAccountId: String(raw.instagramAccountId || ''),
+      accessToken: String(raw.accessToken || ''),
+      username: String(raw.username || ''),
+      profilePicture: String(raw.profilePicture || ''),
+      tokenExpiry,
+      pageId: (raw.pageId as string) ?? null,
+      pageName: (raw.pageName as string) ?? null,
+      issuedAt: typeof raw.issuedAt === 'string' ? raw.issuedAt : undefined,
+    };
+  };
+
+  const handleAuthSuccess = async (raw: InstagramAuthData | Record<string, unknown>) => {
     try {
-      addDebug(`Processando sucesso da autenticação: @${authData.username}`);
-      
-      // Garantir que a data de expiração seja um objeto Date
-      if (typeof authData.tokenExpiry === 'string') {
-        authData.tokenExpiry = new Date(authData.tokenExpiry);
-      }
-      
-      // Atualizar estado
-      setInstagramData(authData);
+      const authData = normalizeAuthPayload(raw as Record<string, unknown>);
+      addDebug(`Salvando autenticação: @${authData.username}`);
+      const savedClient = await clientService.saveInstagramAuth(client.id, authData);
+      const mapped: InstagramAuthData = {
+        instagramAccountId: savedClient.instagramAccountId!,
+        accessToken: savedClient.accessToken!,
+        username: savedClient.username!,
+        profilePicture: savedClient.profilePicture || '',
+        tokenExpiry: savedClient.tokenExpiry || authData.tokenExpiry,
+        pageId: savedClient.pageId || null,
+        pageName: savedClient.pageName || null,
+        issuedAt: savedClient.instagramLongLivedIssuedAt,
+      };
+      setInstagramData(mapped);
       setConnected(true);
       setError(null);
       setNeedsFix(false);
-      setLoading(false);
-      
-      // Notificar componente pai
-      onConnectionUpdate(client.id, authData);
-      addDebug('Componente pai notificado sobre a conexão');
-      
-    } catch (err: any) {
+      onConnectionUpdate(client.id, mapped);
+      addDebug('Dados salvos no Supabase e pai notificado');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao salvar conexão Instagram';
       console.error('Erro ao processar sucesso da autenticação:', err);
-      addDebug(`Erro ao processar sucesso: ${err.message}`);
-      setError('Erro ao processar dados de autenticação');
+      addDebug(`Erro: ${msg}`);
+      setError(msg);
+    } finally {
       setLoading(false);
     }
   };
@@ -375,16 +399,15 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       
       if (authSuccess && savedData) {
         addDebug('Dados temporários de autenticação encontrados');
-        const authData = JSON.parse(savedData) as InstagramAuthData;
+        const parsed = JSON.parse(savedData) as Record<string, unknown>;
         
         // Garantir que todos os campos necessários existam
-        if (!authData.instagramAccountId) {
+        if (!parsed.instagramAccountId) {
           addDebug('ERRO: ID da conta do Instagram não encontrado nos dados temporários');
           throw new Error('Dados da conta do Instagram incompletos');
         }
         
-        // Processar sucesso
-        handleAuthSuccess(authData);
+        await handleAuthSuccess(parsed);
         
         // Limpar dados temporários
         localStorage.removeItem('instagram_auth_temp_data');

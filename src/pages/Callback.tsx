@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, CircularProgress, Alert, Button, useTheme } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
 import InstagramAccountSelector from '../components/InstagramAccountSelector';
+import { getAuthorizationUrl } from '../services/instagramAuthService';
 
 const Callback: React.FC = () => {
   const theme = useTheme();
@@ -10,54 +10,46 @@ const Callback: React.FC = () => {
   const [success, setSuccess] = useState<boolean>(false);
   const [showAccountSelector, setShowAccountSelector] = useState<boolean>(false);
   const [authCode, setAuthCode] = useState<string | null>(null);
-  const navigate = useNavigate();
+  const [oauthClientId, setOauthClientId] = useState<string | null>(null);
 
   useEffect(() => {
     const processCallback = async () => {
       try {
-        // Obter o código da URL
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
-        const error = urlParams.get('error');
+        const errParam = urlParams.get('error');
         const errorDescription = urlParams.get('error_description');
-        
-        console.log('🔍 Processando callback do Instagram:', { 
-          hasCode: !!code, 
-          error, 
-          errorDescription 
+        const state = urlParams.get('state')?.trim() || null;
+        setOauthClientId(state);
+
+        console.log('Processando callback Facebook/Graph:', {
+          hasCode: !!code,
+          error: errParam,
+          errorDescription,
+          hasState: !!state,
         });
-        
-        if (error) {
+
+        if (errParam) {
           let errorMessage = 'Autorização negada ou cancelada pelo usuário.';
-          
-          if (error === 'access_denied') {
-            errorMessage = 'Acesso negado. Você precisa autorizar o aplicativo para continuar.';
+          if (errParam === 'access_denied') {
+            errorMessage = 'Acesso negado. Autorize o aplicativo para continuar.';
           } else if (errorDescription) {
             errorMessage = errorDescription;
           }
-          
           throw new Error(errorMessage);
         }
-        
+
         if (!code) {
-          throw new Error('Código de autorização não encontrado na URL. Por favor, tente novamente.');
+          throw new Error('Código de autorização não encontrado na URL. Tente novamente.');
         }
-        
-        console.log('✅ Código de autorização recebido, iniciando seletor de contas');
-        
-        // Ir direto para o seletor de contas (sem validação CSRF)
+
         setAuthCode(code);
         setShowAccountSelector(true);
-        
       } catch (err) {
-        console.error('❌ Erro no callback do Instagram:', err);
+        console.error('Erro no callback Facebook/Graph:', err);
         const errorMessage = (err as Error).message || 'Erro desconhecido durante a autenticação';
         setError(errorMessage);
-        
-        // Salvar mensagem de erro no localStorage
         localStorage.setItem('instagram_auth_error', errorMessage);
-        
-        // Fechar a janela de popup após um breve atraso
         setTimeout(() => {
           if (window.opener) {
             window.close();
@@ -67,36 +59,55 @@ const Callback: React.FC = () => {
         setLoading(false);
       }
     };
-    
-    processCallback();
-  }, [navigate]);
 
-  const handleAccountSelected = (instagramData: any) => {
-    console.log('✅ Conta selecionada:', instagramData);
-    
-    // Salvar dados no localStorage
-    localStorage.setItem('instagram_auth_temp_data', JSON.stringify(instagramData));
+    processCallback();
+  }, []);
+
+  const handleAccountSelected = (instagramData: Record<string, unknown>) => {
+    console.log('Conta selecionada:', instagramData);
+
+    const tokenExpiry = instagramData.tokenExpiry;
+    const serializable = {
+      ...instagramData,
+      tokenExpiry:
+        tokenExpiry instanceof Date
+          ? tokenExpiry.toISOString()
+          : typeof tokenExpiry === 'string'
+            ? tokenExpiry
+            : new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+
+    localStorage.setItem('instagram_auth_temp_data', JSON.stringify(serializable));
     localStorage.setItem('instagram_auth_success', 'true');
-    
+
+    const clientId =
+      oauthClientId || localStorage.getItem('current_client_id') || '';
+
+    try {
+      if (window.opener) {
+        window.opener.postMessage(
+          { type: 'INSTAGRAM_AUTH_SUCCESS', data: serializable, clientId },
+          window.location.origin,
+        );
+      }
+    } catch {
+      // COOP pode bloquear postMessage — janela pai usa localStorage
+    }
+
     setSuccess(true);
     setShowAccountSelector(false);
-    
-    // Fechar a janela de popup após um breve atraso
+
     setTimeout(() => {
-      if (window.opener) {
+      if (window.opener && window.opener !== window) {
         window.close();
       }
     }, 2000);
   };
 
   const handleSelectorClose = () => {
-    console.log('❌ Seleção de conta cancelada');
     setShowAccountSelector(false);
     setError('Seleção de conta cancelada pelo usuário.');
-    
     localStorage.setItem('instagram_auth_error', 'Seleção cancelada pelo usuário');
-    
-    // Fechar a janela de popup após um breve atraso
     setTimeout(() => {
       if (window.opener) {
         window.close();
@@ -106,18 +117,20 @@ const Callback: React.FC = () => {
 
   const handleRetry = () => {
     setError(null);
+    const params = new URLSearchParams(window.location.search);
+    const clientId = params.get('state')?.trim() || oauthClientId || localStorage.getItem('current_client_id');
+    if (clientId) {
+      window.location.href = getAuthorizationUrl(clientId);
+      return;
+    }
     setLoading(true);
-    
-    // Reprocessar o callback
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    
+    const code = params.get('code');
     if (code) {
       setAuthCode(code);
       setShowAccountSelector(true);
       setLoading(false);
     } else {
-      setError('Código de autorização não encontrado. Por favor, feche esta janela e tente novamente.');
+      setError('Código não encontrado. Feche a janela e inicie a conexão novamente.');
       setLoading(false);
     }
   };
@@ -129,86 +142,72 @@ const Callback: React.FC = () => {
   };
 
   return (
-    <Box 
-      sx={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
         minHeight: '100vh',
         p: 3,
         textAlign: 'center',
-        bgcolor: 'background.default'
+        bgcolor: 'background.default',
       }}
     >
       {loading && (
         <>
           <CircularProgress size={60} sx={{ mb: 3, color: theme.palette.primary.main }} />
           <Typography variant="h6" sx={{ mb: 1 }}>
-            Processando autenticação do Instagram...
+            Processando login Facebook…
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Por favor, aguarde enquanto carregamos suas contas.
+            Carregando páginas e contas Instagram vinculadas.
           </Typography>
         </>
       )}
-      
+
       {error && (
         <Box sx={{ maxWidth: 500, width: '100%' }}>
           <Alert severity="error" sx={{ mb: 3 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Erro na Autenticação
+              Erro na autenticação
             </Typography>
             {error}
           </Alert>
-          
+
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mb: 3 }}>
-            <Button 
-              variant="contained" 
-              onClick={handleRetry}
-              sx={{ 
-                bgcolor: theme.palette.primary.main, 
-                '&:hover': { bgcolor: theme.palette.primary.dark } 
-              }}
-            >
-              Tentar Novamente
+            <Button variant="contained" onClick={handleRetry} sx={{ bgcolor: theme.palette.primary.main }}>
+              Tentar novamente
             </Button>
-            <Button 
-              variant="outlined" 
-              onClick={handleClose}
-            >
+            <Button variant="outlined" onClick={handleClose}>
               Fechar
             </Button>
           </Box>
-          
+
           <Typography variant="body2" color="text.secondary">
-            Esta janela será fechada automaticamente em alguns segundos...
-          </Typography>
-        </Box>
-      )}
-      
-      {success && (
-        <Box sx={{ maxWidth: 500, width: '100%' }}>
-          <Alert severity="success" sx={{ mb: 3 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Sucesso!
-            </Typography>
-            Conta do Instagram conectada com sucesso!
-          </Alert>
-          
-          <Typography variant="body2" color="text.secondary">
-            Esta janela será fechada automaticamente...
+            Esta janela pode fechar automaticamente em alguns segundos…
           </Typography>
         </Box>
       )}
 
-      {/* Seletor de contas do Instagram */}
+      {success && (
+        <Box sx={{ maxWidth: 500, width: '100%' }}>
+          <Alert severity="success" sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Sucesso
+            </Typography>
+            Conta Instagram conectada. Fechando…
+          </Alert>
+        </Box>
+      )}
+
       {authCode && (
         <InstagramAccountSelector
           open={showAccountSelector}
           onClose={handleSelectorClose}
           onAccountSelected={handleAccountSelected}
           authCode={authCode}
+          clientId={oauthClientId || undefined}
         />
       )}
     </Box>

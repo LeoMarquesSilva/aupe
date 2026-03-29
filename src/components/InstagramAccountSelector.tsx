@@ -148,7 +148,7 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
           Escolher Conta do Instagram
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Conta profissional (Business/Creator) via login Instagram — confirme para salvar neste cliente
+          Login via Facebook: escolha a Página com Instagram Business vinculado para salvar neste cliente.
         </Typography>
       </DialogTitle>
       
@@ -164,7 +164,7 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
           </Alert>
         ) : accounts.length === 0 ? (
           <Alert severity="warning">
-            Não foi possível obter a conta. Use uma conta Instagram profissional e verifique o redirect URI no Meta App Dashboard (Instagram → Business login).
+            Não foi possível obter contas. Verifique: Página do Facebook + Instagram Business vinculado, escopos do app e URI de redirecionamento em Facebook Login.
           </Alert>
         ) : (
           <Box>

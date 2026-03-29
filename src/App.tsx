@@ -24,7 +24,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import CreatePost from './pages/CreatePost';
 import CreateStory from './pages/CreateStory';
 import CreateReels from './pages/CreateReels';
-import InstagramCallback from './pages/InstagramCallback';
+import Callback from './pages/Callback';
 import StoryCalendar from './pages/StoryCalendar';
 import EditStory from './pages/EditStory';
 import EditPost from './pages/EditPost';
@@ -255,11 +255,11 @@ const router = createBrowserRouter([
   // Rotas protegidas - Callbacks do Instagram
   {
     path: "/api/instagram-auth/callback",
-    element: <PublicCallbackLayout><InstagramCallback /></PublicCallbackLayout>,
+    element: <PublicCallbackLayout><Callback /></PublicCallbackLayout>,
   },
   {
     path: "/callback",
-    element: <PublicCallbackLayout><InstagramCallback /></PublicCallbackLayout>,
+    element: <PublicCallbackLayout><Callback /></PublicCallbackLayout>,
   },
   
   // Rotas protegidas - Checkout Stripe
