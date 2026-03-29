@@ -4,6 +4,7 @@ const IG_AUTH_DEBUG_TAG = 'ig-auth-debug-2026-03-29a';
 const IG_AUTH_DEBUG_PREFIX = '[IG_AUTH_DEBUG]';
 
 function logAuthDebug(step: string, payload?: unknown): void {
+  if (process.env.NODE_ENV !== 'development') return;
   if (payload === undefined) {
     console.info(`${IG_AUTH_DEBUG_PREFIX} ${IG_AUTH_DEBUG_TAG} ${step}`);
     return;
@@ -263,65 +264,78 @@ async function exchangeLongLivedUserAccessToken(
   return { accessToken, expiresInSec };
 }
 
+function isLocalDevOrigin(origin: string): boolean {
+  try {
+    const u = new URL(origin);
+    return u.hostname === 'localhost' || u.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Redirect OAuth — deve estar em Facebook Login > Configurações > URIs de redirecionamento OAuth válidos.
+ * Redirect OAuth — deve constar em Facebook Login > URIs de redirecionamento OAuth válidos.
+ *
+ * Regra crítica: o redirect tem de ser **na mesma origem** que a página que abriu o popup; caso contrário
+ * o popup não partilha localStorage da sessão Supabase e `saveInstagramAuth` falha com AuthSessionMissing.
+ * Por isso ignoramos REACT_APP_* se apontar para outro host que não seja o `window.location.origin`.
  */
 export function getFacebookRedirectUri(): string {
   const facebook = (process.env.REACT_APP_FACEBOOK_REDIRECT_URI || '').trim();
   const instagramAlias = (process.env.REACT_APP_INSTAGRAM_REDIRECT_URI || '').trim();
 
-  if (typeof window !== 'undefined') {
-    const origin = window.location.origin;
-    const isLocalOrigin = /^(http:\/\/localhost(:\d+)?|http:\/\/127\.0\.0\.1(:\d+)?)$/i.test(origin);
-    const currentCallback = `${origin}/callback`;
+  if (typeof window === 'undefined') {
+    return facebook || instagramAlias || '';
+  }
 
-    // Em dev local, evita cair para domínio remoto antigo via alias REACT_APP_INSTAGRAM_REDIRECT_URI.
-    if (isLocalOrigin) {
-      if (facebook) {
-        try {
-          const parsed = new URL(facebook);
-          const isLocalConfigured =
-            parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-          if (!isLocalConfigured) {
-            logAuthDebug('redirect-uri:force-local-callback', {
-              reason: 'facebook_redirect_uri_points_to_remote_host',
-              configured: facebook,
-              forced: currentCallback,
-            });
-            return currentCallback;
-          }
-          return facebook;
-        } catch {
+  const origin = window.location.origin;
+  const currentCallback = `${origin}/callback`;
+  const configured = facebook || instagramAlias;
+
+  if (isLocalDevOrigin(origin)) {
+    if (configured) {
+      try {
+        const parsed = new URL(configured);
+        const cfgLocal = isLocalDevOrigin(parsed.origin);
+        if (!cfgLocal) {
+          logAuthDebug('redirect-uri:force-current-origin', {
+            reason: 'env_points_to_non_local_while_on_localhost',
+            configured,
+            forced: currentCallback,
+          });
           return currentCallback;
         }
-      }
-
-      if (instagramAlias) {
-        try {
-          const parsed = new URL(instagramAlias);
-          const isLocalConfigured =
-            parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-          if (!isLocalConfigured) {
-            logAuthDebug('redirect-uri:force-local-callback', {
-              reason: 'instagram_alias_redirect_uri_points_to_remote_host',
-              configured: instagramAlias,
-              forced: currentCallback,
-            });
-            return currentCallback;
-          }
-          return instagramAlias;
-        } catch {
+        if (parsed.origin !== origin) {
+          logAuthDebug('redirect-uri:force-current-origin', {
+            reason: 'localhost_scheme_or_port_mismatch',
+            configured,
+            forced: currentCallback,
+          });
           return currentCallback;
         }
+        return configured;
+      } catch {
+        return currentCallback;
       }
-      return currentCallback;
+    }
+    return currentCallback;
+  }
+
+  if (configured) {
+    try {
+      if (new URL(configured).origin === origin) {
+        return configured;
+      }
+      logAuthDebug('redirect-uri:ignore-env-wrong-host', {
+        configured,
+        using: currentCallback,
+      });
+    } catch {
+      /* ignore */
     }
   }
 
-  if (facebook) return facebook;
-  if (instagramAlias) return instagramAlias;
-  if (typeof window !== 'undefined') return `${window.location.origin}/callback`;
-  return '';
+  return currentCallback;
 }
 
 /** Alias — mesmo App ID. */

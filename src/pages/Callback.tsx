@@ -45,6 +45,31 @@ const Callback: React.FC = () => {
     }
   };
 
+  const postSuccessToOpener = (serializable: Record<string, unknown>, clientId: string) => {
+    if (!window.opener) return;
+    let targetOrigin = window.location.origin;
+    try {
+      const oo = (window.opener as Window).location?.origin;
+      if (oo && oo !== 'null') {
+        targetOrigin = oo;
+      }
+    } catch {
+      // COOP pode impedir ler opener; popup e pai devem ser mesma origem — usar origem desta janela.
+    }
+    window.opener.postMessage(
+      { type: 'INSTAGRAM_AUTH_SUCCESS', data: serializable, clientId },
+      targetOrigin,
+    );
+  };
+
+  const isMissingSessionError = (err: unknown): boolean => {
+    if (!err || typeof err !== 'object') return false;
+    const name = (err as { name?: string }).name;
+    if (name === 'AuthSessionMissingError') return true;
+    const msg = err instanceof Error ? err.message : String(err);
+    return /session missing|não autenticado|auth session missing/i.test(msg);
+  };
+
   useEffect(() => {
     const processCallback = async () => {
       try {
@@ -117,9 +142,23 @@ const Callback: React.FC = () => {
     }
 
     try {
-      // Persistência principal: salva direto no backend nesta própria janela callback.
       await clientService.saveInstagramAuth(clientId, normalized);
     } catch (err) {
+      if (isMissingSessionError(err) && window.opener) {
+        postSuccessToOpener(serializable, clientId);
+        setClosing(true);
+        setSuccess(true);
+        setShowAccountSelector(false);
+        setTimeout(() => {
+          tryCloseWindow();
+          setTimeout(() => {
+            if (!window.closed) {
+              window.location.replace('/');
+            }
+          }, 700);
+        }, 1200);
+        return;
+      }
       const msg = err instanceof Error ? err.message : 'Falha ao salvar dados Instagram no cliente';
       setError(msg);
       localStorage.setItem('instagram_auth_error', msg);
@@ -127,14 +166,9 @@ const Callback: React.FC = () => {
     }
 
     try {
-      if (window.opener) {
-        window.opener.postMessage(
-          { type: 'INSTAGRAM_AUTH_SUCCESS', data: serializable, clientId },
-          window.location.origin,
-        );
-      }
+      postSuccessToOpener(serializable, clientId);
     } catch {
-      // COOP pode bloquear postMessage — janela pai usa localStorage
+      /* noop */
     }
 
     setClosing(true);

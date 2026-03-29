@@ -3,6 +3,8 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import { resolveCors } from '../_shared/cors.ts';
+import { clientIp, rateLimitByKey } from '../_shared/rateLimit.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -20,22 +22,6 @@ const ALLOWED_MIME = new Set([
   'application/pdf',
 ]);
 
-function corsHeaders(): Record<string, string> {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
-    'Vary': 'Origin',
-  };
-}
-
-function errorResponse(message: string, status: number): Response {
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
-  });
-}
-
 function safeFileBase(name: string): string {
   const base = name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
   return base || 'file';
@@ -46,11 +32,36 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 serve(async (req) => {
+  const co = resolveCors(req, {
+    allowHeaders: 'Content-Type, Authorization, apikey, x-client-info',
+    allowMethods: 'POST, OPTIONS',
+  });
+  if (co instanceof Response) return co;
+  const cors = co;
+
+  const errorResponse = (message: string, status: number): Response =>
+    new Response(JSON.stringify({ error: message }), {
+      status,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders() });
+    return new Response(null, { status: 204, headers: cors });
   }
   if (req.method !== 'POST') {
     return errorResponse('Método não permitido', 405);
+  }
+
+  const rl = rateLimitByKey(`upload-approval:${clientIp(req)}`, 30, 60_000);
+  if (!rl.ok) {
+    return new Response(JSON.stringify({ error: 'Muitas requisições. Tente mais tarde.' }), {
+      status: 429,
+      headers: {
+        ...cors,
+        'Content-Type': 'application/json',
+        'Retry-After': String(rl.retryAfterSec),
+      },
+    });
   }
 
   let body: {
@@ -147,7 +158,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ url: pub }), {
       status: 200,
-      headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
+      headers: { ...cors, 'Content-Type': 'application/json' },
     });
   } catch (err) {
     console.error('upload-approval-feedback-attachment:', err);

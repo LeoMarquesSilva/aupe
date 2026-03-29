@@ -3,6 +3,8 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import { resolveCors } from '../_shared/cors.ts';
+import { clientIp, rateLimitByKey } from '../_shared/rateLimit.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -11,35 +13,44 @@ const MIN_TOKEN_LENGTH = 16;
 const MAX_TOKEN_LENGTH = 128;
 const VALID_TOKEN_REGEX = /^[a-zA-Z0-9]+$/;
 
-function corsHeaders(): Record<string, string> {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
-    Vary: 'Origin',
-  };
-}
-
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-function invalidTokenResponse(): Response {
-  return new Response(JSON.stringify({ error: 'Link inválido ou expirado.' }), {
-    status: 404,
-    headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
-  });
-}
-
 serve(async (req) => {
+  const co = resolveCors(req, {
+    allowHeaders: 'Content-Type, Authorization, apikey, x-client-info',
+    allowMethods: 'GET, OPTIONS',
+  });
+  if (co instanceof Response) return co;
+  const cors = co;
+
+  const invalidTokenResponse = (): Response =>
+    new Response(JSON.stringify({ error: 'Link inválido ou expirado.' }), {
+      status: 404,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders() });
+    return new Response(null, { status: 204, headers: cors });
   }
 
   if (req.method !== 'GET') {
     return new Response(JSON.stringify({ error: 'Método não permitido' }), {
       status: 405,
-      headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const rl = rateLimitByKey(`internal-approval-by-token:${clientIp(req)}`, 60, 60_000);
+  if (!rl.ok) {
+    return new Response(JSON.stringify({ error: 'Muitas requisições. Tente mais tarde.' }), {
+      status: 429,
+      headers: {
+        ...cors,
+        'Content-Type': 'application/json',
+        'Retry-After': String(rl.retryAfterSec),
+      },
     });
   }
 
@@ -96,7 +107,7 @@ serve(async (req) => {
           posts: [],
           expiresAt: linkRow.expires_at,
         }),
-        { status: 200, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -118,7 +129,7 @@ serve(async (req) => {
           posts: [],
           expiresAt: linkRow.expires_at,
         }),
-        { status: 200, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -169,13 +180,13 @@ serve(async (req) => {
         posts,
         expiresAt: linkRow.expires_at,
       }),
-      { status: 200, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
     console.error('get-internal-approval-by-token error:', err);
     return new Response(JSON.stringify({ error: 'Erro ao carregar dados.' }), {
       status: 500,
-      headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
+      headers: { ...cors, 'Content-Type': 'application/json' },
     });
   }
 });

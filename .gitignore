@@ -29,3 +29,6 @@ CONTEXTO_BANCO_DADOS.json
 VERIFICAR_ESTRUTURA_RLS.sql
 .trigger
 dev.vars
+
+# Artefacto local de deploy/debug Edge (não versionar)
+.args-get-standalone.json

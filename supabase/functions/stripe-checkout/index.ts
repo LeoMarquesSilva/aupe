@@ -4,28 +4,51 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
+import { resolveCors } from '../_shared/cors.ts';
+import { clientIp, rateLimitByKey } from '../_shared/rateLimit.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2024-11-20.acacia',
   httpClient: Stripe.createFetchHttpClient(),
 });
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
 serve(async (req) => {
-  // Handle CORS preflight
+  const co = resolveCors(req, {
+    allowHeaders: 'authorization, x-client-info, apikey, content-type',
+    allowMethods: 'POST, OPTIONS',
+  });
+  if (co instanceof Response) return co;
+  const cors = co;
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: cors });
+  }
+
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Método não permitido' }), {
+      status: 405,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const rl = rateLimitByKey(`stripe-checkout:${clientIp(req)}`, 30, 60_000);
+  if (!rl.ok) {
+    return new Response(JSON.stringify({ error: 'Muitas requisições. Tente mais tarde.' }), {
+      status: 429,
+      headers: {
+        ...cors,
+        'Content-Type': 'application/json',
+        'Retry-After': String(rl.retryAfterSec),
+      },
+    });
   }
 
   try {
-    // Ler body como texto primeiro para debug
     const bodyText = await req.text();
-    console.log('📥 Body recebido:', bodyText);
-    
+    if (Deno.env.get('EDGE_FUNCS_DEBUG') === 'true') {
+      console.log('📥 Body length (debug):', bodyText.length);
+    }
+
     // Parse JSON
     let body;
     try {
@@ -34,9 +57,9 @@ serve(async (req) => {
       console.error('❌ Erro ao fazer parse do JSON:', parseError);
       return new Response(
         JSON.stringify({ error: 'JSON inválido no body da requisição' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: 400,
+          headers: { ...cors, 'Content-Type': 'application/json' },
         }
       );
     }
@@ -46,9 +69,9 @@ serve(async (req) => {
     if (!priceId || !organizationId || !userId) {
       return new Response(
         JSON.stringify({ error: 'priceId, organizationId e userId são obrigatórios' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        {
+          status: 400,
+          headers: { ...cors, 'Content-Type': 'application/json' },
         }
       );
     }
@@ -77,24 +100,24 @@ serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ 
-        sessionId: session.id, 
-        url: session.url 
+      JSON.stringify({
+        sessionId: session.id,
+        url: session.url,
       }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      {
+        headers: { ...cors, 'Content-Type': 'application/json' },
       }
     );
-  } catch (error: any) {
-    console.error('❌ Erro ao criar checkout session:', error);
-    
+  } catch (error: unknown) {
+    console.error('❌ Erro ao criar checkout session:', error instanceof Error ? error.message : error);
+
     return new Response(
-      JSON.stringify({ 
-        error: error.message || 'Erro ao criar sessão de checkout' 
+      JSON.stringify({
+        error: 'Não foi possível criar a sessão de checkout. Tente novamente.',
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      {
+        status: 500,
+        headers: { ...cors, 'Content-Type': 'application/json' },
       }
     );
   }

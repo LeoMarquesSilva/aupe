@@ -4,6 +4,9 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import { resolveCors } from '../_shared/cors.ts';
+import { clientIp, rateLimitByKey } from '../_shared/rateLimit.ts';
+import { edgeDebugLog } from '../_shared/redact.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -16,25 +19,9 @@ const MAX_TOKEN_LENGTH = 128;
 const VALID_TOKEN_REGEX = /^[a-zA-Z0-9]+$/;
 const MAX_COMMENT_LENGTH = 2000;
 
-function corsHeaders(): Record<string, string> {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
-    Vary: 'Origin',
-  };
-}
-
 const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
-
-function errorResponse(message: string, status: number): Response {
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
-  });
-}
 
 function formatDateTimeBr(value?: string | null): string {
   if (!value) return '—';
@@ -171,19 +158,44 @@ async function sendGestorLinkWhatsAppNotification(
       console.error('[WhatsApp interno] Evolution API:', res.status, errBody);
       return;
     }
-    console.log('[WhatsApp interno] Notificação enviada para', dest);
+    edgeDebugLog('[WhatsApp interno] Notificação enviada para', dest);
   } catch (err) {
     console.error('[WhatsApp interno] Erro (non-fatal):', err);
   }
 }
 
 serve(async (req) => {
+  const co = resolveCors(req, {
+    allowHeaders: 'Content-Type, Authorization, apikey, x-client-info',
+    allowMethods: 'POST, OPTIONS',
+  });
+  if (co instanceof Response) return co;
+  const cors = co;
+
+  const errorResponse = (message: string, status: number): Response =>
+    new Response(JSON.stringify({ error: message }), {
+      status,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders() });
+    return new Response(null, { status: 204, headers: cors });
   }
 
   if (req.method !== 'POST') {
     return errorResponse('Método não permitido', 405);
+  }
+
+  const rl = rateLimitByKey(`submit-internal-approval:${clientIp(req)}`, 40, 60_000);
+  if (!rl.ok) {
+    return new Response(JSON.stringify({ error: 'Muitas requisições. Tente mais tarde.' }), {
+      status: 429,
+      headers: {
+        ...cors,
+        'Content-Type': 'application/json',
+        'Retry-After': String(rl.retryAfterSec),
+      },
+    });
   }
 
   let body: { token?: string; postId?: string; action?: string; comment?: string };
@@ -264,7 +276,7 @@ serve(async (req) => {
           success: true,
           message: 'Este item já foi revisado anteriormente.',
         }),
-        { status: 200, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -326,7 +338,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
-      headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
+      headers: { ...cors, 'Content-Type': 'application/json' },
     });
   } catch (err) {
     console.error('submit-internal-approval-response error:', err);

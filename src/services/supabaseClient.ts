@@ -22,6 +22,25 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   (window as any).__supabase = supabase;
 }
 
+const isDevLog = process.env.NODE_ENV === 'development';
+
+function redactInstagramAuthForLog(a: InstagramAuthData): Omit<InstagramAuthData, 'accessToken'> & { accessToken: string } {
+  return { ...a, accessToken: '[REDACTED]' };
+}
+
+function redactClientRowForLog(row: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...row };
+  if (typeof out.access_token === 'string') out.access_token = '[REDACTED]';
+  return out;
+}
+
+function redactClientDataForLog(data: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...data };
+  if (typeof out.access_token === 'string') out.access_token = '[REDACTED]';
+  if (typeof out.accessToken === 'string') out.accessToken = '[REDACTED]';
+  return out;
+}
+
 // Interface para perfil de usuário
 export interface UserProfile {
   id: string;
@@ -132,11 +151,21 @@ const convertFromDbFormat = (obj: Record<string, any>) => {
   return result;
 };
 
-// Função auxiliar para obter o usuário atual
+// Função auxiliar para obter o usuário atual (sessão local primeiro — popup OAuth mesma origem)
 const getCurrentUser = async () => {
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error) {
-    console.error('Erro ao obter usuário atual:', error);
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+  if (!sessionError && session?.user) {
+    return session.user;
+  }
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error || !user) {
+    console.error('Erro ao obter usuário atual:', error || sessionError);
     throw new Error('Usuário não autenticado');
   }
   return user;
@@ -357,9 +386,11 @@ export const clientService = {
       
       // Garantir que organization_id está presente
       clientData.organization_id = profile.organization_id;
-      
-      console.log('Tentando adicionar cliente com dados:', clientData);
-      
+
+      if (isDevLog) {
+        console.log('Tentando adicionar cliente com dados (token redigido):', redactClientDataForLog(clientData as Record<string, unknown>));
+      }
+
       const { data, error } = await supabase
         .from('clients')
         .insert([clientData])
@@ -473,9 +504,14 @@ export const clientService = {
       
       // Converter camelCase para snake_case com mapeamento específico
       const clientData = convertToDbFormat(filteredClient);
-      
-      console.log('Atualizando cliente com dados (SEM campos do Instagram):', clientData);
-      
+
+      if (isDevLog) {
+        console.log(
+          'Atualizando cliente com dados (SEM campos do Instagram, token redigido):',
+          redactClientDataForLog(clientData as Record<string, unknown>),
+        );
+      }
+
       // Obter organization_id do perfil do usuário
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -579,9 +615,11 @@ export const clientService = {
         throw new Error('Organização não encontrada. Entre em contato com o suporte.');
       }
 
-      console.log('=== SALVANDO DADOS DO INSTAGRAM ===');
-      console.log('Cliente ID:', clientId);
-      console.log('Dados recebidos:', authData);
+      if (isDevLog) {
+        console.log('=== SALVANDO DADOS DO INSTAGRAM ===');
+        console.log('Cliente ID:', clientId);
+        console.log('Dados recebidos (token redigido):', redactInstagramAuthForLog(authData));
+      }
 
       const isPlaceholderClientName = (n: string | null | undefined): boolean => {
         const t = (n || '').trim();
@@ -623,8 +661,10 @@ export const clientService = {
         updateData.name = deriveClientDisplayName(authData);
       }
 
-      console.log('Dados que serão salvos no banco:', updateData);
-      
+      if (isDevLog) {
+        console.log('Dados que serão salvos no banco (token redigido):', redactClientDataForLog(updateData as Record<string, unknown>));
+      }
+
       // Fazer o update diretamente
       const { data, error } = await supabase
         .from('clients')
@@ -644,8 +684,10 @@ export const clientService = {
         );
       }
       
-      console.log('Dados salvos com sucesso no banco:', data);
-      
+      if (isDevLog && data) {
+        console.log('Dados salvos com sucesso no banco (token redigido):', redactClientRowForLog(data as Record<string, unknown>));
+      }
+
       // Conversão manual para garantir que funcione
       const convertedClient: Client = {
         id: data.id,
@@ -665,9 +707,11 @@ export const clientService = {
         instagramLongLivedIssuedAt: data.instagram_long_lived_issued_at || undefined,
       };
       
-      console.log('Cliente convertido manualmente:', convertedClient);
-      console.log('=== DADOS SALVOS E CONVERTIDOS COM SUCESSO ===');
-      
+      if (isDevLog) {
+        console.log('Cliente convertido (token redigido):', { ...convertedClient, accessToken: '[REDACTED]' });
+        console.log('=== DADOS SALVOS E CONVERTIDOS COM SUCESSO ===');
+      }
+
       return convertedClient;
       
     } catch (err: any) {

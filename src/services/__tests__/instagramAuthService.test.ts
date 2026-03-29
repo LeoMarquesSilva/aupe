@@ -45,7 +45,7 @@ describe('instagramAuthService (Facebook Login / Graph)', () => {
     expect(url).toContain('state=client-uuid');
   });
 
-  it('getInstagramRedirectUri reads env when origin is not localhost', () => {
+  it('getInstagramRedirectUri ignora env de outro host (evita popup sem sessão Supabase)', () => {
     const prev = window.location;
     Object.defineProperty(window, 'location', {
       configurable: true,
@@ -54,7 +54,20 @@ describe('instagramAuthService (Facebook Login / Graph)', () => {
     });
     process.env.REACT_APP_INSTAGRAM_REDIRECT_URI = 'https://fixed/callback';
     delete process.env.REACT_APP_FACEBOOK_REDIRECT_URI;
-    expect(getInstagramRedirectUri()).toBe('https://fixed/callback');
+    expect(getInstagramRedirectUri()).toBe('https://app.deployed.test/callback');
+    Object.defineProperty(window, 'location', { configurable: true, writable: true, value: prev });
+  });
+
+  it('getInstagramRedirectUri usa env quando o host coincide com a página', () => {
+    const prev = window.location;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      writable: true,
+      value: { ...prev, origin: 'https://app.test' },
+    });
+    process.env.REACT_APP_INSTAGRAM_REDIRECT_URI = 'https://app.test/callback';
+    delete process.env.REACT_APP_FACEBOOK_REDIRECT_URI;
+    expect(getInstagramRedirectUri()).toBe('https://app.test/callback');
     Object.defineProperty(window, 'location', { configurable: true, writable: true, value: prev });
   });
 });

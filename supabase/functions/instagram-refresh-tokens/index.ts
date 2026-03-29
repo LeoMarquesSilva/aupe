@@ -4,38 +4,41 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
-
-const corsHeaders: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
-};
-
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
+import { resolveCors } from '../_shared/cors.ts';
+import { redactOAuthLike } from '../_shared/redact.ts';
 
 serve(async (req) => {
+  const co = resolveCors(req, {
+    allowHeaders: 'authorization, x-client-info, apikey, content-type, x-cron-secret',
+    allowMethods: 'POST, OPTIONS',
+  });
+  if (co instanceof Response) return co;
+  const cors = co;
+
+  const jr = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: cors });
   }
 
   if (req.method !== 'POST') {
-    return jsonResponse({ message: 'Method not allowed' }, 405);
+    return jr({ message: 'Method not allowed' }, 405);
   }
 
   const expected = Deno.env.get('INSTAGRAM_REFRESH_CRON_SECRET') || '';
   const sent = req.headers.get('x-cron-secret') || '';
   if (!expected || sent !== expected) {
-    return jsonResponse({ message: 'Forbidden' }, 403);
+    return jr({ message: 'Forbidden' }, 403);
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
   if (!supabaseUrl || !serviceKey) {
-    return jsonResponse({ message: 'Supabase não configurado' }, 500);
+    return jr({ message: 'Supabase não configurado' }, 500);
   }
 
   const admin = createClient(supabaseUrl, serviceKey, {
@@ -54,7 +57,7 @@ serve(async (req) => {
 
   if (qErr) {
     console.error(qErr);
-    return jsonResponse({ message: qErr.message }, 500);
+    return jr({ message: 'Erro ao consultar clientes' }, 500);
   }
 
   const refreshDeadline = new Date(refreshBefore).getTime();
@@ -85,7 +88,7 @@ serve(async (req) => {
 
       if (!res.ok || !j.access_token) {
         fail++;
-        errors.push(`${row.id}: ${JSON.stringify(j)}`);
+        errors.push(`${row.id}: ${JSON.stringify(redactOAuthLike(j))}`);
         continue;
       }
 
@@ -113,7 +116,7 @@ serve(async (req) => {
     }
   }
 
-  return jsonResponse({
+  return jr({
     processed: (rows || []).length,
     refreshed: ok,
     failed: fail,

@@ -3,14 +3,33 @@
  * Usado pela Vercel Function e pelo setupProxy em dev.
  */
 const axios = require('axios');
+const { rateLimit, clientIpFromReq } = require('./rate-limit-ip');
 const OAUTH_DEBUG_TAG = 'oauth-api-debug-2026-03-29a';
 
+function sanitizeGraphErrorForLog(data) {
+  if (!data || typeof data !== 'object') return data;
+  try {
+    const s = JSON.stringify(data);
+    if (/access_token|client_secret|fb_exchange_token/i.test(s)) {
+      return '[Graph error redacted: possível token no payload]';
+    }
+    return data;
+  } catch {
+    return '[unserializable]';
+  }
+}
+
 function logOAuthApi(step, payload) {
+  if (process.env.NODE_ENV === 'production') return;
   if (payload === undefined) {
     console.info(`[FB_OAUTH_API_DEBUG] ${OAUTH_DEBUG_TAG} ${step}`);
     return;
   }
-  console.info(`[FB_OAUTH_API_DEBUG] ${OAUTH_DEBUG_TAG} ${step}`, payload);
+  const safe =
+    step === 'request:error' && payload && typeof payload === 'object'
+      ? { ...payload, graphError: sanitizeGraphErrorForLog(payload.graphError) }
+      : payload;
+  console.info(`[FB_OAUTH_API_DEBUG] ${OAUTH_DEBUG_TAG} ${step}`, safe);
 }
 
 /** Facebook Login apenas; nomes INSTAGRAM_* / REACT_APP_INSTAGRAM_* são alias legado. */
@@ -39,6 +58,16 @@ function resolveCredentials() {
  */
 async function handleFacebookOAuthToken(req, res) {
   logOAuthApi('request:start', { method: req.method });
+  if (req.method === 'POST') {
+    const ip = clientIpFromReq(req);
+    const lim = rateLimit(`fb-oauth-token:${ip}`, 30, 60_000);
+    if (!lim.ok) {
+      if (typeof res.setHeader === 'function') {
+        res.setHeader('Retry-After', String(lim.retryAfterSec));
+      }
+      return res.status(429).json({ message: 'Muitas tentativas. Aguarde e tente novamente.' });
+    }
+  }
   if (req.method !== 'POST') {
     if (typeof res.setHeader === 'function') res.setHeader('Allow', 'POST');
     return res.status(405).json({ message: 'Method not allowed' });

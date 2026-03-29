@@ -4,18 +4,9 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
-
-const corsHeaders: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
+import { edgeDebugLog, redactOAuthLike } from '../_shared/redact.ts';
+import { resolveCors } from '../_shared/cors.ts';
+import { clientIp, rateLimitByKey } from '../_shared/rateLimit.ts';
 
 async function exchangeLongLivedToken(shortLivedToken: string, appSecret: string): Promise<Record<string, unknown>> {
   const params = new URLSearchParams({
@@ -31,12 +22,12 @@ async function exchangeLongLivedToken(shortLivedToken: string, appSecret: string
     const getRes = await fetch(getUrl);
     getJson = await getRes.json();
     if (getRes.ok && getJson.access_token) {
-      console.log('Long-lived via GET OK');
+      edgeDebugLog('Long-lived via GET OK');
       return getJson;
     }
-    console.warn('Long-lived GET falhou:', getRes.status, JSON.stringify(getJson));
+    console.warn('Long-lived GET falhou:', getRes.status, JSON.stringify(redactOAuthLike(getJson)));
   } catch (e) {
-    console.error('Long-lived GET exception:', e);
+    console.error('Long-lived GET exception:', (e as Error).message);
   }
 
   let postJson: Record<string, unknown> = {};
@@ -48,12 +39,12 @@ async function exchangeLongLivedToken(shortLivedToken: string, appSecret: string
     });
     postJson = await postRes.json();
     if (postRes.ok && postJson.access_token) {
-      console.log('Long-lived via POST OK');
+      edgeDebugLog('Long-lived via POST OK');
       return postJson;
     }
-    console.warn('Long-lived POST falhou:', postRes.status, JSON.stringify(postJson));
+    console.warn('Long-lived POST falhou:', postRes.status, JSON.stringify(redactOAuthLike(postJson)));
   } catch (e) {
-    console.error('Long-lived POST exception:', e);
+    console.error('Long-lived POST exception:', (e as Error).message);
   }
 
   const errMsg =
@@ -64,12 +55,37 @@ async function exchangeLongLivedToken(shortLivedToken: string, appSecret: string
 }
 
 serve(async (req) => {
+  const co = resolveCors(req, {
+    allowHeaders: 'authorization, x-client-info, apikey, content-type',
+    allowMethods: 'POST, OPTIONS',
+  });
+  if (co instanceof Response) return co;
+  const cors = co;
+
+  const jr = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: cors });
   }
 
   if (req.method !== 'POST') {
-    return jsonResponse({ message: 'Method not allowed' }, 405);
+    return jr({ message: 'Method not allowed' }, 405);
+  }
+
+  const rl = rateLimitByKey(`ig-oauth-ex:${clientIp(req)}`, 20, 60_000);
+  if (!rl.ok) {
+    return new Response(JSON.stringify({ message: 'Muitas requisições. Tente em instantes.' }), {
+      status: 429,
+      headers: {
+        ...cors,
+        'Content-Type': 'application/json',
+        'Retry-After': String(rl.retryAfterSec),
+      },
+    });
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -79,7 +95,7 @@ serve(async (req) => {
   const appSecret = Deno.env.get('INSTAGRAM_APP_SECRET') || '';
 
   if (!appId || !appSecret) {
-    return jsonResponse({ message: 'Servidor OAuth não configurado (secrets Meta)' }, 500);
+    return jr({ message: 'Servidor OAuth não configurado (secrets Meta)' }, 500);
   }
 
   // JWT opcional — segurança vem do code Instagram (single-use) + apikey
@@ -93,7 +109,7 @@ serve(async (req) => {
       });
       const { data } = await sb.auth.getUser(jwt);
       if (data?.user) {
-        console.log('Authenticated user:', data.user.id);
+        edgeDebugLog('Authenticated user:', data.user.id);
       }
     } catch {
       console.warn('JWT inválido/expirado — prosseguindo');
@@ -104,19 +120,19 @@ serve(async (req) => {
   try {
     body = await req.json();
   } catch {
-    return jsonResponse({ message: 'JSON inválido' }, 400);
+    return jr({ message: 'JSON inválido' }, 400);
   }
 
   const rawCode = body.code?.trim();
   if (!rawCode) {
-    return jsonResponse({ message: 'Código de autorização não fornecido' }, 400);
+    return jr({ message: 'Código de autorização não fornecido' }, 400);
   }
 
   const code = rawCode.replace(/#_$/, '').replace(/#$/, '');
   const defaultRedirect = Deno.env.get('INSTAGRAM_REDIRECT_URI') || '';
   const redirectUri = (body.redirectUri || defaultRedirect).trim();
   if (!redirectUri) {
-    return jsonResponse({ message: 'redirectUri obrigatório' }, 400);
+    return jr({ message: 'redirectUri obrigatório' }, 400);
   }
 
   const clientId = body.clientId?.trim() || null;
@@ -137,10 +153,9 @@ serve(async (req) => {
     const shortJson = await shortRes.json();
 
     if (!shortRes.ok) {
-      console.error('Short-lived token error:', shortJson);
-      return jsonResponse({
+      console.error('Short-lived token error:', redactOAuthLike(shortJson));
+      return jr({
         message: shortJson.error_message || 'Falha ao trocar código por token',
-        details: shortJson,
       }, 400);
     }
 
@@ -149,7 +164,7 @@ serve(async (req) => {
     const scopedUserId = row?.user_id != null ? String(row.user_id) : '';
 
     if (!shortLivedToken) {
-      return jsonResponse({ message: 'Resposta OAuth sem access_token', details: shortJson }, 502);
+      return jr({ message: 'Resposta OAuth sem access_token' }, 502);
     }
 
     // 2) Trocar short-lived por long-lived (GET com fallback POST)
@@ -244,11 +259,11 @@ serve(async (req) => {
         console.error('Erro ao salvar no banco:', updateError);
       } else {
         savedToDb = true;
-        console.log(`Instagram auth salvo para client ${clientId}`);
+        edgeDebugLog(`Instagram auth salvo para client ${clientId}`);
       }
     }
 
-    return jsonResponse({
+    return jr({
       instagramAccountId,
       accessToken: longLivedToken,
       username: finalUsername,
@@ -266,8 +281,7 @@ serve(async (req) => {
     });
   } catch (e) {
     const errMsg = (e as Error).message || 'Erro interno desconhecido';
-    const errStack = (e as Error).stack || '';
-    console.error('Erro na Edge Function:', errMsg, errStack);
-    return jsonResponse({ message: errMsg, stack: errStack.substring(0, 500) }, 500);
+    console.error('Erro na Edge Function (mensagem apenas):', errMsg);
+    return jr({ message: 'Erro interno ao processar OAuth. Tente novamente.' }, 500);
   }
 });
