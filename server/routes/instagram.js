@@ -2,10 +2,12 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 
-const DEFAULT_APP_ID = '1087259016929287';
-
 function instagramAppId() {
-  return process.env.INSTAGRAM_APP_ID || DEFAULT_APP_ID;
+  const id = (process.env.INSTAGRAM_APP_ID || '').trim();
+  if (!id) {
+    throw new Error('INSTAGRAM_APP_ID não configurado');
+  }
+  return id;
 }
 
 function instagramAppSecret() {

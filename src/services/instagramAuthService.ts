@@ -44,11 +44,15 @@ interface FacebookPagesResponse {
   data: FacebookPage[];
 }
 
-const DEFAULT_APP_ID = '1087259016929287';
-
-/** App ID do produto Facebook Login (mesmo app no Meta for Developers). */
+/** App ID do produto Facebook Login (Meta for Developers — ex.: app "insyt"). */
 export function getMetaAppId(): string {
-  return process.env.REACT_APP_FACEBOOK_APP_ID || process.env.REACT_APP_INSTAGRAM_APP_ID || DEFAULT_APP_ID;
+  const id = (process.env.REACT_APP_FACEBOOK_APP_ID || process.env.REACT_APP_INSTAGRAM_APP_ID || '').trim();
+  if (!id) {
+    throw new Error(
+      'Configure REACT_APP_INSTAGRAM_APP_ID ou REACT_APP_FACEBOOK_APP_ID com o App ID do Meta (app insyt).',
+    );
+  }
+  return id;
 }
 
 /**

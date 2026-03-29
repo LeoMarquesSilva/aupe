@@ -17,10 +17,22 @@ describe('instagramAuthService (Facebook Login / Graph)', () => {
     process.env = originalEnv;
   });
 
-  it('getInstagramAppId falls back to default when env unset', () => {
+  it('getInstagramAppId exige variável de ambiente', () => {
     delete process.env.REACT_APP_FACEBOOK_APP_ID;
     delete process.env.REACT_APP_INSTAGRAM_APP_ID;
-    expect(getInstagramAppId()).toBe('1087259016929287');
+    expect(() => getInstagramAppId()).toThrow(/REACT_APP_INSTAGRAM_APP_ID/);
+  });
+
+  it('getInstagramAppId usa REACT_APP_INSTAGRAM_APP_ID', () => {
+    process.env.REACT_APP_INSTAGRAM_APP_ID = '999888777';
+    delete process.env.REACT_APP_FACEBOOK_APP_ID;
+    expect(getInstagramAppId()).toBe('999888777');
+  });
+
+  it('getInstagramAppId prefere REACT_APP_FACEBOOK_APP_ID', () => {
+    process.env.REACT_APP_FACEBOOK_APP_ID = '111';
+    process.env.REACT_APP_INSTAGRAM_APP_ID = '222';
+    expect(getInstagramAppId()).toBe('111');
   });
 
   it('getAuthorizationUrl uses Facebook dialog oauth and Graph scopes', () => {
