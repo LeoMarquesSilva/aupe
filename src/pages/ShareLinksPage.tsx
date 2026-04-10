@@ -40,7 +40,7 @@ import { appShellContainerSx } from '../theme/appShellLayout';
 
 const ShareLinksPage: React.FC = () => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [links, setLinks] = useState<ActiveShareLinkWithClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -182,7 +182,7 @@ const ShareLinksPage: React.FC = () => {
             background: GLASS.surface.bg,
             backdropFilter: `blur(${GLASS.surface.blur})`,
             boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
-            overflow: 'hidden',
+            overflowX: 'auto',
           }}
         >
           <Table size={isMobile ? 'small' : 'medium'}>
@@ -192,7 +192,7 @@ const ShareLinksPage: React.FC = () => {
                 {!isMobile && (
                   <TableCell sx={{ fontWeight: 600 }}>Rótulo</TableCell>
                 )}
-                <TableCell sx={{ fontWeight: 600 }}>Gerado em</TableCell>
+                <TableCell sx={{ fontWeight: 600, display: { xs: 'none', sm: 'table-cell' } }}>Gerado em</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Expira em</TableCell>
                 <TableCell sx={{ fontWeight: 600 }} align="center">Acessos</TableCell>
                 {!isMobile && (
@@ -241,14 +241,14 @@ const ShareLinksPage: React.FC = () => {
                       )}
                     </TableCell>
                   )}
-                  <TableCell>
+                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                     <Typography variant="body2">
                       {format(parseISO(link.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {format(parseISO(link.expiresAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      {format(parseISO(link.expiresAt), isMobile ? 'dd/MM/yy' : "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                     </Typography>
                   </TableCell>
                   <TableCell align="center">

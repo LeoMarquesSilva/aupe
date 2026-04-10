@@ -75,7 +75,7 @@ const CreatePost: React.FC = () => {
   });
 
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   useEffect(() => {
     const loadClients = async () => {
@@ -329,14 +329,15 @@ const CreatePost: React.FC = () => {
   const hasInstagramAuth = selectedClient?.accessToken && selectedClient?.instagramAccountId;
 
   return (
-    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 4, flexGrow: 1 }}>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: { xs: 2, md: 4 }, flexGrow: 1 }}>
+      <Box sx={{ mb: 4, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2 }}>
         <Box>
           <Typography variant="h4" component="h1" sx={{ 
             mb: 1, 
             fontWeight: 'bold',
             fontFamily: '"Montserrat", sans-serif',
             color: GLASS.text.heading,
+            fontSize: { xs: '1.5rem', md: '2.125rem' },
           }}>
             Agendamento de Posts
           </Typography>
@@ -345,7 +346,7 @@ const CreatePost: React.FC = () => {
           </Typography>
         </Box>
         
-        <Stack direction="row" spacing={2}>
+        <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap' }}>
           <Button
             variant="outlined"
             color="secondary"
@@ -533,8 +534,10 @@ const CreatePost: React.FC = () => {
           >
             <CardContent sx={{ 
               display: 'flex', 
-              alignItems: 'center',
+              alignItems: { xs: 'flex-start', sm: 'center' },
               justifyContent: 'space-between',
+              flexDirection: { xs: 'column', sm: 'row' },
+              gap: { xs: 1.5, sm: 0 },
               p: 2, 
               '&:last-child': { pb: 2 }
             }}>

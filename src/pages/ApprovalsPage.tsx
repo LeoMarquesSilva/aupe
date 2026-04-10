@@ -123,7 +123,7 @@ function needsInternalReview(post: ScheduledPostRow): boolean {
 
 const ApprovalsPage: React.FC = () => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [posts, setPosts] = useState<ScheduledPostRow[]>([]);
@@ -1013,7 +1013,7 @@ const ApprovalsPage: React.FC = () => {
               placeholder="Buscar por cliente, legenda ou tipo"
               value={kanbanSearch}
               onChange={(e) => setKanbanSearch(e.target.value)}
-              sx={{ minWidth: 260, flex: 1 }}
+              sx={{ minWidth: { xs: '100%', sm: 260 }, flex: 1 }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -1022,7 +1022,7 @@ const ApprovalsPage: React.FC = () => {
                 ),
               }}
             />
-            <FormControl size="small" sx={{ minWidth: 170 }}>
+            <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 170 }, flex: { xs: 1, sm: 'unset' } }}>
               <InputLabel>Cliente</InputLabel>
               <Select
                 value={statusClientId}
@@ -1037,7 +1037,7 @@ const ApprovalsPage: React.FC = () => {
                 ))}
               </Select>
             </FormControl>
-            <FormControl size="small" sx={{ minWidth: 170 }}>
+            <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 170 } }}>
               <InputLabel>Tipo</InputLabel>
               <Select
                 value={kanbanTypeFilter}
@@ -1052,7 +1052,7 @@ const ApprovalsPage: React.FC = () => {
                 <MenuItem value="roteiro">Roteiro</MenuItem>
               </Select>
             </FormControl>
-            <FormControl size="small" sx={{ minWidth: 170 }}>
+            <FormControl size="small" sx={{ minWidth: { xs: '48%', sm: 170 } }}>
               <InputLabel>Período</InputLabel>
               <Select
                 value={kanbanDateFilter}
@@ -1163,7 +1163,7 @@ const ApprovalsPage: React.FC = () => {
             backdropFilter: `blur(${GLASS.surface.blur})`,
             WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
             boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
-            overflow: 'hidden',
+            overflowX: 'auto',
           }}
         >
           <Table size={isMobile ? 'small' : 'medium'}>
@@ -1281,14 +1281,14 @@ const ApprovalsPage: React.FC = () => {
                         </Box>
                       </TableCell>
                     )}
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                       <Typography variant="body2">
-                        {format(parseISO(link.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                        {format(parseISO(link.createdAt), isMobile ? 'dd/MM' : "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                       </Typography>
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">
-                        {format(parseISO(link.expiresAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                        {format(parseISO(link.expiresAt), isMobile ? 'dd/MM/yy' : "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                       </Typography>
                     </TableCell>
                     {!isMobile && (

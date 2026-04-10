@@ -258,14 +258,14 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
         </Box>
         
         {/* Table */}
-        <TableContainer sx={{ maxHeight: 600 }}>
-          <Table stickyHeader sx={{ minWidth: isMobile ? 760 : 980 }}>
+        <TableContainer sx={{ maxHeight: 600, overflowX: 'auto' }}>
+          <Table stickyHeader sx={{ minWidth: isMobile ? 480 : 980 }}>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ 
                   fontWeight: 600, 
                   bgcolor: 'grey.50',
-                  minWidth: 300,
+                  minWidth: isMobile ? 200 : 300,
                   py: 1.5
                 }}>
                   Post
@@ -274,8 +274,9 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                 <TableCell sx={{ 
                   fontWeight: 600, 
                   bgcolor: 'grey.50',
-                  minWidth: 120,
-                  py: 1.5
+                  minWidth: isMobile ? 90 : 120,
+                  py: 1.5,
+                  display: { xs: 'none', sm: 'table-cell' },
                 }}>
                   <TableSortLabel
                     active={sortField === 'date'}
@@ -514,7 +515,7 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                       </TableCell>
 
                       {/* Data */}
-                      <TableCell sx={{ py: 1.5 }}>
+                      <TableCell sx={{ py: 1.5, display: { xs: 'none', sm: 'table-cell' } }}>
                         <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
                           {formatTimestamp(post.timestamp)}
                         </Typography>

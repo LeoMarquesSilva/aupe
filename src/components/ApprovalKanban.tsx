@@ -89,7 +89,7 @@ function CardSkeleton() {
 
 const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loading = false }) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery('(max-width:900px)');
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const colors = {
     internal: theme.palette.secondary.main,
     awaiting: theme.palette.warning.main,

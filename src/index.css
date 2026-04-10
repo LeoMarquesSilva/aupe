@@ -275,16 +275,24 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-@media (max-width: 600px) {
+/* Tablet and below — matches AppShell mobile breakpoint (md = 900px) */
+@media (max-width: 900px) {
   .page-container {
     padding: 16px;
   }
-  
+
   .page-title {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
   }
-  
+
   .modern-card {
     padding: 16px;
+  }
+}
+
+/* Small phones — fine-tune only */
+@media (max-width: 600px) {
+  .page-title {
+    font-size: 1.35rem;
   }
 }

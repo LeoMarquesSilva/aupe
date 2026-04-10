@@ -65,7 +65,7 @@ const EditStory: React.FC = () => {
   }, [id]);
 
   return (
-    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 4 }}>
+    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: { xs: 2, md: 4 } }}>
         {/* Breadcrumbs de navegação */}
         <Breadcrumbs 
           separator={<NavigateNextIcon fontSize="small" />} 
@@ -104,7 +104,7 @@ const EditStory: React.FC = () => {
           </Typography>
         </Breadcrumbs>
         
-        <Typography variant="h4" sx={{ mb: 4, fontWeight: 'bold', color: GLASS.text.heading }}>
+        <Typography variant="h4" sx={{ mb: 4, fontWeight: 'bold', color: GLASS.text.heading, fontSize: { xs: '1.5rem', md: '2.125rem' } }}>
           Editar Story
         </Typography>
         

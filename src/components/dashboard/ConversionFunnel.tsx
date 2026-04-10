@@ -48,6 +48,7 @@ const ConversionFunnel: React.FC<ConversionFunnelProps> = ({ data }) => {
       borderRadius: '16px',
       overflow: 'hidden',
       height: '100%',
+      width: '100%',
       display: 'flex',
       flexDirection: 'column',
     }}>

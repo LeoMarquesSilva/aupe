@@ -131,7 +131,8 @@ const handleMediaTypeFilter = (mediaType: 'all' | 'IMAGE' | 'VIDEO' | 'CAROUSEL_
         <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
           Período
         </Typography>
-        <ButtonGroup size="small" variant="outlined" sx={{
+        <Box sx={{ overflowX: 'auto', pb: 0.5 }}>
+        <ButtonGroup size="small" variant="outlined" sx={{ whiteSpace: 'nowrap',
           '& .MuiButtonGroup-grouped.MuiButton-contained': {
             bgcolor: GLASS.accent.orange,
             color: '#fff',
@@ -174,6 +175,7 @@ const handleMediaTypeFilter = (mediaType: 'all' | 'IMAGE' | 'VIDEO' | 'CAROUSEL_
             Todos
           </Button>
         </ButtonGroup>
+        </Box>
       </Box>
 
       {/* Filtros de Tipo de Mídia */}
@@ -222,7 +224,7 @@ const handleMediaTypeFilter = (mediaType: 'all' | 'IMAGE' | 'VIDEO' | 'CAROUSEL_
 
       {/* Filtros de Ordenação */}
       <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-        <FormControl size="small" sx={{ minWidth: 140 }}>
+        <FormControl size="small" sx={{ minWidth: 140, flex: { xs: 1, sm: 'unset' } }}>
           <InputLabel>Ordenar por</InputLabel>
           <Select
             value={filters.sortBy || 'date'}

@@ -905,8 +905,8 @@ const AdminSettings: React.FC = () => {
 
         {/* Painel de Usuários e Roles */}
         <TabPanel value={currentTab} index={0}>
-          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Alert severity="info" icon={<ShieldIcon />} sx={{ flexGrow: 1, mr: 2 }}>
+          <Box sx={{ mb: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
+            <Alert severity="info" icon={<ShieldIcon />} sx={{ flexGrow: 1 }}>
               <Typography variant="subtitle1" fontWeight="bold">
                 Gerenciamento de Usuários e Permissões
               </Typography>
@@ -919,13 +919,13 @@ const AdminSettings: React.FC = () => {
               variant="contained"
               startIcon={<PersonAddIcon />}
               onClick={handleCreateUser}
-              sx={{ minWidth: 'auto', whiteSpace: 'nowrap', bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}
+              sx={{ minWidth: 'auto', whiteSpace: 'nowrap', bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button, flexShrink: 0 }}
             >
               Novo Usuário
             </Button>
           </Box>
 
-          <TableContainer>
+          <TableContainer sx={{ overflowX: 'auto' }}>
             <Table>
               <TableHead>
                 <TableRow>
@@ -982,7 +982,7 @@ const AdminSettings: React.FC = () => {
             </Typography>
           </Alert>
 
-          <TableContainer>
+          <TableContainer sx={{ overflowX: "auto" }}>
             <Table>
               <TableHead>
                 <TableRow>
@@ -1041,7 +1041,7 @@ const AdminSettings: React.FC = () => {
             </Typography>
           </Alert>
 
-          <TableContainer>
+          <TableContainer sx={{ overflowX: "auto" }}>
             <Table>
               <TableHead>
                 <TableRow>
@@ -1098,8 +1098,8 @@ const AdminSettings: React.FC = () => {
 
         {/* Painel de Cache */}
         <TabPanel value={currentTab} index={3}>
-          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Alert severity="info" icon={<StorageIcon />} sx={{ flexGrow: 1, mr: 2 }}>
+          <Box sx={{ mb: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
+            <Alert severity="info" icon={<StorageIcon />} sx={{ flexGrow: 1 }}>
               <Typography variant="subtitle1" fontWeight="bold">
                 Cache do Instagram
               </Typography>
@@ -1113,13 +1113,14 @@ const AdminSettings: React.FC = () => {
               startIcon={<DeleteIcon />}
               onClick={clearCache}
               disabled={loading}
+              sx={{ flexShrink: 0 }}
             >
               Limpar Cache
             </Button>
           </Box>
 
           {cacheData.length > 0 ? (
-            <TableContainer>
+            <TableContainer sx={{ overflowX: 'auto' }}>
               <Table>
                 <TableHead>
                   <TableRow>

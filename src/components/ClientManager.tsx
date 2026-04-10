@@ -367,8 +367,10 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                 >
                   <Box sx={{ 
                     display: 'flex', 
-                    alignItems: 'center', 
+                    alignItems: { xs: 'flex-start', sm: 'center' }, 
                     justifyContent: 'space-between',
+                    flexDirection: { xs: 'column', sm: 'row' },
+                    gap: { xs: 1.5, sm: 0 },
                     p: 2
                   }}>
                     <Box 

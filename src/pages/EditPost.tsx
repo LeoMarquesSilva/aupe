@@ -44,8 +44,7 @@ const EditPost: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
   const theme = useTheme();
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const [post, setPost] = useState<ScheduledPost | null>(null);
   const [client, setClient] = useState<Client | null>(null);
@@ -426,14 +425,14 @@ const EditPost: React.FC = () => {
   const editable = canEdit();
 
   return (
-    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 4 }}>
+    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: { xs: 2, md: 4 } }}>
       {/* Header */}
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+      <Box sx={{ mb: 4, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Button
             startIcon={<ArrowBackIcon />}
             onClick={() => navigate(-1)}
-            sx={{ textTransform: 'none' }}
+            sx={{ textTransform: 'none', flexShrink: 0 }}
           >
             Voltar
           </Button>
@@ -442,6 +441,7 @@ const EditPost: React.FC = () => {
               fontWeight: 'bold',
               fontFamily: '"Montserrat", sans-serif',
               color: GLASS.text.heading,
+              fontSize: { xs: '1.4rem', md: '2.125rem' },
               display: 'flex',
               alignItems: 'center',
               gap: 1
@@ -455,7 +455,7 @@ const EditPost: React.FC = () => {
           </Box>
         </Box>
         
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
           <Chip 
             label={getStatusLabel(post.status)}
             color={getStatusColor(post.status) as any}
@@ -616,7 +616,7 @@ const EditPost: React.FC = () => {
           disabled={!editable}
         />
 
-        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+        <Box sx={{ mt: 4, display: 'flex', justifyContent: { xs: 'stretch', md: 'flex-end' }, flexDirection: { xs: 'column-reverse', md: 'row' }, gap: 2 }}>
           <Button
             variant="outlined"
             onClick={() => navigate(-1)}

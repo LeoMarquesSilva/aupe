@@ -95,7 +95,7 @@ const Checkout: React.FC = () => {
 
   if (error) {
     return (
-      <Container maxWidth="sm" sx={{ mt: 8 }}>
+      <Container maxWidth="sm" sx={{ mt: { xs: 4, md: 8 }, px: { xs: 2, sm: 3 } }}>
         <Paper
           elevation={0}
           sx={{
@@ -131,7 +131,8 @@ const Checkout: React.FC = () => {
       <Paper
         elevation={0}
         sx={{
-          p: 6,
+          p: { xs: 3, sm: 6 },
+          mx: { xs: 2, sm: 0 },
           textAlign: 'center',
           background: GLASS.surface.bg,
           backdropFilter: `blur(${GLASS.surface.blur})`,

@@ -112,11 +112,11 @@ const ResetPassword: React.FC = () => {
           background: `linear-gradient(135deg, ${alpha(GLASS.accent.orange, 0.08)} 0%, ${alpha(GLASS.accent.orangeLight, 0.05)} 100%)`,
         }}
       >
-        <Container maxWidth="sm">
+        <Container maxWidth="sm" sx={{ px: { xs: 2, sm: 3 } }}>
           <Paper
             elevation={0}
             sx={{
-              p: 5,
+              p: { xs: 3, sm: 5 },
               borderRadius: GLASS.radius.card,
               background: GLASS.surface.bgStrong,
               backdropFilter: `blur(${GLASS.surface.blurStrong})`,
@@ -149,11 +149,11 @@ const ResetPassword: React.FC = () => {
         background: `linear-gradient(135deg, ${alpha(GLASS.accent.orange, 0.08)} 0%, ${alpha(GLASS.accent.orangeLight, 0.05)} 100%)`,
       }}
     >
-      <Container maxWidth="sm">
+      <Container maxWidth="sm" sx={{ px: { xs: 2, sm: 3 } }}>
         <Paper
           elevation={0}
           sx={{
-            p: 5,
+            p: { xs: 3, sm: 5 },
             borderRadius: GLASS.radius.card,
             background: GLASS.surface.bgStrong,
             backdropFilter: `blur(${GLASS.surface.blurStrong})`,

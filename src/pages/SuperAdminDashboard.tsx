@@ -413,18 +413,18 @@ const SuperAdminDashboard: React.FC = () => {
   };
 
   return (
-    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 4 }}>
+    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: { xs: 2, md: 4 } }}>
       {/* Header */}
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Box sx={{ mb: 4, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
         <Box>
-          <Typography variant="h4" fontWeight="bold" gutterBottom>
+          <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ fontSize: { xs: '1.5rem', md: '2.125rem' } }}>
             Super Admin Dashboard
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Gerenciamento global do sistema INSYT
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           <Button
             startIcon={<RefreshIcon />}
             onClick={loadAllData}
@@ -502,7 +502,7 @@ const SuperAdminDashboard: React.FC = () => {
             </Button>
           </Box>
 
-          <TableContainer>
+          <TableContainer sx={{ overflowX: "auto" }}>
             <Table>
               <TableHead>
                 <TableRow>
@@ -569,7 +569,7 @@ const SuperAdminDashboard: React.FC = () => {
             </Button>
           </Box>
 
-          <TableContainer>
+          <TableContainer sx={{ overflowX: "auto" }}>
             <Table>
               <TableHead>
                 <TableRow>
@@ -745,7 +745,7 @@ const SuperAdminDashboard: React.FC = () => {
             </Button>
           </Box>
 
-          <TableContainer>
+          <TableContainer sx={{ overflowX: "auto" }}>
             <Table>
               <TableHead>
                 <TableRow>
