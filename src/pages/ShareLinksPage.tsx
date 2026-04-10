@@ -17,7 +17,6 @@ import {
   Tooltip,
   useTheme,
   useMediaQuery,
-  alpha,
   Button,
   Avatar,
 } from '@mui/material';
@@ -36,6 +35,8 @@ import {
   getShareLinkUrl,
   ActiveShareLinkWithClient,
 } from '../services/shareLinkService';
+import { GLASS } from '../theme/glassTokens';
+import { appShellContainerSx } from '../theme/appShellLayout';
 
 const ShareLinksPage: React.FC = () => {
   const theme = useTheme();
@@ -101,21 +102,30 @@ const ShareLinksPage: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 2 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 3 }}>
+    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 2 }}>
+      <Box
+        className="grain-overlay premium-header-bg"
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 2,
+          mb: 3,
+          p: { xs: 2, sm: 2.5 },
+          borderRadius: GLASS.radius.card,
+          border: `1px solid rgba(255, 255, 255, 0.18)`,
+        }}
+      >
         <Box>
           <Typography
             variant="h4"
-            sx={{
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 700,
-              color: theme.palette.text.primary,
-              mb: 0.5,
-            }}
+            className="premium-header-title"
+            sx={{ fontFamily: '"Cabinet Grotesk", sans-serif', mb: 0.5 }}
           >
             Links compartilhados
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+          <Typography variant="body2" className="premium-header-subtitle">
             Links ativos para os clientes visualizarem o dashboard do Instagram sem login. Crie novos links na página de cada cliente.
           </Typography>
         </Box>
@@ -123,7 +133,13 @@ const ShareLinksPage: React.FC = () => {
           startIcon={<RefreshIcon />}
           onClick={fetchLinks}
           size="small"
-          sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+          sx={{
+            textTransform: 'none',
+            color: '#fff',
+            borderColor: 'rgba(255,255,255,0.35)',
+            bgcolor: 'rgba(10, 15, 45, 0.22)',
+            '&:hover': { bgcolor: 'rgba(10, 15, 45, 0.35)' },
+          }}
         >
           Atualizar
         </Button>
@@ -141,16 +157,18 @@ const ShareLinksPage: React.FC = () => {
           sx={{
             p: 4,
             textAlign: 'center',
-            borderRadius: 3,
-            border: `1px dashed ${alpha(theme.palette.divider, 0.8)}`,
-            bgcolor: alpha(theme.palette.primary.main, 0.02),
+            borderRadius: GLASS.radius.card,
+            border: `1px dashed ${GLASS.border.outer}`,
+            background: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
           }}
         >
           <LinkIcon sx={{ fontSize: 48, color: theme.palette.text.disabled, mb: 1 }} />
-          <Typography variant="h6" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600, mb: 0.5 }}>
+          <Typography variant="h6" sx={{ fontFamily: '"Cabinet Grotesk", sans-serif', fontWeight: 600, mb: 0.5 }}>
             Nenhum link ativo
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+          <Typography variant="body2" color="text.secondary">
             Os links compartilháveis são criados na página de cada cliente (botão &quot;Compartilhar&quot; no dashboard). Quando houver links ativos, eles aparecerão aqui.
           </Typography>
         </Paper>
@@ -159,25 +177,28 @@ const ShareLinksPage: React.FC = () => {
           component={Paper}
           elevation={0}
           sx={{
-            borderRadius: 3,
-            border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+            borderRadius: GLASS.radius.card,
+            border: `1px solid ${GLASS.border.outer}`,
+            background: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
             overflow: 'hidden',
           }}
         >
           <Table size={isMobile ? 'small' : 'medium'}>
             <TableHead>
-              <TableRow sx={{ bgcolor: alpha(theme.palette.primary.main, 0.06) }}>
-                <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>Cliente</TableCell>
+              <TableRow sx={{ bgcolor: 'rgba(247, 66, 17, 0.06)' }}>
+                <TableCell sx={{ fontWeight: 600 }}>Cliente</TableCell>
                 {!isMobile && (
-                  <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>Rótulo</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Rótulo</TableCell>
                 )}
-                <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>Gerado em</TableCell>
-                <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>Expira em</TableCell>
-                <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }} align="center">Acessos</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Gerado em</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Expira em</TableCell>
+                <TableCell sx={{ fontWeight: 600 }} align="center">Acessos</TableCell>
                 {!isMobile && (
-                  <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>Criado por</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Criado por</TableCell>
                 )}
-                <TableCell align="right" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>
+                <TableCell align="right" sx={{ fontWeight: 600 }}>
                   Ações
                 </TableCell>
               </TableRow>
@@ -193,19 +214,18 @@ const ShareLinksPage: React.FC = () => {
                         sx={{
                           width: 40,
                           height: 40,
-                          bgcolor: alpha(theme.palette.primary.main, 0.2),
+                          bgcolor: 'rgba(247, 66, 17, 0.2)',
                           fontSize: '0.875rem',
-                          fontFamily: '"Poppins", sans-serif',
                         }}
                       >
                         {link.clientName.charAt(0).toUpperCase()}
                       </Avatar>
                       <Box>
-                        <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 500 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
                           {link.clientName}
                         </Typography>
                         {link.clientInstagram && (
-                          <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                          <Typography variant="caption" color="text.secondary">
                             @{link.clientInstagram}
                           </Typography>
                         )}
@@ -215,37 +235,37 @@ const ShareLinksPage: React.FC = () => {
                   {!isMobile && (
                     <TableCell>
                       {link.label ? (
-                        <Chip label={link.label} size="small" sx={{ fontFamily: '"Poppins", sans-serif', fontSize: '0.75rem' }} />
+                        <Chip label={link.label} size="small" sx={{ fontSize: '0.75rem' }} />
                       ) : (
                         <Typography variant="caption" color="text.disabled">—</Typography>
                       )}
                     </TableCell>
                   )}
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                    <Typography variant="body2">
                       {format(parseISO(link.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                    <Typography variant="body2">
                       {format(parseISO(link.expiresAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                     </Typography>
                   </TableCell>
                   <TableCell align="center">
-                    <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 500 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
                       {link.accessCount}
                     </Typography>
                   </TableCell>
                   {!isMobile && (
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', color: 'text.secondary' }}>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                         {link.createdByLabel}
                       </Typography>
                     </TableCell>
                   )}
                   <TableCell align="right">
                     <Tooltip title="Abrir link">
-                      <IconButton size="small" onClick={() => openLink(link)} sx={{ color: theme.palette.primary.main }}>
+                      <IconButton size="small" onClick={() => openLink(link)} sx={{ color: GLASS.accent.orange }}>
                         <OpenIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>

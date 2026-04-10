@@ -11,6 +11,7 @@ import {
   Edit as EditIcon,
   Instagram as InstagramIcon
 } from '@mui/icons-material';
+import { GLASS } from '../../theme/glassTokens';
 import { Client } from '../../types';
 
 interface ClientSettingsProps {
@@ -31,7 +32,14 @@ const ClientSettings: React.FC<ClientSettingsProps> = ({
   return (
     <Grid container spacing={3}>
       <Grid item xs={12} md={6}>
-        <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
+        <Paper elevation={0} sx={{ 
+          p: 2, 
+          borderRadius: GLASS.radius.card,
+          background: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Informações do Cliente</Typography>
           
           <Box sx={{ mb: 2 }}>
@@ -55,7 +63,13 @@ const ClientSettings: React.FC<ClientSettingsProps> = ({
             variant="contained" 
             startIcon={<EditIcon />}
             onClick={onEditClient}
-            sx={{ mt: 1, color: '#ffffff' }}
+            sx={{ 
+              mt: 1, 
+              color: '#ffffff',
+              bgcolor: GLASS.accent.orange,
+              borderRadius: GLASS.radius.button,
+              '&:hover': { bgcolor: GLASS.accent.orangeDark },
+            }}
           >
             Editar Informações
           </Button>
@@ -63,7 +77,14 @@ const ClientSettings: React.FC<ClientSettingsProps> = ({
       </Grid>
       
       <Grid item xs={12} md={6}>
-        <Paper elevation={2} sx={{ p: 2, borderRadius: 2 }}>
+        <Paper elevation={0} sx={{ 
+          p: 2, 
+          borderRadius: GLASS.radius.card,
+          background: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }}>
           <Typography variant="h6" sx={{ mb: 2 }}>Conexão com Instagram</Typography>
           
           {hasInstagramAuth ? (
@@ -103,7 +124,13 @@ const ClientSettings: React.FC<ClientSettingsProps> = ({
                 variant="contained" 
                 startIcon={<InstagramIcon />}
                 onClick={onConnectInstagram}
-                sx={{ mt: 1, color: '#ffffff' }}
+                sx={{ 
+                  mt: 1, 
+                  color: '#ffffff',
+                  bgcolor: GLASS.accent.orange,
+                  borderRadius: GLASS.radius.button,
+                  '&:hover': { bgcolor: GLASS.accent.orangeDark },
+                }}
               >
                 Conectar ao Instagram
               </Button>

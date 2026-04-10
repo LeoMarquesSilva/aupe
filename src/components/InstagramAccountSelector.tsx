@@ -17,7 +17,6 @@ import {
   CircularProgress,
   Alert,
   Paper,
-  Divider,
   useTheme
 } from '@mui/material';
 import {
@@ -33,6 +32,7 @@ import {
   getInstagramOAuthDebugSnapshot,
 } from '../services/instagramAuthService';
 import { devLog, logClientError } from '../utils/clientLogger';
+import { GLASS } from '../theme/glassTokens';
 
 interface InstagramAccountSelectorProps {
   open: boolean;
@@ -49,7 +49,7 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
   authCode,
   clientId,
 }) => {
-  const theme = useTheme();
+  const _theme = useTheme();
   const [accounts, setAccounts] = useState<AvailableInstagramAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -81,6 +81,7 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
     if (open && authCode && !hasSelectedAccount) {
       loadAvailableAccounts();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, authCode, hasSelectedAccount]);
 
   const loadAvailableAccounts = async () => {
@@ -169,7 +170,14 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
       maxWidth="md"
       fullWidth
       PaperProps={{
-        sx: { borderRadius: 2 }
+        sx: {
+          borderRadius: GLASS.radius.card,
+          bgcolor: GLASS.surface.bgStrong,
+          backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }
       }}
       // Evitar fechar com ESC ou clique fora durante processamento
       disableEscapeKeyDown={connecting || hasSelectedAccount}
@@ -177,7 +185,7 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
     >
       <DialogTitle sx={{ pb: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <InstagramIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+          <InstagramIcon sx={{ mr: 1, color: GLASS.accent.orange }} />
           Escolher Conta do Instagram
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -213,13 +221,18 @@ const InstagramAccountSelector: React.FC<InstagramAccountSelectorProps> = ({
               {accounts.map((account, index) => (
                 <React.Fragment key={account.instagramAccountId}>
                   <Paper 
-                    elevation={1} 
+                    elevation={0} 
                     sx={{ 
                       mb: 2,
-                      border: selectedAccountId === account.instagramAccountId ? 2 : 0,
-                      borderColor: 'primary.main',
-                      borderRadius: 2,
-                      opacity: hasSelectedAccount && selectedAccountId !== account.instagramAccountId ? 0.5 : 1
+                      border: selectedAccountId === account.instagramAccountId
+                        ? `2px solid ${GLASS.accent.orange}`
+                        : `1px solid ${GLASS.border.outer}`,
+                      borderRadius: GLASS.radius.inner,
+                      opacity: hasSelectedAccount && selectedAccountId !== account.instagramAccountId ? 0.5 : 1,
+                      bgcolor: GLASS.surface.bg,
+                      backdropFilter: `blur(${GLASS.surface.blur})`,
+                      WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+                      boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
                     }}
                   >
                     <ListItem sx={{ p: 0 }}>

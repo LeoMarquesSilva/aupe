@@ -62,7 +62,9 @@ export const useImageLoader = (
 
   useEffect(() => {
     loadImage(initialUrl);
-  }, [initialUrl, fallbackUrl, validateUrl]);
+  },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [initialUrl, fallbackUrl, validateUrl]);
 
   return {
     src,

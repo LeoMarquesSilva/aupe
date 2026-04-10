@@ -21,6 +21,7 @@ import {
   createInternalApprovalLink,
   type CreateInternalApprovalLinkResult,
 } from '../services/approvalService';
+import { GLASS } from '../theme/glassTokens';
 
 interface InternalApprovalLinkDialogProps {
   open: boolean;
@@ -90,7 +91,18 @@ const InternalApprovalLinkDialog: React.FC<InternalApprovalLinkDialogProps> = ({
   const showResult = result !== null;
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: GLASS.radius.card,
+          bgcolor: GLASS.surface.bgStrong,
+          backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }
+      }}
+    >
       <DialogTitle>
         {showResult ? 'Link para o gestor criado' : 'Gerar link para o gestor'}
       </DialogTitle>
@@ -184,6 +196,11 @@ const InternalApprovalLinkDialog: React.FC<InternalApprovalLinkDialogProps> = ({
               onClick={handleCreate}
               disabled={creating || postIds.length === 0}
               startIcon={creating ? <CircularProgress size={20} color="inherit" /> : null}
+              sx={{
+                bgcolor: GLASS.accent.orange,
+                borderRadius: GLASS.radius.button,
+                '&:hover': { bgcolor: GLASS.accent.orangeDark },
+              }}
             >
               {creating ? 'Criando...' : 'Criar e gerar link'}
             </Button>

@@ -21,6 +21,7 @@ import {
   createApprovalRequest,
   type CreateApprovalRequestResult,
 } from '../services/approvalService';
+import { GLASS } from '../theme/glassTokens';
 
 interface ApprovalRequestDialogProps {
   open: boolean;
@@ -99,7 +100,18 @@ const ApprovalRequestDialog: React.FC<ApprovalRequestDialogProps> = ({
   const showResult = result !== null;
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: GLASS.radius.card,
+          bgcolor: GLASS.surface.bgStrong,
+          backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }
+      }}
+    >
       <DialogTitle>
         {showResult ? 'Link de aprovação criado' : 'Enviar para aprovação do cliente'}
       </DialogTitle>
@@ -195,6 +207,11 @@ const ApprovalRequestDialog: React.FC<ApprovalRequestDialogProps> = ({
               onClick={handleCreate}
               disabled={creating || postIds.length === 0}
               startIcon={creating ? <CircularProgress size={20} color="inherit" /> : null}
+              sx={{
+                bgcolor: GLASS.accent.orange,
+                borderRadius: GLASS.radius.button,
+                '&:hover': { bgcolor: GLASS.accent.orangeDark },
+              }}
             >
               {creating ? 'Criando...' : 'Criar e gerar link'}
             </Button>

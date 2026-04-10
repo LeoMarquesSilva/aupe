@@ -6,6 +6,7 @@ import {
   Skeleton,
   useMediaQuery,
   Tooltip,
+  useTheme,
 } from '@mui/material';
 import {
   Schedule as AwaitingIcon,
@@ -15,24 +16,12 @@ import {
   FactCheck as InternalIcon,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
+import { GLASS } from '../theme/glassTokens';
 import ApprovalKanbanCard, {
   type ApprovalKanbanColumn,
   type ApprovalKanbanPost,
 } from './ApprovalKanbanCard';
 import { type ApprovalStatus, normalizeApprovalStatus } from '../types';
-
-const COLORS = {
-  internal: '#8b5cf6',
-  awaiting: '#f59e0b',
-  approved: '#10b981',
-  scheduled: '#2563eb',
-  adjustments: '#64748b',
-} as const;
-
-const BG_COLUMN = '#f8fafc';
-const BORDER = '#e2e8f0';
-const TEXT_PRIMARY = '#1e293b';
-const TEXT_SECONDARY = '#64748b';
 
 export interface ApprovalKanbanPostInput extends ApprovalKanbanPost {
   approvalStatus?: ApprovalStatus;
@@ -76,20 +65,21 @@ const COLUMNS: { id: ApprovalKanbanColumn; title: string; icon: React.ReactNode;
 ];
 
 function CardSkeleton() {
+  const theme = useTheme();
   return (
     <Paper
       elevation={0}
       sx={{
         p: 2,
         borderRadius: '16px',
-        border: `1px solid ${BORDER}`,
-        bgcolor: '#ffffff',
+        border: `1px solid ${theme.palette.divider}`,
+        bgcolor: theme.palette.background.paper,
       }}
     >
       <Skeleton variant="rectangular" height={80} sx={{ borderRadius: '12px', mb: 1.5 }} />
       <Skeleton variant="text" width="70%" height={20} sx={{ mb: 1 }} />
       <Skeleton variant="text" width="40%" height={16} sx={{ mb: 1.5 }} />
-      <Box sx={{ pt: 1.5, borderTop: `1px solid #f1f5f9`, display: 'flex', justifyContent: 'space-between' }}>
+      <Box sx={{ pt: 1.5, borderTop: `1px solid ${theme.palette.divider}`, display: 'flex', justifyContent: 'space-between' }}>
         <Skeleton variant="text" width={80} height={16} />
         <Skeleton variant="circular" width={28} height={28} />
       </Box>
@@ -98,7 +88,15 @@ function CardSkeleton() {
 }
 
 const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loading = false }) => {
+  const theme = useTheme();
   const isMobile = useMediaQuery('(max-width:900px)');
+  const colors = {
+    internal: theme.palette.secondary.main,
+    awaiting: theme.palette.warning.main,
+    approved: theme.palette.success.main,
+    scheduled: theme.palette.primary.main,
+    adjustments: theme.palette.text.secondary,
+  } as const;
   const getPostColumn = (post: ApprovalKanbanPostInput): ApprovalKanbanColumn | null => {
     const normalizedStatus = normalizeApprovalStatus(post.approvalStatus);
     const isRoteiro = (post.postType ?? post.post_type) === 'roteiro';
@@ -144,27 +142,31 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
             <Paper
               elevation={0}
               sx={{
-                borderRadius: '10px',
-                border: `1px solid ${BORDER}`,
+                borderRadius: GLASS.radius.inner,
+                border: `1px solid ${GLASS.border.outer}`,
+                borderTop: `3px solid ${colors[col.id as keyof typeof colors]}`,
                 overflow: 'hidden',
                 minHeight: 200,
-                bgcolor: BG_COLUMN,
+                bgcolor: GLASS.surface.bg,
+                backdropFilter: `blur(${GLASS.surface.blur})`,
+                WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+                boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
               }}
             >
               <Box
                 sx={{
                   px: 1.5,
                   py: 1.25,
-                  borderBottom: `1px solid ${BORDER}`,
+                  borderBottom: `1px solid ${GLASS.border.subtle}`,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 1,
                 }}
               >
-                <Box sx={{ color: COLORS[col.id as keyof typeof COLORS], '& .MuiSvgIcon-root': { fontSize: 18 } }}>
+                <Box sx={{ color: colors[col.id as keyof typeof colors], '& .MuiSvgIcon-root': { fontSize: 18 } }}>
                   {col.icon}
                 </Box>
-                <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1, color: TEXT_PRIMARY, fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1, color: GLASS.text.heading, fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {col.title}
                 </Typography>
                 <Skeleton variant="rounded" width={24} height={20} />
@@ -200,19 +202,22 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
           <Paper
             elevation={0}
             sx={{
-              borderRadius: '10px',
-              border: `1px solid ${BORDER}`,
+              borderRadius: GLASS.radius.inner,
+              border: `1px solid ${GLASS.border.outer}`,
+              borderTop: `3px solid ${colors[col.id as keyof typeof colors]}`,
               overflow: 'hidden',
               minHeight: 200,
-              bgcolor: BG_COLUMN,
-              boxShadow: 'none',
+              bgcolor: GLASS.surface.bg,
+              backdropFilter: `blur(${GLASS.surface.blur})`,
+              WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+              boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
             }}
           >
             <Box
               sx={{
                 px: 1.5,
                 py: 1.25,
-                borderBottom: `1px solid ${BORDER}`,
+                borderBottom: `1px solid ${GLASS.border.subtle}`,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1,
@@ -223,7 +228,7 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: COLORS[col.id as keyof typeof COLORS],
+                  color: colors[col.id as keyof typeof colors],
                   '& .MuiSvgIcon-root': { fontSize: 18 },
                 }}
               >
@@ -237,13 +242,12 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
                     component="span"
                     sx={{
                       flex: 1,
-                      color: TEXT_PRIMARY,
+                      color: GLASS.text.heading,
                       fontSize: '0.875rem',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
-                      fontFamily: '"Poppins", sans-serif',
                       cursor: 'help',
-                      borderBottom: `1px dotted ${TEXT_SECONDARY}`,
+                      borderBottom: `1px dotted ${GLASS.text.muted}`,
                     }}
                   >
                     {col.title}
@@ -255,11 +259,10 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
                   fontWeight={600}
                   sx={{
                     flex: 1,
-                    color: TEXT_PRIMARY,
+                    color: GLASS.text.heading,
                     fontSize: '0.875rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
-                    fontFamily: '"Poppins", sans-serif',
                   }}
                 >
                   {col.title}
@@ -270,12 +273,12 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
                 sx={{
                   px: 1,
                   py: 0.25,
-                  borderRadius: 1,
-                  bgcolor: '#e2e8f0',
+                  borderRadius: GLASS.radius.buttonSm,
+                  bgcolor: GLASS.surface.bgStrong,
+                  border: `1px solid ${GLASS.border.subtle}`,
                   fontSize: '0.75rem',
                   fontWeight: 600,
-                  color: TEXT_SECONDARY,
-                  fontFamily: '"Poppins", sans-serif',
+                  color: GLASS.text.muted,
                 }}
               >
                 {col.items.length}
@@ -289,7 +292,7 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
                 gap: 1.5,
                 maxHeight: isMobile ? 320 : 420,
                 overflow: 'auto',
-                bgcolor: BG_COLUMN,
+                bgcolor: 'transparent',
               }}
             >
               {col.items.length === 0 ? (
@@ -298,7 +301,7 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
                     py: 4,
                     px: 2,
                     textAlign: 'center',
-                    color: TEXT_SECONDARY,
+                    color: 'text.secondary',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -306,7 +309,7 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
                   }}
                 >
                   {col.icon}
-                  <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                  <Typography variant="body2">
                     {col.id === 'internal' && 'Nenhum item em revisão interna.'}
                     {col.id === 'awaiting' && 'Nenhum item aguardando o cliente.'}
                     {col.id === 'approved' && 'Nenhum item aprovado.'}

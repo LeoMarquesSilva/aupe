@@ -16,6 +16,7 @@ import {
   CalendarMonth as CalendarIcon,
   AccessTime as TimeIcon
 } from '@mui/icons-material';
+import { GLASS } from '../theme/glassTokens';
 
 interface DateTimePickerProps {
   scheduledDate: string;
@@ -27,7 +28,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [validationMessage, setValidationMessage] = useState<string>('');
-  const [isValid, setIsValid] = useState<boolean>(true);
+  const [_isValid, setIsValid] = useState<boolean>(true);
 
   // ✅ Inicializar valores quando scheduledDate muda
   useEffect(() => {
@@ -61,6 +62,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange
       setIsValid(true);
       onChange('');
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, selectedTime]);
 
   const validateAndUpdate = () => {
@@ -226,7 +228,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange
         alignItems: 'center',
         fontWeight: 'medium'
       }}>
-        <ScheduleIcon sx={{ mr: 1, color: 'primary.main' }} />
+        <ScheduleIcon sx={{ mr: 1, color: GLASS.accent.orange }} />
         Data e Hora de Agendamento
       </Typography>
 
@@ -237,18 +239,22 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange
             elevation={0} 
             sx={{ 
               p: 3, 
-              border: '1px solid rgba(0,0,0,0.08)',
-              borderRadius: 2,
-              backgroundColor: '#fafafa'
+              background: GLASS.surface.bg,
+              backdropFilter: `blur(${GLASS.surface.blur})`,
+              WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+              border: `1px solid ${GLASS.border.outer}`,
+              borderRadius: GLASS.radius.inner,
+              boxShadow: GLASS.shadow.cardInset,
             }}
           >
             <Typography variant="subtitle1" sx={{ 
               mb: 2, 
               fontWeight: 'medium',
               display: 'flex',
-              alignItems: 'center'
+              alignItems: 'center',
+              color: GLASS.text.heading,
             }}>
-              <CalendarIcon sx={{ mr: 1, fontSize: 20 }} />
+              <CalendarIcon sx={{ mr: 1, fontSize: 20, color: GLASS.accent.orange }} />
               Selecione a Data
             </Typography>
 
@@ -260,14 +266,19 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange
                   label={suggestion.label}
                   onClick={disabled ? undefined : () => handleDateChange(suggestion.value)}
                   variant={selectedDate === suggestion.value ? 'filled' : 'outlined'}
-                  color={selectedDate === suggestion.value ? 'primary' : 'default'}
                   size="small"
                   disabled={disabled}
                   sx={{ 
                     cursor: disabled ? 'default' : 'pointer',
+                    ...(selectedDate === suggestion.value ? {
+                      backgroundColor: GLASS.accent.orange,
+                      color: '#fff',
+                    } : {
+                      borderColor: GLASS.border.outer,
+                    }),
                     '&:hover': { 
-                      backgroundColor: disabled ? undefined : (selectedDate === suggestion.value ? 'primary.dark' : 'primary.light'),
-                      color: disabled ? undefined : 'white'
+                      backgroundColor: disabled ? undefined : (selectedDate === suggestion.value ? GLASS.accent.orangeDark : 'rgba(247,66,17,0.1)'),
+                      color: disabled ? undefined : (selectedDate === suggestion.value ? 'white' : GLASS.accent.orange),
                     }
                   }}
                 />
@@ -292,7 +303,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange
             />
 
             {selectedDate && (
-              <Typography variant="body2" color="primary.main" sx={{ mt: 2, fontWeight: 'medium' }}>
+              <Typography variant="body2" sx={{ mt: 2, fontWeight: 'medium', color: GLASS.accent.orange }}>
                 📅 {formatDateDisplay(selectedDate)}
               </Typography>
             )}
@@ -305,18 +316,22 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange
             elevation={0} 
             sx={{ 
               p: 3, 
-              border: '1px solid rgba(0,0,0,0.08)',
-              borderRadius: 2,
-              backgroundColor: '#fafafa'
+              background: GLASS.surface.bg,
+              backdropFilter: `blur(${GLASS.surface.blur})`,
+              WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+              border: `1px solid ${GLASS.border.outer}`,
+              borderRadius: GLASS.radius.inner,
+              boxShadow: GLASS.shadow.cardInset,
             }}
           >
             <Typography variant="subtitle1" sx={{ 
               mb: 2, 
               fontWeight: 'medium',
               display: 'flex',
-              alignItems: 'center'
+              alignItems: 'center',
+              color: GLASS.text.heading,
             }}>
-              <TimeIcon sx={{ mr: 1, fontSize: 20 }} />
+              <TimeIcon sx={{ mr: 1, fontSize: 20, color: GLASS.accent.orange }} />
               Selecione o Horário
             </Typography>
 
@@ -328,14 +343,19 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange
                   label={time}
                   onClick={disabled ? undefined : () => handleTimeChange(time)}
                   variant={selectedTime === time ? 'filled' : 'outlined'}
-                  color={selectedTime === time ? 'secondary' : 'default'}
                   size="small"
                   disabled={disabled}
                   sx={{ 
                     cursor: disabled ? 'default' : 'pointer',
+                    ...(selectedTime === time ? {
+                      backgroundColor: GLASS.accent.orange,
+                      color: '#fff',
+                    } : {
+                      borderColor: GLASS.border.outer,
+                    }),
                     '&:hover': { 
-                      backgroundColor: disabled ? undefined : (selectedTime === time ? 'secondary.dark' : 'secondary.light'),
-                      color: disabled ? undefined : 'white'
+                      backgroundColor: disabled ? undefined : (selectedTime === time ? GLASS.accent.orangeDark : 'rgba(247,66,17,0.1)'),
+                      color: disabled ? undefined : (selectedTime === time ? 'white' : GLASS.accent.orange),
                     }
                   }}
                 />
@@ -361,7 +381,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange
             />
 
             {selectedTime && (
-              <Typography variant="body2" color="secondary.main" sx={{ mt: 2, fontWeight: 'medium' }}>
+              <Typography variant="body2" sx={{ mt: 2, fontWeight: 'medium', color: GLASS.accent.orange }}>
                 🕐 {selectedTime}
               </Typography>
             )}
@@ -376,9 +396,12 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ scheduledDate, onChange
           sx={{ 
             mt: 3, 
             p: 3, 
-            backgroundColor: currentStatus.isValid ? '#e8f5e8' : '#ffebee', 
-            borderRadius: 2, 
-            border: `1px solid ${currentStatus.isValid ? '#4caf50' : '#f44336'}`
+            background: currentStatus.isValid ? 'rgba(247, 66, 17, 0.08)' : '#ffebee',
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            borderRadius: GLASS.radius.inner, 
+            border: `1px solid ${currentStatus.isValid ? GLASS.accent.orange : '#f44336'}`,
+            boxShadow: GLASS.shadow.cardInset,
           }}
         >
           <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 1 }}>

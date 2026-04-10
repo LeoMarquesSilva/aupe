@@ -1,30 +1,33 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
   Avatar,
-  Badge,
   Chip,
-  Button,
-  useTheme,
+  IconButton,
+  Tooltip,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
   useMediaQuery,
-  alpha,
-  Paper
+  useTheme,
 } from '@mui/material';
 import {
   Instagram as InstagramIcon,
   AddBox as PostAddIcon,
   AddPhotoAlternate as StoryAddIcon,
   CalendarMonth as CalendarIcon,
-  CheckCircle as CheckCircleIcon,
-  VideoLibrary as ReelsIcon,
-  Schedule as ScheduleIcon,
   CheckCircleOutline as CheckCircleOutlineIcon,
   ErrorOutline as ErrorOutlineIcon,
+  VideoLibrary as ReelsIcon,
+  Schedule as ScheduleIcon,
   Refresh as RefreshIcon,
   PictureAsPdf as PdfIcon,
-  Share as ShareIcon
+  Share as ShareIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
+import { GLASS } from '../theme/glassTokens';
 import { Client } from '../types';
 import { InstagramProfile } from '../services/instagramMetricsService';
 import { CacheStatus } from '../services/instagramCacheService';
@@ -68,14 +71,12 @@ const ClientHeader: React.FC<ClientHeaderProps> = ({
   onShareLink
 }) => {
   const theme = useTheme();
-  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+  const _isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const hasInstagramAuth = client.accessToken && client.instagramAccountId;
+  const [createMenuAnchor, setCreateMenuAnchor] = useState<null | HTMLElement>(null);
 
   const defaultFormatTimeAgo = (timestamp: string) => {
-    return formatDistanceToNow(new Date(timestamp), {
-      addSuffix: true,
-      locale: ptBR
-    });
+    return formatDistanceToNow(new Date(timestamp), { addSuffix: true, locale: ptBR });
   };
 
   const getTimeAgo = (timestamp: Date) => {
@@ -83,34 +84,25 @@ const ClientHeader: React.FC<ClientHeaderProps> = ({
     return formatTimeAgo ? formatTimeAgo(dateStr) : defaultFormatTimeAgo(dateStr);
   };
 
-  // Função para obter a imagem do avatar - priorizar foto do Instagram
   const getAvatarImage = () => {
-    // Priorizar a foto do perfil do Instagram
-    if (profile?.profile_picture_url) {
-      return profile.profile_picture_url;
-    }
-    // Fallback para profilePicture do cliente (salvo no banco)
-    if (client.profilePicture) {
-      return client.profilePicture;
-    }
-    // Último fallback para o logo do cliente
+    if (profile?.profile_picture_url) return profile.profile_picture_url;
+    if (client.profilePicture) return client.profilePicture;
     return client.logoUrl;
   };
 
+  const statusColor = hasInstagramAuth ? GLASS.accent.orange : GLASS.status.disconnected.color;
+
   return (
-    <Paper
-      elevation={0}
+    <Box
       sx={{
-        p: { xs: 2.5, md: 3.5 },
-        mb: 4,
-        borderRadius: 3,
-        background: cacheStatus && hasInstagramAuth
-          ? isStale
-            ? `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.1)} 0%, ${alpha(theme.palette.warning.main, 0.05)} 100%)`
-            : `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)} 0%, ${alpha(theme.palette.success.main, 0.05)} 100%)`
-          : `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.08)} 0%, ${alpha(theme.palette.primary.main, 0.03)} 100%)`,
-        border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-        backdropFilter: 'blur(10px)',
+        p: { xs: 2.5, md: 3 },
+        mb: 3,
+        borderRadius: GLASS.radius.card,
+        bgcolor: GLASS.surface.bg,
+        backdropFilter: `blur(${GLASS.surface.blur})`,
+        WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+        border: `1px solid ${GLASS.border.outer}`,
+        boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
         position: 'relative',
         overflow: 'hidden',
         '&::before': {
@@ -119,457 +111,352 @@ const ClientHeader: React.FC<ClientHeaderProps> = ({
           top: 0,
           left: 0,
           right: 0,
-          height: '4px',
-          background: cacheStatus && hasInstagramAuth
+          height: '3px',
+          background: hasInstagramAuth
             ? isStale
-              ? `linear-gradient(90deg, ${theme.palette.warning.main}, ${theme.palette.warning.dark})`
-              : `linear-gradient(90deg, ${theme.palette.success.main}, ${theme.palette.success.dark})`
-            : `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main || theme.palette.primary.light})`,
-        }
+              ? 'linear-gradient(90deg, #f59e0b, #d97706)'
+              : `linear-gradient(90deg, ${GLASS.accent.orange}, ${GLASS.accent.orangeLight})`
+            : `linear-gradient(90deg, ${GLASS.status.disconnected.color}, ${GLASS.status.disconnected.colorDark})`,
+        },
       }}
     >
+      {/* Row 1: Identity + Primary Action */}
       <Box
         sx={{
           display: 'flex',
-          flexDirection: isTablet ? 'column' : 'row',
-          alignItems: isTablet ? 'flex-start' : 'center',
+          alignItems: { xs: 'flex-start', md: 'center' },
           justifyContent: 'space-between',
-          gap: 3
+          flexDirection: { xs: 'column', md: 'row' },
+          gap: 2,
         }}
       >
-        {/* Seção do Cliente */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, flex: 1 }}>
-          <Badge
-            overlap="circular"
-            anchorOrigin={{
-              vertical: 'bottom',
-              horizontal: 'right',
-            }}
-            badgeContent={
-              hasInstagramAuth ? (
-                <Box
-                  sx={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: '50%',
-                    bgcolor: theme.palette.success.main,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: `2px solid ${theme.palette.background.paper}`,
-                    boxShadow: `0 2px 8px ${alpha(theme.palette.success.main, 0.4)}`
-                  }}
-                >
-                  <CheckCircleIcon sx={{ fontSize: 14, color: 'white' }} />
-                </Box>
-              ) : (
-                <Box
-                  sx={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: '50%',
-                    bgcolor: theme.palette.error.main,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: `2px solid ${theme.palette.background.paper}`,
-                    boxShadow: `0 2px 8px ${alpha(theme.palette.error.main, 0.4)}`
-                  }}
-                >
-                  <Typography variant="caption" sx={{ color: 'white', fontWeight: 700, fontSize: '0.7rem' }}>
-                    !
-                  </Typography>
-                </Box>
-              )
-            }
-          >
+        {/* Left: Avatar + Info */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0, flex: 1 }}>
+          <Box sx={{ position: 'relative', flexShrink: 0 }}>
             <Avatar
               src={getAvatarImage()}
               alt={client.name}
               sx={{
-                width: { xs: 56, md: 72 },
-                height: { xs: 56, md: 72 },
-                border: `3px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-                boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.15)}`,
-                bgcolor: theme.palette.primary.main,
-                fontSize: { xs: '1.5rem', md: '2rem' },
-                fontWeight: 600
+                width: { xs: 52, md: 60 },
+                height: { xs: 52, md: 60 },
+                border: `3px solid ${hasInstagramAuth ? 'rgba(16, 185, 129, 0.2)' : 'rgba(148, 163, 184, 0.2)'}`,
+                boxShadow: GLASS.shadow.avatar,
+                bgcolor: statusColor,
+                fontSize: '1.5rem',
+                fontWeight: 700,
               }}
             >
               {client.name.charAt(0).toUpperCase()}
             </Avatar>
-          </Badge>
+            {/* Status dot */}
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: 2,
+                right: 2,
+                width: 14,
+                height: 14,
+                borderRadius: '50%',
+                bgcolor: hasInstagramAuth ? GLASS.accent.orange : GLASS.status.disconnected.color,
+                border: '2.5px solid #fff',
+                boxShadow: `0 1px 4px ${hasInstagramAuth ? GLASS.status.connected.glow : 'rgba(0,0,0,0.1)'}`,
+              }}
+            />
+          </Box>
 
-          <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box sx={{ minWidth: 0 }}>
             <Typography
-              variant="h4"
-              component="h1"
+              variant="h5"
               sx={{
                 fontWeight: 700,
-                fontSize: { xs: '1.5rem', md: '1.75rem' },
-                mb: 0.5,
-                background: `linear-gradient(135deg, ${theme.palette.text.primary}, ${theme.palette.primary.main})`,
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                lineHeight: 1.2
+                color: GLASS.text.heading,
+                lineHeight: 1.2,
+                letterSpacing: '-0.01em',
+                fontSize: { xs: '1.25rem', md: '1.4rem' },
               }}
             >
               {client.name}
             </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.4, flexWrap: 'wrap' }}>
               <Box
                 sx={{
-                  display: 'flex',
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 0.75,
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: 2,
-                  bgcolor: alpha(theme.palette.primary.main, 0.08),
-                  border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
+                  gap: 0.5,
+                  color: GLASS.text.muted,
+                  fontSize: '0.82rem',
+                  fontWeight: 500,
                 }}
               >
-                <InstagramIcon
-                  sx={{
-                    fontSize: 18,
-                    color: theme.palette.primary.main
-                  }}
-                />
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontWeight: 600,
-                    color: theme.palette.text.primary,
-                    fontSize: '0.875rem'
-                  }}
-                >
-                  @{client.instagram}
-                </Typography>
+                <InstagramIcon sx={{ fontSize: 15, color: GLASS.accent.orange }} />
+                @{client.instagram}
               </Box>
               {profile && (
-                <Chip
-                  icon={<InstagramIcon sx={{ fontSize: 16 }} />}
-                  label={`${profile.followers_count.toLocaleString('pt-BR')} seguidores`}
-                  size="small"
-                  sx={{
-                    height: 28,
-                    fontWeight: 600,
-                    bgcolor: alpha(theme.palette.success.main, 0.1),
-                    color: theme.palette.success.dark,
-                    border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
-                    '& .MuiChip-icon': {
-                      color: theme.palette.success.main
-                    }
-                  }}
-                />
-              )}
-            </Box>
-            
-            {/* Status do Cache e Estatísticas - Integrado */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
-              {cacheStatus && hasInstagramAuth && (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    px: 1.5,
-                    py: 0.75,
-                    borderRadius: 2,
-                    background: isStale
-                      ? `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.15)}, ${alpha(theme.palette.warning.main, 0.08)})`
-                      : `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.15)}, ${alpha(theme.palette.success.main, 0.08)})`,
-                    border: `1px solid ${alpha(isStale ? theme.palette.warning.main : theme.palette.success.main, 0.3)}`,
-                    boxShadow: `0 2px 8px ${alpha(isStale ? theme.palette.warning.main : theme.palette.success.main, 0.1)}`
-                  }}
+                <Typography
+                  component="span"
+                  sx={{ fontSize: '0.75rem', fontWeight: 600, color: GLASS.text.muted }}
                 >
-                  {(cacheStatus.syncStatus === 'completed' || cacheStatus.syncStatus === 'in_progress') ? (
-                    cacheStatus.syncStatus === 'completed' ? (
-                      <CheckCircleOutlineIcon
-                        sx={{
-                          fontSize: 16,
-                          color: isStale ? theme.palette.warning.main : theme.palette.success.main
-                        }}
-                      />
-                    ) : (
-                      <ScheduleIcon sx={{ fontSize: 16, color: theme.palette.info.main }} />
-                    )
-                  ) : cacheStatus.syncStatus === 'failed' ? (
-                    <ErrorOutlineIcon sx={{ fontSize: 16, color: theme.palette.error.main }} />
-                  ) : (
-                    <ScheduleIcon sx={{ fontSize: 16, color: theme.palette.warning.main }} />
-                  )}
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: '0.75rem',
-                      color: isStale ? theme.palette.warning.dark : theme.palette.success.dark
-                    }}
-                  >
-                    {isStale ? 'Desatualizado' : 'Atualizado'} • {getTimeAgo(cacheStatus.lastFullSync)}
-                  </Typography>
-                  <Chip
-                    label={`${cacheStatus.postsCount} posts`}
-                    size="small"
-                    sx={{
-                      height: 20,
-                      fontSize: '0.65rem',
-                      fontWeight: 600,
-                      bgcolor: alpha(isStale ? theme.palette.warning.main : theme.palette.success.main, 0.2),
-                      color: isStale ? theme.palette.warning.dark : theme.palette.success.dark,
-                      border: `1px solid ${alpha(isStale ? theme.palette.warning.main : theme.palette.success.main, 0.4)}`
-                    }}
-                  />
-                  {onForceRefresh && (
-                    <Button
-                      size="small"
-                      startIcon={<RefreshIcon />}
-                      onClick={onForceRefresh}
-                      disabled={syncInProgress}
-                      sx={{
-                        minWidth: 'auto',
-                        px: 1,
-                        py: 0.25,
-                        fontSize: '0.7rem',
-                        textTransform: 'none',
-                        color: isStale ? theme.palette.warning.dark : theme.palette.success.dark,
-                        '&:hover': {
-                          bgcolor: alpha(isStale ? theme.palette.warning.main : theme.palette.success.main, 0.1)
-                        }
-                      }}
-                    >
-                      Atualizar
-                    </Button>
-                  )}
-                </Box>
-              )}
-              
-              {/* Estatísticas de Posts */}
-              {postsStats && (postsStats.published > 0 || postsStats.scheduled > 0) && (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1.5,
-                    px: 1.5,
-                    py: 0.75,
-                    borderRadius: 2,
-                    background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.12)}, ${alpha(theme.palette.primary.main, 0.06)})`,
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
-                  }}
-                >
-                  {postsStats.published > 0 && (
-                    <Chip
-                      label={`${postsStats.published} publicados`}
-                      size="small"
-                      sx={{
-                        height: 24,
-                        fontSize: '0.7rem',
-                        fontWeight: 600,
-                        bgcolor: alpha(theme.palette.success.main, 0.15),
-                        color: theme.palette.success.dark,
-                        border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`
-                      }}
-                    />
-                  )}
-                  {postsStats.scheduled > 0 && (
-                    <Chip
-                      label={`${postsStats.scheduled} agendados`}
-                      size="small"
-                      sx={{
-                        height: 24,
-                        fontSize: '0.7rem',
-                        fontWeight: 600,
-                        bgcolor: alpha(theme.palette.info.main, 0.15),
-                        color: theme.palette.info.dark,
-                        border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`
-                      }}
-                    />
-                  )}
-                </Box>
+                  {profile.followers_count.toLocaleString('pt-BR')} seguidores
+                </Typography>
               )}
             </Box>
           </Box>
         </Box>
 
-        {/* Botões de Ação */}
-        <Box
-          sx={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 1.5,
-            alignItems: 'center'
-          }}
-        >
-          <Button
-            variant="contained"
-            startIcon={<PostAddIcon />}
+        {/* Right: Primary CTA */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+          <Box
+            component="button"
             onClick={onCreatePost}
             sx={{
-              px: 3,
-              py: 1.25,
-              borderRadius: 2,
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              textTransform: 'none',
-              background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-              boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.4)}`,
-              transition: 'all 0.3s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.75,
+              px: 2,
+              py: 1,
+              border: 'none',
+              borderRadius: GLASS.radius.button,
+              bgcolor: GLASS.text.heading,
+              color: '#fff',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+              fontWeight: 650,
+              fontFamily: 'inherit',
+              boxShadow: GLASS.shadow.button,
+              transition: `all ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
               '&:hover': {
-                transform: 'translateY(-2px)',
-                boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.5)}`,
-                background: `linear-gradient(135deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`
-              }
+                bgcolor: '#131940',
+                boxShadow: GLASS.shadow.buttonHover,
+              },
+              '&:focus-visible': {
+                outline: 'none',
+                boxShadow: '0 0 0 3px rgba(247, 66, 17, 0.3)',
+              },
             }}
           >
+            <PostAddIcon sx={{ fontSize: 16, color: GLASS.accent.orangeLight }} />
             Criar Post
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<StoryAddIcon />}
-            onClick={onCreateStory}
-            sx={{
-              px: 3,
-              py: 1.25,
-              borderRadius: 2,
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              textTransform: 'none',
-              borderWidth: 2,
-              borderColor: alpha(theme.palette.primary.main, 0.3),
-              color: theme.palette.primary.main,
-              bgcolor: alpha(theme.palette.primary.main, 0.05),
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                borderWidth: 2,
-                borderColor: theme.palette.primary.main,
-                bgcolor: alpha(theme.palette.primary.main, 0.1),
-                transform: 'translateY(-2px)',
-                boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`
-              }
-            }}
-          >
-            Criar Story
-          </Button>
-          {onCreateReels && (
-            <Button
-              variant="outlined"
-              startIcon={<ReelsIcon />}
-              onClick={onCreateReels}
+          </Box>
+
+          {/* Dropdown for secondary create actions */}
+          <Tooltip title="Mais opções de criação" placement="bottom">
+            <IconButton
+              size="small"
+              onClick={(e) => setCreateMenuAnchor(e.currentTarget)}
               sx={{
-                px: 3,
-                py: 1.25,
-                borderRadius: 2,
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                textTransform: 'none',
-                borderWidth: 2,
-                borderColor: alpha('#7c3aed', 0.3),
-                color: '#7c3aed',
-                bgcolor: alpha('#7c3aed', 0.05),
-                transition: 'all 0.3s ease',
+                width: 36,
+                height: 36,
+                border: `1px solid ${GLASS.border.outer}`,
+                bgcolor: GLASS.header.actionBg,
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                transition: `all ${GLASS.motion.duration.fast} ${GLASS.motion.easing}`,
                 '&:hover': {
-                  borderWidth: 2,
-                  borderColor: '#7c3aed',
-                  bgcolor: alpha('#7c3aed', 0.1),
-                  transform: 'translateY(-2px)',
-                  boxShadow: `0 4px 12px ${alpha('#7c3aed', 0.2)}`
-                }
+                  bgcolor: GLASS.surface.bgHover,
+                  borderColor: GLASS.accent.orange,
+                },
               }}
             >
-              Criar Reels
-            </Button>
-          )}
-          <Button
-            variant="outlined"
-            startIcon={<CalendarIcon />}
-            onClick={onViewCalendar}
+              <AddIcon sx={{ fontSize: 18, color: GLASS.text.muted }} />
+            </IconButton>
+          </Tooltip>
+
+          <Menu
+            anchorEl={createMenuAnchor}
+            open={Boolean(createMenuAnchor)}
+            onClose={() => setCreateMenuAnchor(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          >
+            <MenuItem onClick={() => { onCreateStory(); setCreateMenuAnchor(null); }}>
+              <ListItemIcon><StoryAddIcon fontSize="small" /></ListItemIcon>
+              <ListItemText primary="Criar Story" />
+            </MenuItem>
+            {onCreateReels && (
+              <MenuItem onClick={() => { onCreateReels(); setCreateMenuAnchor(null); }}>
+                <ListItemIcon><ReelsIcon fontSize="small" /></ListItemIcon>
+                <ListItemText primary="Criar Reels" />
+              </MenuItem>
+            )}
+          </Menu>
+        </Box>
+      </Box>
+
+      {/* Row 2: Meta bar */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: { xs: 1, md: 1.5 },
+          mt: 2,
+          pt: 2,
+          borderTop: `1px solid ${GLASS.border.subtle}`,
+          flexWrap: 'wrap',
+        }}
+      >
+        {/* Cache status pill */}
+        {cacheStatus && hasInstagramAuth && (
+          <Box
             sx={{
-              px: 3,
-              py: 1.25,
-              borderRadius: 2,
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              textTransform: 'none',
-              borderWidth: 2,
-              borderColor: alpha(theme.palette.secondary.main || theme.palette.primary.main, 0.3),
-              color: theme.palette.secondary.main || theme.palette.primary.main,
-              bgcolor: alpha(theme.palette.secondary.main || theme.palette.primary.main, 0.05),
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                borderWidth: 2,
-                borderColor: theme.palette.secondary.main || theme.palette.primary.main,
-                bgcolor: alpha(theme.palette.secondary.main || theme.palette.primary.main, 0.1),
-                transform: 'translateY(-2px)',
-                boxShadow: `0 4px 12px ${alpha(theme.palette.secondary.main || theme.palette.primary.main, 0.2)}`
-              }
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.6,
+              px: 1.25,
+              py: 0.4,
+              borderRadius: GLASS.radius.badge,
+              bgcolor: isStale ? 'rgba(245, 158, 11, 0.08)' : GLASS.status.connected.bg,
+              border: `1px solid ${isStale ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`,
             }}
           >
-            Calendário
-          </Button>
+            {cacheStatus.syncStatus === 'completed' ? (
+              <CheckCircleOutlineIcon sx={{ fontSize: 13, color: isStale ? '#d97706' : GLASS.accent.orange }} />
+            ) : cacheStatus.syncStatus === 'failed' ? (
+              <ErrorOutlineIcon sx={{ fontSize: 13, color: '#ef4444' }} />
+            ) : (
+              <ScheduleIcon sx={{ fontSize: 13, color: isStale ? '#d97706' : GLASS.accent.blue }} />
+            )}
+            <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: isStale ? '#92400e' : GLASS.status.connected.colorDark }}>
+              {isStale ? 'Desatualizado' : 'Atualizado'} · {getTimeAgo(cacheStatus.lastFullSync)}
+            </Typography>
+            <Chip
+              label={`${cacheStatus.postsCount} posts`}
+              size="small"
+              sx={{
+                height: 18,
+                fontSize: '0.6rem',
+                fontWeight: 700,
+                bgcolor: isStale ? 'rgba(245, 158, 11, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                color: isStale ? '#92400e' : GLASS.accent.orangeDark,
+                border: 'none',
+                '& .MuiChip-label': { px: 0.75 },
+              }}
+            />
+            {onForceRefresh && (
+              <Tooltip title="Atualizar dados">
+                <IconButton
+                  size="small"
+                  onClick={onForceRefresh}
+                  disabled={syncInProgress}
+                  sx={{
+                    width: 22,
+                    height: 22,
+                    color: isStale ? '#d97706' : GLASS.accent.orange,
+                    '&:hover': { bgcolor: isStale ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)' },
+                  }}
+                >
+                  <RefreshIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+        )}
+
+        {/* Post stats pills */}
+        {postsStats && postsStats.published > 0 && (
+          <Box
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.5,
+              px: 1.25,
+              py: 0.4,
+              borderRadius: GLASS.radius.badge,
+              bgcolor: GLASS.metric.published.iconBg,
+              border: `1px solid ${GLASS.metric.published.iconBorder}`,
+            }}
+          >
+            <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: GLASS.accent.orange, flexShrink: 0 }} />
+            <Typography sx={{ fontSize: '0.68rem', fontWeight: 650, color: GLASS.accent.orangeDark }}>
+              {postsStats.published} publicados
+            </Typography>
+          </Box>
+        )}
+        {postsStats && postsStats.scheduled > 0 && (
+          <Box
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.5,
+              px: 1.25,
+              py: 0.4,
+              borderRadius: GLASS.radius.badge,
+              bgcolor: GLASS.metric.scheduled.iconBg,
+              border: `1px solid ${GLASS.metric.scheduled.iconBorder}`,
+            }}
+          >
+            <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: GLASS.accent.blue, flexShrink: 0 }} />
+            <Typography sx={{ fontSize: '0.68rem', fontWeight: 650, color: GLASS.accent.blueDark }}>
+              {postsStats.scheduled} agendados
+            </Typography>
+          </Box>
+        )}
+
+        {/* Spacer */}
+        <Box sx={{ flex: 1 }} />
+
+        {/* Quick action icon buttons */}
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title="Calendário">
+            <IconButton
+              size="small"
+              onClick={onViewCalendar}
+              sx={{
+                width: 34,
+                height: 34,
+                border: `1px solid ${GLASS.border.outer}`,
+                bgcolor: GLASS.header.actionBg,
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                transition: `all ${GLASS.motion.duration.fast} ${GLASS.motion.easing}`,
+                '&:hover': { bgcolor: GLASS.surface.bgHover, borderColor: GLASS.accent.orange },
+              }}
+            >
+              <CalendarIcon sx={{ fontSize: 16, color: GLASS.text.muted }} />
+            </IconButton>
+          </Tooltip>
           {onShareLink && (
-            <Button
-              variant="outlined"
-              startIcon={<ShareIcon />}
-              onClick={onShareLink}
-              sx={{
-                px: 3,
-                py: 1.25,
-                borderRadius: 2,
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                textTransform: 'none',
-                borderWidth: 2,
-                borderColor: alpha(theme.palette.primary.main, 0.5),
-                color: theme.palette.primary.main,
-                bgcolor: alpha(theme.palette.primary.main, 0.05),
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  borderWidth: 2,
-                  borderColor: theme.palette.primary.main,
-                  bgcolor: alpha(theme.palette.primary.main, 0.12),
-                  transform: 'translateY(-2px)',
-                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`
-                }
-              }}
-            >
-              Compartilhar
-            </Button>
+            <Tooltip title="Compartilhar">
+              <IconButton
+                size="small"
+                onClick={onShareLink}
+                sx={{
+                  width: 34,
+                  height: 34,
+                  border: `1px solid ${GLASS.border.outer}`,
+                  bgcolor: GLASS.header.actionBg,
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  transition: `all ${GLASS.motion.duration.fast} ${GLASS.motion.easing}`,
+                  '&:hover': { bgcolor: GLASS.surface.bgHover, borderColor: GLASS.accent.orange },
+                }}
+              >
+                <ShareIcon sx={{ fontSize: 16, color: GLASS.text.muted }} />
+              </IconButton>
+            </Tooltip>
           )}
           {onExportPDF && (
-            <Button
-              variant="outlined"
-              startIcon={<PdfIcon />}
-              onClick={onExportPDF}
-              sx={{
-                px: 3,
-                py: 1.25,
-                borderRadius: 2,
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                textTransform: 'none',
-                borderWidth: 2,
-                borderColor: alpha('#d32f2f', 0.3),
-                color: '#d32f2f',
-                bgcolor: alpha('#d32f2f', 0.05),
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  borderWidth: 2,
-                  borderColor: '#d32f2f',
-                  bgcolor: alpha('#d32f2f', 0.1),
-                  transform: 'translateY(-2px)',
-                  boxShadow: `0 4px 12px ${alpha('#d32f2f', 0.2)}`
-                }
-              }}
-            >
-              Exportar PDF
-            </Button>
+            <Tooltip title="Exportar PDF">
+              <IconButton
+                size="small"
+                onClick={onExportPDF}
+                sx={{
+                  width: 34,
+                  height: 34,
+                  border: `1px solid ${GLASS.border.outer}`,
+                  bgcolor: GLASS.header.actionBg,
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  transition: `all ${GLASS.motion.duration.fast} ${GLASS.motion.easing}`,
+                  '&:hover': { bgcolor: GLASS.surface.bgHover, borderColor: GLASS.accent.orange },
+                }}
+              >
+                <PdfIcon sx={{ fontSize: 16, color: GLASS.text.muted }} />
+              </IconButton>
+            </Tooltip>
           )}
         </Box>
       </Box>
-    </Paper>
+    </Box>
   );
 };
 

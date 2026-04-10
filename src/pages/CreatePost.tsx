@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { clientService, postService } from '../services/supabaseClient';
+import { clientService } from '../services/supabaseClient';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Box, 
@@ -40,7 +40,7 @@ import {
   Info as InfoIcon,
   VideoLibrary as ReelsIcon
 } from '@mui/icons-material';
-import { Client, Post, PostImage, PostData, PostStatus } from '../types';
+import { Client, PostImage, PostData } from '../types';
 import ClientManager from '../components/ClientManager';
 import ImageUploader from '../components/ImageUploader';
 import CaptionEditor from '../components/CaptionEditor';
@@ -49,6 +49,8 @@ import SubscriptionLimitsAlert from '../components/SubscriptionLimitsAlert';
 import AppSnackbar from '../components/AppSnackbar';
 import { getUserFriendlyMessage } from '../utils/errorMessages';
 import { scheduleInstagramPost, uploadImagesToSupabaseStorage } from '../services/postService';
+import { GLASS } from '../theme/glassTokens';
+import { appShellContainerSx } from '../theme/appShellLayout';
 
 const CreatePost: React.FC = () => {
   // ... resto do código permanece exatamente igual
@@ -327,18 +329,18 @@ const CreatePost: React.FC = () => {
   const hasInstagramAuth = selectedClient?.accessToken && selectedClient?.instagramAccountId;
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4, flexGrow: 1 }}>
+    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 4, flexGrow: 1 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
           <Typography variant="h4" component="h1" sx={{ 
             mb: 1, 
             fontWeight: 'bold',
             fontFamily: '"Montserrat", sans-serif',
-            color: '#121212'
+            color: GLASS.text.heading,
           }}>
             Agendamento de Posts
           </Typography>
-          <Typography variant="subtitle1" color="text.secondary">
+          <Typography variant="subtitle1" sx={{ color: GLASS.text.muted }}>
             Crie e agende posts para o Instagram dos seus clientes
           </Typography>
         </Box>
@@ -350,15 +352,15 @@ const CreatePost: React.FC = () => {
             startIcon={<ReelsIcon />}
             onClick={handleCreateReels}
             sx={{ 
-              borderRadius: 2,
+              borderRadius: GLASS.radius.button,
               textTransform: 'none',
               px: 3,
               py: 1,
-              color: '#7c3aed',
-              borderColor: '#7c3aed',
+              color: GLASS.accent.orange,
+              borderColor: GLASS.accent.orange,
               '&:hover': {
-                backgroundColor: 'rgba(233, 30, 99, 0.04)',
-                borderColor: '#C2185B'
+                backgroundColor: 'rgba(247, 66, 17, 0.04)',
+                borderColor: GLASS.accent.orangeDark,
               }
             }}
           >
@@ -368,7 +370,7 @@ const CreatePost: React.FC = () => {
               size="small"
               sx={{
                 ml: 1,
-                backgroundColor: '#7c3aed',
+                backgroundColor: GLASS.accent.orange,
                 color: 'white',
                 fontSize: '0.7rem',
                 height: '18px'
@@ -382,12 +384,16 @@ const CreatePost: React.FC = () => {
             startIcon={<StoryIcon />}
             onClick={handleCreateStory}
             sx={{ 
-              borderRadius: 2,
+              borderRadius: GLASS.radius.button,
               textTransform: 'none',
               px: 3,
               py: 1,
-              color: theme.palette.secondary.main,
-              borderColor: theme.palette.secondary.main
+              color: GLASS.accent.orange,
+              borderColor: GLASS.accent.orange,
+              '&:hover': {
+                backgroundColor: 'rgba(247, 66, 17, 0.04)',
+                borderColor: GLASS.accent.orangeDark,
+              }
             }}
           >
             Criar Story
@@ -401,14 +407,17 @@ const CreatePost: React.FC = () => {
         sx={{ 
           p: 3, 
           mb: 4, 
-          border: '1px solid rgba(0,0,0,0.08)',
-          borderRadius: 2,
-          backgroundColor: '#fff'
+          background: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          borderRadius: GLASS.radius.card,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 'medium', display: 'flex', alignItems: 'center' }}>
-            <InstagramIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+          <Typography variant="h6" sx={{ fontWeight: 'medium', display: 'flex', alignItems: 'center', color: GLASS.text.heading }}>
+            <InstagramIcon sx={{ mr: 1, color: GLASS.accent.orange }} />
             Selecione a Conta do Instagram
           </Typography>
           <Button 
@@ -416,7 +425,7 @@ const CreatePost: React.FC = () => {
             startIcon={<AddIcon />} 
             onClick={() => setClientDialogOpen(true)}
             size="small"
-            sx={{ color: theme.palette.primary.main }}
+            sx={{ color: GLASS.accent.orange, borderColor: GLASS.accent.orange, borderRadius: GLASS.radius.button }}
           >
             Novo Cliente
           </Button>
@@ -554,7 +563,7 @@ const CreatePost: React.FC = () => {
                     {selectedClient.name}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: theme.palette.primary.main }} />
+                    <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: GLASS.accent.orange }} />
                     <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                       @{selectedClient.instagram}
                     </Typography>
@@ -620,15 +629,19 @@ const CreatePost: React.FC = () => {
         )}
       </Paper>
 
+
       {/* Formulário de criação de post */}
       <Paper 
         elevation={0} 
         sx={{ 
           p: 3, 
           mb: 4, 
-          border: '1px solid rgba(0,0,0,0.08)',
-          borderRadius: 2,
-          backgroundColor: '#fff'
+          background: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          borderRadius: GLASS.radius.card,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
         }}
       >
         <Box sx={{ 
@@ -636,9 +649,9 @@ const CreatePost: React.FC = () => {
           alignItems: 'center', 
           mb: 3, 
           pb: 2, 
-          borderBottom: '1px solid rgba(0,0,0,0.08)' 
+          borderBottom: `1px solid ${GLASS.border.subtle}`,
         }}>
-          <InstagramIcon sx={{ mr: 1.5, color: theme.palette.primary.main }} />
+          <InstagramIcon sx={{ mr: 1.5, color: GLASS.accent.orange }} />
           <Typography variant="h5" sx={{ fontWeight: 'medium' }}>
             Nova Postagem
           </Typography>
@@ -712,7 +725,6 @@ const CreatePost: React.FC = () => {
         <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <Button
             variant="outlined"
-            color="primary"
             size="large"
             startIcon={<SendIcon />}
             onClick={handlePostNow}
@@ -720,12 +732,12 @@ const CreatePost: React.FC = () => {
             sx={{ 
               px: 4, 
               py: 1.5, 
-              borderRadius: 2,
-              borderColor: '#121212',
-              color: '#121212',
+              borderRadius: GLASS.radius.button,
+              borderColor: GLASS.accent.orange,
+              color: GLASS.accent.orange,
               '&:hover': {
-                backgroundColor: 'rgba(18,18,18,0.04)',
-                borderColor: '#000'
+                backgroundColor: 'rgba(247, 66, 17, 0.06)',
+                borderColor: GLASS.accent.orangeDark,
               },
               '&.Mui-disabled': {
                 color: 'rgba(0, 0, 0, 0.26)'
@@ -737,7 +749,6 @@ const CreatePost: React.FC = () => {
 
           <Button
             variant="contained"
-            color="primary"
             size="large"
             startIcon={<ScheduleIcon />}
             onClick={handleSubmit}
@@ -745,11 +756,13 @@ const CreatePost: React.FC = () => {
             sx={{ 
               px: 4, 
               py: 1.5, 
-              borderRadius: 2,
-              backgroundColor: '#121212',
+              borderRadius: GLASS.radius.button,
+              backgroundColor: GLASS.accent.orange,
               color: '#ffffff',
+              boxShadow: GLASS.shadow.button,
               '&:hover': {
-                backgroundColor: '#333'
+                backgroundColor: GLASS.accent.orangeDark,
+                boxShadow: GLASS.shadow.buttonHover,
               },
               '&.Mui-disabled': {
                 color: 'rgba(255, 255, 255, 0.3)'
@@ -780,13 +793,13 @@ const CreatePost: React.FC = () => {
           py: 3, 
           px: 2, 
           mt: 'auto', 
-          backgroundColor: '#f9f9f9',
-          color: 'text.secondary',
+          background: GLASS.surface.bgFooter,
+          color: GLASS.text.muted,
           textAlign: 'center',
-          borderTop: '1px solid rgba(0,0,0,0.08)'
+          borderTop: `1px solid ${GLASS.border.outer}`,
         }}
       >
-        <Container maxWidth="lg">
+        <Container maxWidth={false} disableGutters sx={appShellContainerSx}>
           <Box sx={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
@@ -795,7 +808,7 @@ const CreatePost: React.FC = () => {
             gap: { xs: 2, sm: 0 }
           }}>
             <Typography variant="body2">
-              © {new Date().getFullYear()} AUPE - Todos os direitos reservados
+              © {new Date().getFullYear()} INSYT - Todos os direitos reservados
             </Typography>
             <Box sx={{ 
               display: 'flex', 
@@ -822,11 +835,21 @@ const CreatePost: React.FC = () => {
         onClose={() => setClientDialogOpen(false)}
         fullWidth 
         maxWidth="md"
+        PaperProps={{
+          sx: {
+            background: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            borderRadius: GLASS.radius.card,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: GLASS.shadow.card,
+          }
+        }}
       >
         <DialogTitle sx={{ 
-          borderBottom: '1px solid rgba(0,0,0,0.08)',
+          borderBottom: `1px solid ${GLASS.border.outer}`,
           fontWeight: 'bold',
-          backgroundColor: '#f9f9f9'
+          color: GLASS.text.heading,
         }}>
           Gerenciar Clientes
         </DialogTitle>
@@ -842,16 +865,17 @@ const CreatePost: React.FC = () => {
 
       {isMobile && (
         <Fab 
-          color="primary" 
           aria-label="add-client" 
           sx={{ 
             position: 'fixed', 
             bottom: 16, 
             right: 16,
-            backgroundColor: '#121212',
+            backgroundColor: GLASS.accent.orange,
             color: '#ffffff',
+            boxShadow: GLASS.shadow.button,
             '&:hover': {
-              backgroundColor: '#333'
+              backgroundColor: GLASS.accent.orangeDark,
+              boxShadow: GLASS.shadow.buttonHover,
             }
           }}
           onClick={() => setClientDialogOpen(true)}

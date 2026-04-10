@@ -36,7 +36,7 @@ const SmartImage = React.forwardRef<HTMLDivElement, SmartImageProps & React.HTML
     } = props;
 
     const [imageLoadError, setImageLoadError] = React.useState(false);
-    const [isImageLoaded, setIsImageLoaded] = React.useState(false);
+    const [_isImageLoaded, setIsImageLoaded] = React.useState(false);
     const [isLoading, setIsLoading] = React.useState(false);
 
     // ✅ Hook com autoRefresh ativo

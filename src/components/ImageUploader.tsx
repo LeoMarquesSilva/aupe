@@ -10,6 +10,7 @@ import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import SendIcon from '@mui/icons-material/Send';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
+import { GLASS } from '../theme/glassTokens';
 
 interface ImageUploaderProps {
   images: PostImage[];
@@ -34,7 +35,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   helperText = '',
   disabled = false
 }) => {
-  const theme = useTheme();
+  const _theme = useTheme();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
@@ -248,15 +249,20 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         <Box
           {...getRootProps()}
           sx={{
-            border: '2px dashed #ccc',
-            borderRadius: 2,
+            border: `2px dashed ${GLASS.border.outer}`,
+            borderRadius: GLASS.radius.inner,
             p: 3,
             textAlign: 'center',
             mb: 3,
             cursor: uploading ? 'not-allowed' : 'pointer',
-            backgroundColor: uploading ? '#f5f5f5' : '#f9f9f9',
+            background: uploading ? GLASS.surface.bgStrong : GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            boxShadow: GLASS.shadow.cardInset,
+            transition: `all ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
             '&:hover': {
-              backgroundColor: uploading ? '#f5f5f5' : '#f0f0f0'
+              background: uploading ? GLASS.surface.bgStrong : GLASS.surface.bgHover,
+              borderColor: uploading ? GLASS.border.outer : GLASS.accent.orange,
             },
             opacity: uploading ? 0.7 : 1
           }}
@@ -288,7 +294,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           {/* ✅ Instagram-like Preview com tamanho controlado */}
           <Box sx={{ mb: 4 }}>
             <Typography variant="subtitle1" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-              <InstagramIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+              <InstagramIcon sx={{ mr: 1, color: GLASS.accent.orange }} />
               Pré-visualização do Instagram
             </Typography>
             

@@ -35,6 +35,7 @@ import CaptionEditor from './CaptionEditor';
 import DateTimePicker from './DateTimePicker';
 import { uploadImagesToSupabaseStorage } from '../services/postService';
 import { saveContentForApproval, SaveContentForApprovalPayload } from '../services/approvalService';
+import { GLASS } from '../theme/glassTokens';
 
 function getDefaultScheduledDate(): string {
   const d = new Date();
@@ -164,7 +165,17 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
       onClose={handleClose}
       maxWidth="sm"
       fullWidth
-      PaperProps={{ sx: { borderRadius: 3, maxHeight: '90vh' } }}
+      PaperProps={{
+        sx: {
+          borderRadius: GLASS.radius.card,
+          maxHeight: '90vh',
+          bgcolor: GLASS.surface.bgStrong,
+          backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        },
+      }}
     >
       <DialogTitle sx={{ p: 2.5, pb: 1.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -174,7 +185,7 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
                 <BackIcon fontSize="small" />
               </IconButton>
             )}
-            <Typography variant="h6" fontWeight={600} sx={{ fontFamily: '"Poppins", sans-serif' }}>
+            <Typography variant="h6" fontWeight={600}>
               {step === 'type' ? 'Adicionar conteúdo' : `Novo ${selectedTypeLabel}`}
             </Typography>
           </Box>
@@ -187,7 +198,7 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
       <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
         {step === 'type' && (
           <Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontFamily: '"Poppins", sans-serif' }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Escolha o tipo de conteúdo. Este conteúdo não será agendado para postar — apenas para aprovação do cliente.
             </Typography>
             <Stack direction="row" flexWrap="wrap" gap={1.5}>
@@ -197,7 +208,7 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
                   icon={opt.icon as React.ReactElement}
                   label={opt.label}
                   onClick={() => handleSelectType(opt.id)}
-                  sx={{ py: 2, px: 1.5, fontSize: '0.95rem', fontFamily: '"Poppins", sans-serif' }}
+                  sx={{ py: 2, px: 1.5, fontSize: '0.95rem' }}
                 />
               ))}
             </Stack>
@@ -225,7 +236,7 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
             {contentType === 'reels' && (
               <>
                 <VideoUploader video={video} onChange={setVideo} />
-                <Typography variant="subtitle2" sx={{ mt: 0.5, fontFamily: '"Poppins", sans-serif' }}>
+                <Typography variant="subtitle2" sx={{ mt: 0.5 }}>
                   Capa (opcional)
                 </Typography>
                 <ImageUploader images={coverImage} onChange={setCoverImage} maxImages={1} aspectRatio="1:1" />
@@ -233,7 +244,7 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
             )}
 
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontFamily: '"Poppins", sans-serif' }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
                 Plataforma de publicação
               </Typography>
               <ToggleButtonGroup
@@ -244,21 +255,21 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
                 onChange={(_, v) => v && setPostingPlatform(v)}
                 sx={{ mb: 1 }}
               >
-                <ToggleButton value="instagram" sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}>
+                <ToggleButton value="instagram" sx={{ textTransform: 'none' }}>
                   <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.75}>
                     <SocialPlatformIcons.InstagramBrandIcon sx={{ fontSize: 20 }} />
                     <span>Instagram</span>
                   </Stack>
                 </ToggleButton>
-                <ToggleButton value="linkedin" sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}>
+                <ToggleButton value="linkedin" sx={{ textTransform: 'none' }}>
                   <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.75}>
-                    <SocialPlatformIcons.LinkedInBrandIcon sx={{ fontSize: 20, color: '#0A66C2' }} />
+                    <SocialPlatformIcons.LinkedInBrandIcon sx={{ fontSize: 20, color: 'primary.main' }} />
                     <span>LinkedIn</span>
                   </Stack>
                 </ToggleButton>
               </ToggleButtonGroup>
               {postingPlatform === 'linkedin' && (
-                <Alert severity="info" sx={{ mb: 2, fontFamily: '"Poppins", sans-serif' }}>
+                <Alert severity="info" sx={{ mb: 2 }}>
                   LinkedIn não tem publicação automática no sistema. A data serve como referência para o cliente e para a equipe.
                 </Alert>
               )}
@@ -273,7 +284,7 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
                 />
               }
               label={
-                <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                <Typography variant="body2">
                   Exigir pré-aprovação interna antes de enviar ao cliente
                 </Typography>
               }
@@ -281,7 +292,7 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
             />
 
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1, fontFamily: '"Poppins", sans-serif' }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
                 Data e horário {postingPlatform === 'linkedin' ? '(referência)' : 'do agendamento'}
               </Typography>
               <DateTimePicker
@@ -309,7 +320,7 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
         <DialogActions sx={{ p: 2.5, pt: 2 }}>
           <Button
             onClick={handleClose}
-            sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+            sx={{ textTransform: 'none' }}
           >
             Cancelar
           </Button>
@@ -318,7 +329,7 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
             startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
             onClick={handleSave}
             disabled={saving || !canSave()}
-            sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+            sx={{ textTransform: 'none' }}
           >
             {saving ? 'Salvando…' : 'Salvar para aprovação'}
           </Button>

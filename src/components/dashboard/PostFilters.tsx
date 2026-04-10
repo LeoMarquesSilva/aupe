@@ -9,18 +9,11 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem,
-  TextField,
-  InputAdornment,
-  IconButton
+  MenuItem
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { 
-  FilterList as FilterIcon,
-  SearchOutlined as SearchIcon,
-  Clear as ClearIcon
-} from '@mui/icons-material';
 import { PostsFilter } from '../../services/instagramMetricsService';
+import { GLASS } from '../../theme/glassTokens';
 
 
 interface PostFiltersProps {
@@ -62,6 +55,15 @@ const PostFilters: React.FC<PostFiltersProps> = ({
       onClose={onClose}
       maxWidth="sm"
       fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: GLASS.radius.card,
+          background: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }
+      }}
     >
       <DialogTitle>Filtros Avançados</DialogTitle>
       <DialogContent>
@@ -136,7 +138,7 @@ const PostFilters: React.FC<PostFiltersProps> = ({
       <DialogActions>
         <Button onClick={onReset}>Limpar</Button>
         <Button onClick={onClose}>Cancelar</Button>
-        <Button onClick={handleApply} variant="contained">Aplicar</Button>
+        <Button onClick={handleApply} variant="contained" sx={{ bgcolor: GLASS.accent.orange, borderRadius: GLASS.radius.button, '&:hover': { bgcolor: GLASS.accent.orangeDark } }}>Aplicar</Button>
       </DialogActions>
     </Dialog>
   );

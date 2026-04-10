@@ -30,10 +30,10 @@ import {
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
   Cancel as CancelIcon,
-  Person as PersonIcon,
   ThumbUp as ThumbUpIcon,
 } from '@mui/icons-material';
 import { imageUrlService } from '../../services/imageUrlService';
+import { GLASS } from '../../theme/glassTokens';
 
 interface ScheduledPost {
   id: string;
@@ -251,11 +251,11 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
               border: '1px solid',
               borderColor: 'divider',
               '&.Mui-selected': {
-                bgcolor: 'primary.main',
+                bgcolor: GLASS.accent.orange,
                 color: 'white',
-                borderColor: 'primary.main',
+                borderColor: GLASS.accent.orange,
                 '&:hover': {
-                  bgcolor: 'primary.dark',
+                  bgcolor: GLASS.accent.orangeDark,
                 }
               },
               '&:not(.Mui-selected)': {
@@ -299,13 +299,16 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
                 height: '100%', 
                 display: 'flex', 
                 flexDirection: 'column',
-                border: '1px solid',
-                borderColor: 'divider',
-                boxShadow: 'none',
-                transition: 'all 0.2s ease',
+                border: `1px solid ${GLASS.border.outer}`,
+                bgcolor: GLASS.surface.bg,
+                backdropFilter: `blur(${GLASS.surface.blur})`,
+                boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+                borderRadius: GLASS.radius.card,
+                transition: `all ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
                 '&:hover': {
-                  borderColor: 'primary.main',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                  borderColor: GLASS.accent.orange,
+                  boxShadow: `${GLASS.shadow.cardHover}, ${GLASS.shadow.cardInset}`,
+                  bgcolor: GLASS.surface.bgHover,
                 }
               }}>
                 {/* Checkbox para aprovação (apenas posts pendentes) */}
@@ -448,7 +451,7 @@ const ScheduledPostsList: React.FC<ScheduledPostsListProps> = ({
                     {/* Usuário que criou */}
                     {post.profiles && (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                        <Avatar sx={{ width: 20, height: 20, bgcolor: 'primary.main', fontSize: '0.625rem' }}>
+                        <Avatar sx={{ width: 20, height: 20, bgcolor: GLASS.accent.orange, fontSize: '0.625rem' }}>
                           {userName.charAt(0).toUpperCase()}
                         </Avatar>
                         <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>

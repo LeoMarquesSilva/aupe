@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Client, ScheduledPost, PostStatus } from '../types';
 import { InstagramAuthData } from '../services/instagramAuthService';
-import { fixInstagramConnection } from 'services/instagramFixService';
 import { isClientVerboseLogging, devLog, devWarn, logClientError } from '../utils/clientLogger';
 
 // Usar variáveis de ambiente para as credenciais do Supabase

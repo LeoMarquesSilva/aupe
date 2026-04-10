@@ -93,7 +93,7 @@ serve(async (req) => {
     const clientId = linkRow.client_id;
 
     const [{ data: clientRow, error: clientError }, { data: profileRow }, { data: postsRows }, { data: statusRow }] = await Promise.all([
-      supabase.from('clients').select('id, name, instagram, logo_url, profile_picture').eq('id', clientId).single(),
+      supabase.from('clients').select('id, name, instagram, logo_url, profile_picture, organization_id').eq('id', clientId).single(),
       supabase.from('instagram_profile_cache').select('profile_data, last_updated').eq('client_id', clientId).single(),
       supabase.from('instagram_posts_cache').select('post_data, last_updated').eq('client_id', clientId).order('last_updated', { ascending: false }),
       supabase.from('instagram_cache_status').select('last_full_sync, posts_count, sync_status, error_message').eq('client_id', clientId).single(),
@@ -101,6 +101,18 @@ serve(async (req) => {
 
     if (clientError || !clientRow) {
       return invalidTokenResponse();
+    }
+
+    let agencyLogoUrl: string | undefined;
+    const orgId = (clientRow as { organization_id?: string | null }).organization_id;
+    if (orgId) {
+      const { data: orgRow } = await supabase
+        .from('organizations')
+        .select('agency_logo_url')
+        .eq('id', orgId)
+        .single();
+      const raw = (orgRow as { agency_logo_url?: string | null } | null)?.agency_logo_url;
+      agencyLogoUrl = raw && String(raw).trim() ? String(raw).trim() : undefined;
     }
 
     const client = {
@@ -139,6 +151,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         client,
+        agencyLogoUrl,
         profile,
         posts,
         cacheStatus,

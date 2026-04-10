@@ -34,6 +34,7 @@ import { removePostFromApproval, updateInternalApproval } from '../services/appr
 import DateTimePicker from './DateTimePicker';
 import type { ApprovalKanbanPostInput } from './ApprovalKanban';
 import * as SocialPlatformIcons from './icons/SocialPlatformIcons';
+import { GLASS } from '../theme/glassTokens';
 
 interface ApprovalPostDetailModalProps {
   open: boolean;
@@ -140,7 +141,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
       setInternalComment('');
       setInternalError(null);
     }
-  }, [open, post?.id, post?.scheduledDate, post?.scheduled_date]);
+  }, [open, post]);
 
   const handleInternalDecision = async (status: 'approved' | 'rejected') => {
     if (!post || internalBusy) return;
@@ -217,7 +218,22 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
 
   if (!post) {
     return (
-      <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: GLASS.radius.card,
+            bgcolor: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          },
+        }}
+      >
         <DialogTitle>Detalhes da postagem</DialogTitle>
         <DialogContent />
       </Dialog>
@@ -248,8 +264,23 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
     : undefined;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: GLASS.radius.card,
+          bgcolor: GLASS.surface.bgStrong,
+          backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        },
+      }}
+    >
+      <DialogTitle sx={{ fontWeight: 600, color: GLASS.text.heading }}>
         Detalhes da postagem
       </DialogTitle>
       <DialogContent>
@@ -285,7 +316,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
             const urls = getAllImageUrls(post);
             return (
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block', fontFamily: '"Poppins", sans-serif' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
                   Carrossel ({urls.length} imagens)
                 </Typography>
                 <Box
@@ -352,7 +383,6 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                 bgcolor: alpha(theme.palette.success.main, 0.12),
                 color: theme.palette.success.dark,
                 fontWeight: 600,
-                fontFamily: '"Poppins", sans-serif',
               }}
             />
             <Chip
@@ -365,7 +395,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                     ? 'error'
                     : 'warning'
               }
-              sx={{ fontFamily: '"Poppins", sans-serif' }}
+              sx={{ fontWeight: 510 }}
             />
             {isInPublishingQueue && !isLinkedIn && (
               <Chip
@@ -373,7 +403,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                 size="small"
                 variant="outlined"
                 color="info"
-                sx={{ fontFamily: '"Poppins", sans-serif' }}
+                sx={{ fontWeight: 510 }}
               />
             )}
             {isLinkedIn && (
@@ -381,17 +411,16 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                 size="small"
                 icon={
                   <SocialPlatformIcons.LinkedInBrandIcon
-                    sx={{ fontSize: '16px !important', color: '#0A66C2 !important' }}
+                    sx={{ fontSize: '16px !important', color: `${GLASS.accent.orange} !important` }}
                   />
                 }
                 label="LinkedIn"
                 sx={{
-                  fontFamily: '"Poppins", sans-serif',
                   height: 20,
                   fontSize: '0.6875rem',
                   fontWeight: 600,
-                  bgcolor: 'rgba(10, 102, 194, 0.12)',
-                  color: '#0A66C2',
+                  bgcolor: 'rgba(247, 66, 17, 0.12)',
+                  color: GLASS.accent.orange,
                   border: 'none',
                   borderRadius: '9999px',
                   '& .MuiChip-icon': { ml: '6px' },
@@ -409,10 +438,10 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                 bgcolor: alpha(theme.palette.secondary.main, 0.06),
               }}
             >
-              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1, fontFamily: '"Poppins", sans-serif' }}>
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
                 Pré-aprovação interna
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                 {post.internalApprovalStatus === 'rejected'
                   ? 'Conteúdo reprovado na revisão interna. Ajuste e registre nova decisão, ou aprove se já estiver ok.'
                   : 'A equipe precisa aprovar antes de incluir este post no link enviado ao cliente.'}
@@ -425,10 +454,10 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                 onChange={(e) => setInternalComment(e.target.value)}
                 multiline
                 minRows={2}
-                sx={{ mb: 1.5, fontFamily: '"Poppins", sans-serif' }}
+                sx={{ mb: 1.5 }}
               />
               {internalError && (
-                <Alert severity="error" sx={{ mb: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+                <Alert severity="error" sx={{ mb: 1.5 }}>
                   {internalError}
                 </Alert>
               )}
@@ -438,7 +467,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                   color="success"
                   disabled={internalBusy}
                   onClick={() => handleInternalDecision('approved')}
-                  sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                  sx={{ textTransform: 'none' }}
                 >
                   {internalBusy ? <CircularProgress size={20} color="inherit" /> : 'Aprovar internamente'}
                 </Button>
@@ -447,7 +476,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                   color="error"
                   disabled={internalBusy}
                   onClick={() => handleInternalDecision('rejected')}
-                  sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                  sx={{ textTransform: 'none' }}
                 >
                   Reprovar internamente
                 </Button>
@@ -464,11 +493,11 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                 bgcolor: alpha(theme.palette.warning.main, 0.06),
               }}
             >
-              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
                 Ações
               </Typography>
               {actionError && (
-                <Alert severity="error" sx={{ mb: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+                <Alert severity="error" sx={{ mb: 1.5 }}>
                   {actionError}
                 </Alert>
               )}
@@ -480,7 +509,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                     startIcon={removing ? <CircularProgress size={18} color="inherit" /> : <LinkOffIcon />}
                     onClick={handleRemoveFromApproval}
                     disabled={removing || deleting}
-                    sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                    sx={{ textTransform: 'none' }}
                   >
                     {removing ? 'Removendo…' : 'Remover da aprovação'}
                   </Button>
@@ -492,7 +521,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                     startIcon={deleting ? <CircularProgress size={18} color="inherit" /> : <DeleteIcon />}
                     onClick={handleDeletePost}
                     disabled={removing || deleting}
-                    sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                    sx={{ textTransform: 'none' }}
                   >
                     {deleting ? 'Excluindo…' : 'Excluir post'}
                   </Button>
@@ -510,10 +539,10 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                 bgcolor: alpha(theme.palette.success.main, 0.06),
               }}
             >
-              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
                 {isInPublishingQueue ? 'Ajustar agendamento' : 'Agendar postagem'}
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                 {isInPublishingQueue
                   ? 'Este post já está na fila de publicação. Ajuste a data e horário para reagendar.'
                   : 'Ajuste a data e horário e clique em "Agendar post" para enviar para a fila de publicação.'}
@@ -523,12 +552,12 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                 onChange={setScheduleDate}
               />
               {isInPublishingQueue && (
-                <Alert severity="info" sx={{ mt: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+                <Alert severity="info" sx={{ mt: 1.5 }}>
                   O envio para o Instagram acontece automaticamente no horário agendado.
                 </Alert>
               )}
               {scheduleError && (
-                <Alert severity="error" sx={{ mt: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+                <Alert severity="error" sx={{ mt: 1.5 }}>
                   {scheduleError}
                 </Alert>
               )}
@@ -539,7 +568,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                 onClick={handleSchedulePost}
                 disabled={scheduling || !scheduleDate || !hasScheduleChanged}
                 fullWidth
-                sx={{ mt: 1.5, fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                sx={{ mt: 1.5, textTransform: 'none' }}
               >
                 {scheduling
                   ? (isInPublishingQueue ? 'Salvando…' : 'Agendando…')
@@ -551,22 +580,22 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
           )}
 
           {isApproved && isRoteiro && (
-            <Alert severity="info" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+            <Alert severity="info">
               Roteiro aprovado. Este tipo de conteúdo é de aprovação interna e não entra na fila de postagem automática.
             </Alert>
           )}
 
           {isApproved && isLinkedIn && (
-            <Alert severity="info" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+            <Alert severity="info">
               Conteúdo LinkedIn aprovado pelo cliente. Não há publicação automática no sistema; use a data como referência para postar manualmente no LinkedIn.
             </Alert>
           )}
 
           <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
               Legenda
             </Typography>
-            <Typography variant="body2" sx={{ mt: 0.25, fontFamily: '"Poppins", sans-serif', whiteSpace: 'pre-wrap' }}>
+            <Typography variant="body2" sx={{ mt: 0.25, whiteSpace: 'pre-wrap' }}>
               {post.caption?.trim() || 'Sem legenda'}
             </Typography>
           </Box>
@@ -576,10 +605,10 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <CalendarIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
                 <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                  <Typography variant="caption" color="text.secondary">
                     Data agendada
                   </Typography>
-                  <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                  <Typography variant="body2">
                     {scheduledStr}
                   </Typography>
                 </Box>
@@ -588,10 +617,10 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <PersonIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                <Typography variant="caption" color="text.secondary">
                   Usuário que enviou
                 </Typography>
-                <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                <Typography variant="body2">
                   {creatorLabel}
                 </Typography>
               </Box>
@@ -600,10 +629,10 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <CalendarIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
                 <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                  <Typography variant="caption" color="text.secondary">
                     Data de envio
                   </Typography>
-                  <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                  <Typography variant="body2">
                     {createdAtStr}
                   </Typography>
                 </Box>
@@ -613,10 +642,10 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <CalendarIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
                 <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                  <Typography variant="caption" color="text.secondary">
                     Data de aprovação
                   </Typography>
-                  <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                  <Typography variant="body2">
                     {respondedStr}
                   </Typography>
                 </Box>
@@ -624,7 +653,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
             ) : (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <CalendarIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                <Typography variant="body2" color="text.secondary">
                   Aguardando resposta do cliente
                 </Typography>
               </Box>
@@ -638,9 +667,12 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                 alignItems: 'center',
                 gap: 1.5,
                 p: 1.5,
-                borderRadius: 2,
-                border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-                bgcolor: alpha(theme.palette.primary.main, 0.04),
+                borderRadius: GLASS.radius.inner,
+                border: `1px solid ${GLASS.border.outer}`,
+                bgcolor: GLASS.surface.bg,
+                backdropFilter: `blur(${GLASS.surface.blur})`,
+                WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+                boxShadow: GLASS.shadow.cardInset,
               }}
             >
               <Avatar
@@ -648,17 +680,16 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                 sx={{
                   width: 44,
                   height: 44,
-                  bgcolor: alpha(theme.palette.primary.main, 0.2),
-                  fontFamily: '"Poppins", sans-serif',
+                  bgcolor: 'rgba(247, 66, 17, 0.15)',
                 }}
               >
                 {client.name?.charAt(0) ?? '?'}
               </Avatar>
               <Box>
-                <Typography variant="subtitle2" fontWeight={600} sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                <Typography variant="subtitle2" fontWeight={600}>
                   {client.name}
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                <Typography variant="body2" color="text.secondary">
                   {client.instagram ? `@${client.instagram}` : '—'}
                 </Typography>
               </Box>
@@ -674,10 +705,10 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                 bgcolor: alpha(theme.palette.error.main, 0.05),
               }}
             >
-              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
                 Corrigir e reenviar
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                 Faça os ajustes solicitados pelo cliente e reenvie o post para aprovação.
               </Typography>
               <Button
@@ -688,7 +719,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                   onEditRequest?.();
                   onClose();
                 }}
-                sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none', fontWeight: 600 }}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
               >
                 Editar e reenviar
               </Button>
@@ -712,7 +743,6 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                   gap: 0.5,
                   fontWeight: 600,
                   color: 'text.primary',
-                  fontFamily: '"Poppins", sans-serif',
                 }}
               >
                 <CommentIcon sx={{ fontSize: 16 }} />
@@ -722,7 +752,6 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
                 variant="body2"
                 sx={{
                   mt: 0.5,
-                  fontFamily: '"Poppins", sans-serif',
                   whiteSpace: 'pre-wrap',
                 }}
               >
@@ -733,7 +762,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
         </Box>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}>
+        <Button onClick={onClose} sx={{ textTransform: 'none' }}>
           Fechar
         </Button>
       </DialogActions>

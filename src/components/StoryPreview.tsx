@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, IconButton } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import Stories from 'react-insta-stories';
 import { Story, StoryElement, Position, Size } from '../types';
 import { imageUrlService } from '../services/imageUrlService';
@@ -20,8 +20,8 @@ interface StoryContentProps {
   config: any;
 }
 
-// Tipo para as histórias do react-insta-stories
-type InstaStory = {
+// Tipo para as histórias do react-insta-stories (used by Stories component internally)
+type _InstaStory = {
   url?: string;
   duration?: number;
   header?: {
@@ -165,6 +165,7 @@ const StoryPreview: React.FC<StoryPreviewProps> = ({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragState, resizeState, containerSize, onElementUpdate, isEditing]);
   
   // Função para converter posição relativa (0-1) para pixels

@@ -202,6 +202,7 @@ export async function revokeShareLink(linkId: string): Promise<void> {
  */
 export async function fetchDashboardByToken(token: string): Promise<{
   client: { id: string; name: string; instagram: string; logoUrl?: string; profilePicture?: string };
+  agencyLogoUrl?: string;
   profile: unknown;
   posts: unknown[];
   cacheStatus: {

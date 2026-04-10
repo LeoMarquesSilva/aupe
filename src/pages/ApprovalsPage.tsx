@@ -74,6 +74,8 @@ import ApprovalUploadDrawer from '../components/ApprovalUploadDrawer';
 import ApprovalKanban from '../components/ApprovalKanban';
 import ApprovalPostDetailModal from '../components/ApprovalPostDetailModal';
 import ApprovalEditDrawer from '../components/ApprovalEditDrawer';
+import { GLASS } from '../theme/glassTokens';
+import { appShellContainerSx } from '../theme/appShellLayout';
 import type { ApprovalKanbanPostInput } from '../components/ApprovalKanban';
 
 export type { ApprovalKanbanPostInput };
@@ -145,6 +147,7 @@ const ApprovalsPage: React.FC = () => {
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [postForEdit, setPostForEdit] = useState<ApprovalKanbanPostInput | null>(null);
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
+  const [statusClientId, setStatusClientId] = useState<string>('');
   const [kanbanSearch, setKanbanSearch] = useState('');
   const [kanbanTypeFilter, setKanbanTypeFilter] = useState<string>('all');
   const [kanbanDateFilter, setKanbanDateFilter] = useState<string>('all');
@@ -266,10 +269,9 @@ const ApprovalsPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [fetchAllApprovalPosts]);
 
-  const kanbanPosts =
-    selectedClientId
-      ? allApprovalPosts.filter((p) => p.clientId === selectedClientId)
-      : allApprovalPosts;
+  const kanbanPosts = statusClientId
+    ? allApprovalPosts.filter((p) => p.clientId === statusClientId)
+    : allApprovalPosts;
 
   const filteredKanbanPosts = useMemo(() => {
     const now = new Date();
@@ -520,59 +522,52 @@ const ApprovalsPage: React.FC = () => {
     border: 'none',
     borderBottom: '3px solid transparent',
     bgcolor: 'transparent',
-    color: '#64748b',
-    fontFamily: '"Poppins", sans-serif',
-    fontWeight: 600,
+    color: GLASS.text.muted,
+    fontWeight: 510,
     fontSize: '0.9375rem',
     cursor: 'pointer',
     transition: 'color 0.2s ease, border-color 0.2s ease',
-    '&:hover': { color: '#1e293b' },
+    outline: 'none',
+    '&:hover': { color: GLASS.text.heading },
+    '&:focus-visible': {
+      boxShadow: `inset 0 0 0 2px rgba(247, 66, 17,0.28)`,
+      borderRadius: 1,
+    },
     '&[data-state="active"]': {
-      color: '#10b981',
-      borderBottomColor: '#10b981',
+      color: GLASS.accent.orange,
+      borderBottomColor: GLASS.accent.orange,
     },
   };
 
   return (
     <>
-    <Box
-      sx={{
-        minHeight: '100%',
-        background: `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.03)} 0%, ${theme.palette.background.default} 12%)`,
-        position: 'relative',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 280,
-          background: `radial-gradient(ellipse 80% 60% at 50% 0%, ${alpha(theme.palette.primary.main, 0.06)} 0%, transparent 70%)`,
-          pointerEvents: 'none',
-        },
-      }}
-    >
-      <Container maxWidth="xl" sx={{ py: 3, position: 'relative' }}>
+      <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: { xs: 2, md: 3.5 } }}>
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
         >
-          <Typography
-            variant="h4"
+          <Box
+            className="grain-overlay premium-header-bg"
             sx={{
-              fontFamily: '"Poppins", sans-serif',
-              fontWeight: 700,
-              fontSize: '1.5rem',
-              color: '#1e293b',
-              mb: 0.5,
+              p: { xs: 2, md: 2.75 },
+              borderRadius: GLASS.radius.card,
+              border: `1px solid rgba(255, 255, 255, 0.18)`,
+              boxShadow: '0 16px 38px -24px rgba(10, 15, 45, 0.8)',
+              mb: 2.5,
             }}
           >
-            Aprovação
-          </Typography>
-          <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', mb: 3, color: '#64748b', fontSize: '0.875rem' }}>
-            Gere links para o cliente aprovar ou solicitar ajustes. Acompanhe o status no quadro e gerencie os links ativos.
-          </Typography>
+            <Typography
+              variant="h4"
+              className="premium-header-title"
+              sx={{ letterSpacing: '-0.02em', fontSize: { xs: '1.35rem', md: '1.6rem' }, mb: 0.5 }}
+            >
+              Aprovação
+            </Typography>
+            <Typography variant="body2" className="premium-header-subtitle">
+              Gere links para o cliente aprovar ou solicitar ajustes. Acompanhe o status no quadro e gerencie os links ativos.
+            </Typography>
+          </Box>
 
           {error && (
             <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
@@ -583,7 +578,7 @@ const ApprovalsPage: React.FC = () => {
           <TabsRadix.Root value={activeTab} onValueChange={setActiveTab}>
             <Box
               sx={{
-                borderBottom: `1px solid ${theme.palette.divider}`,
+                borderBottom: `1px solid ${GLASS.border.outer}`,
                 mb: 0,
               }}
             >
@@ -640,14 +635,18 @@ const ApprovalsPage: React.FC = () => {
         sx={{
           p: 2,
           mb: 3,
-          borderRadius: 3,
-          border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+          borderRadius: GLASS.radius.card,
+          border: `1px solid ${GLASS.border.outer}`,
+          bgcolor: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
         }}
       >
-        <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 0.5, fontFamily: '"Poppins", sans-serif' }}>
+        <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 0.5 }}>
           Passo 1 — Nova solicitação de aprovação
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontFamily: '"Poppins", sans-serif' }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Envie os posts para aprovação: selecione o cliente e os posts e gere o link.
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -670,10 +669,10 @@ const ApprovalsPage: React.FC = () => {
                     >
                       {client.name.charAt(0)}
                     </Avatar>
-                    <Typography component="span" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                    <Typography component="span">
                       {client.name}
                     </Typography>
-                    <Typography component="span" sx={{ ml: 1, color: 'text.secondary', fontSize: '0.875rem', fontFamily: '"Poppins", sans-serif' }}>
+                    <Typography component="span" sx={{ ml: 1, color: 'text.secondary', fontSize: '0.875rem' }}>
                       {client.instagram ? `@${client.instagram}` : ''}
                     </Typography>
                   </Box>
@@ -706,8 +705,8 @@ const ApprovalsPage: React.FC = () => {
                     <ListItemText
                       primary={client.name}
                       secondary={client.instagram ? `@${client.instagram}` : ''}
-                      primaryTypographyProps={{ variant: 'body1', fontFamily: '"Poppins", sans-serif' }}
-                      secondaryTypographyProps={{ variant: 'body2', fontFamily: '"Poppins", sans-serif' }}
+                      primaryTypographyProps={{ variant: 'body1' }}
+                      secondaryTypographyProps={{ variant: 'body2' }}
                     />
                     {isConnected ? (
                       <Chip
@@ -715,7 +714,7 @@ const ApprovalsPage: React.FC = () => {
                         color="success"
                         label="Conectado"
                         icon={<CheckCircleIcon />}
-                        sx={{ ml: 1, fontFamily: '"Poppins", sans-serif' }}
+                        sx={{ ml: 1 }}
                       />
                     ) : (
                       <Chip
@@ -723,7 +722,7 @@ const ApprovalsPage: React.FC = () => {
                         color="error"
                         label="Não conectado"
                         icon={<ErrorIcon />}
-                        sx={{ ml: 1, fontFamily: '"Poppins", sans-serif' }}
+                        sx={{ ml: 1 }}
                       />
                     )}
                   </MenuItem>
@@ -736,7 +735,7 @@ const ApprovalsPage: React.FC = () => {
               variant="outlined"
               size="medium"
               onClick={() => setUploadDrawerOpen(true)}
-              sx={{ mb: 2, fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+              sx={{ mb: 2, textTransform: 'none' }}
             >
               Adicionar conteúdo
             </Button>
@@ -764,7 +763,7 @@ const ApprovalsPage: React.FC = () => {
                     variant="outlined"
                     onClick={() => setSelectedPostIds(new Set(eligiblePosts.map((p) => p.id)))}
                     disabled={eligiblePosts.length === 0}
-                    sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                    sx={{ textTransform: 'none' }}
                   >
                     Selecionar p/ cliente ({eligiblePosts.length})
                   </Button>
@@ -774,7 +773,7 @@ const ApprovalsPage: React.FC = () => {
                     color="secondary"
                     onClick={() => setSelectedPostIds(new Set(gestorEligiblePosts.map((p) => p.id)))}
                     disabled={gestorEligiblePosts.length === 0}
-                    sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                    sx={{ textTransform: 'none' }}
                   >
                     Selecionar p/ gestor ({gestorEligiblePosts.length})
                   </Button>
@@ -783,7 +782,7 @@ const ApprovalsPage: React.FC = () => {
                     variant="text"
                     onClick={() => setSelectedPostIds(new Set())}
                     disabled={selectedCount === 0}
-                    sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                    sx={{ textTransform: 'none' }}
                   >
                     Limpar seleção
                   </Button>
@@ -921,7 +920,7 @@ const ApprovalsPage: React.FC = () => {
                     startIcon={<GestorLinkIcon />}
                     onClick={() => setInternalDialogOpen(true)}
                     disabled={!canOpenGestorDialog}
-                    sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                    sx={{ textTransform: 'none' }}
                   >
                     Gerar link para o gestor {selectedCount > 0 ? `(${selectedCount})` : ''}
                   </Button>
@@ -930,7 +929,7 @@ const ApprovalsPage: React.FC = () => {
                     startIcon={<ThumbUpIcon />}
                     onClick={handleOpenDialog}
                     disabled={!canOpenClientDialog}
-                    sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                    sx={{ textTransform: 'none' }}
                   >
                     Gerar link ao cliente {selectedCount > 0 ? `(${selectedCount})` : ''}
                   </Button>
@@ -960,7 +959,7 @@ const ApprovalsPage: React.FC = () => {
       <Box sx={{ pt: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5, flexWrap: 'wrap', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-            <Typography variant="subtitle1" fontWeight={600} sx={{ fontFamily: '"Poppins", sans-serif' }}>
+            <Typography variant="subtitle1" fontWeight={600}>
               Status das aprovações
             </Typography>
             <Chip
@@ -969,7 +968,6 @@ const ApprovalsPage: React.FC = () => {
               sx={{
                 height: 20,
                 fontSize: '0.7rem',
-                fontFamily: '"Poppins", sans-serif',
                 fontWeight: 600,
                 bgcolor: isRealtimeConnected
                   ? alpha(theme.palette.success.main, 0.15)
@@ -978,9 +976,9 @@ const ApprovalsPage: React.FC = () => {
                 '& .MuiChip-label': { px: 1 },
               }}
             />
-            {selectedClientId && (
-              <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                Filtrado por: {clients.find((c) => c.id === selectedClientId)?.name ?? 'Cliente'}
+            {statusClientId && (
+              <Typography variant="body2" color="text.secondary">
+                Filtrado por: {clients.find((c) => c.id === statusClientId)?.name ?? 'Cliente'}
               </Typography>
             )}
           </Box>
@@ -989,6 +987,7 @@ const ApprovalsPage: React.FC = () => {
               size="small"
               onClick={() => fetchAllApprovalPosts()}
               disabled={kanbanLoading}
+              aria-label="Atualizar status do kanban"
               sx={{ color: 'text.secondary' }}
             >
               {kanbanLoading ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
@@ -1000,9 +999,12 @@ const ApprovalsPage: React.FC = () => {
           sx={{
             p: 1.5,
             mb: 1.5,
-            borderRadius: 2,
-            border: `1px solid ${alpha(theme.palette.divider, 0.7)}`,
-            bgcolor: alpha(theme.palette.background.paper, 0.7),
+            borderRadius: GLASS.radius.inner,
+            border: `1px solid ${GLASS.border.outer}`,
+            bgcolor: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
           }}
         >
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -1020,6 +1022,21 @@ const ApprovalsPage: React.FC = () => {
                 ),
               }}
             />
+            <FormControl size="small" sx={{ minWidth: 170 }}>
+              <InputLabel>Cliente</InputLabel>
+              <Select
+                value={statusClientId}
+                label="Cliente"
+                onChange={(e) => setStatusClientId(e.target.value)}
+              >
+                <MenuItem value="">Todos os clientes</MenuItem>
+                {clients.map((client) => (
+                  <MenuItem key={client.id} value={client.id}>
+                    {client.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <FormControl size="small" sx={{ minWidth: 170 }}>
               <InputLabel>Tipo</InputLabel>
               <Select
@@ -1053,18 +1070,19 @@ const ApprovalsPage: React.FC = () => {
               size="small"
               variant="text"
               onClick={() => {
+                setStatusClientId('');
                 setKanbanSearch('');
                 setKanbanTypeFilter('all');
                 setKanbanDateFilter('all');
               }}
-              sx={{ textTransform: 'none', fontFamily: '"Poppins", sans-serif' }}
+              sx={{ textTransform: 'none' }}
             >
               Limpar filtros
             </Button>
             <Chip
               size="small"
               label={`Exibindo ${filteredKanbanPosts.length} de ${kanbanPosts.length}`}
-              sx={{ fontFamily: '"Poppins", sans-serif' }}
+              sx={{ fontWeight: 510 }}
             />
           </Box>
         </Paper>
@@ -1086,10 +1104,10 @@ const ApprovalsPage: React.FC = () => {
               >
       <Box sx={{ pt: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 2 }}>
         <Box>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ fontFamily: '"Poppins", sans-serif' }}>
+          <Typography variant="subtitle1" fontWeight={600}>
             Links de aprovação ativos
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+          <Typography variant="body2" color="text.secondary">
             Links de cliente (aprovação externa) e de gestor (revisão interna) ativos; copie ou revogue quando precisar.
           </Typography>
         </Box>
@@ -1102,7 +1120,7 @@ const ApprovalsPage: React.FC = () => {
           }}
           size="small"
           disabled={linksLoading}
-          sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+          sx={{ textTransform: 'none' }}
         >
           Atualizar
         </Button>
@@ -1118,16 +1136,19 @@ const ApprovalsPage: React.FC = () => {
           sx={{
             p: 4,
             textAlign: 'center',
-            borderRadius: 3,
-            border: `1px dashed ${alpha(theme.palette.divider, 0.8)}`,
-            bgcolor: alpha(theme.palette.primary.main, 0.02),
+            borderRadius: GLASS.radius.card,
+            border: `1px dashed ${GLASS.border.outer}`,
+            bgcolor: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            boxShadow: GLASS.shadow.cardInset,
           }}
         >
           <ThumbUpIcon sx={{ fontSize: 48, color: theme.palette.text.disabled, mb: 1 }} />
-          <Typography variant="h6" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600, mb: 0.5 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
             Nenhum link ativo
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+          <Typography variant="body2" color="text.secondary">
             Gere um link para o <strong>cliente</strong> (Passo 1–2) ou um link para o <strong>gestor</strong> (revisão interna). Ambos aparecem aqui enquanto não expirarem.
           </Typography>
         </Paper>
@@ -1136,27 +1157,31 @@ const ApprovalsPage: React.FC = () => {
           component={Paper}
           elevation={0}
           sx={{
-            borderRadius: 3,
-            border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+            borderRadius: GLASS.radius.card,
+            border: `1px solid ${GLASS.border.outer}`,
+            bgcolor: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
             overflow: 'hidden',
           }}
         >
           <Table size={isMobile ? 'small' : 'medium'}>
             <TableHead>
-              <TableRow sx={{ bgcolor: alpha(theme.palette.primary.main, 0.06) }}>
+              <TableRow sx={{ bgcolor: 'rgba(247, 66, 17,0.06)' }}>
                 {!isMobile && (
-                  <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>Tipo</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Tipo</TableCell>
                 )}
-                <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>Cliente</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Cliente</TableCell>
                 {!isMobile && (
-                  <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>Rótulo</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Rótulo</TableCell>
                 )}
-                <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>Gerado em</TableCell>
-                <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>Expira em</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Gerado em</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Expira em</TableCell>
                 {!isMobile && (
-                  <TableCell sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>Criado por</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Criado por</TableCell>
                 )}
-                <TableCell align="right" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>
+                <TableCell align="right" sx={{ fontWeight: 600 }}>
                   Ações
                 </TableCell>
               </TableRow>
@@ -1176,18 +1201,17 @@ const ApprovalsPage: React.FC = () => {
                           label={isGestor ? 'Gestor' : 'Cliente'}
                           size="small"
                           sx={{
-                            fontFamily: '"Poppins", sans-serif',
                             fontSize: '0.75rem',
                             fontWeight: 600,
                             ...(isGestor
                               ? {
-                                  bgcolor: 'rgba(139, 92, 246, 0.12)',
-                                  color: '#6d28d9',
+                                  bgcolor: alpha(theme.palette.secondary.main, 0.18),
+                                  color: theme.palette.secondary.dark,
                                   border: 'none',
                                 }
                               : {
-                                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                  color: theme.palette.primary.dark,
+                                  bgcolor: 'rgba(247, 66, 17,0.1)',
+                                  color: GLASS.accent.orangeDark,
                                   border: 'none',
                                 }),
                           }}
@@ -1201,13 +1225,12 @@ const ApprovalsPage: React.FC = () => {
                             label={isGestor ? 'Gestor' : 'Cliente'}
                             size="small"
                             sx={{
-                              fontFamily: '"Poppins", sans-serif',
                               fontSize: '0.65rem',
                               height: 20,
                               flexShrink: 0,
                               ...(isGestor
-                                ? { bgcolor: 'rgba(139, 92, 246, 0.12)', color: '#6d28d9' }
-                                : { bgcolor: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.dark }),
+                                ? { bgcolor: alpha(theme.palette.secondary.main, 0.18), color: theme.palette.secondary.dark }
+                                : { bgcolor: 'rgba(247, 66, 17,0.1)', color: GLASS.accent.orangeDark }),
                             }}
                           />
                         )}
@@ -1219,22 +1242,21 @@ const ApprovalsPage: React.FC = () => {
                             height: 40,
                             bgcolor: alpha(theme.palette.secondary.main, 0.2),
                             fontSize: '0.875rem',
-                            fontFamily: '"Poppins", sans-serif',
                           }}
                         >
                           {(displayName && displayName !== '—' ? displayName : '?').charAt(0).toUpperCase()}
                         </Avatar>
                         <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 500 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>
                             {displayName}
                           </Typography>
                           {link.clientInstagram && (
-                            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                            <Typography variant="caption" color="text.secondary">
                               @{link.clientInstagram}
                             </Typography>
                           )}
                           {gestorLink && !isMobile && (
-                            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif', display: 'block' }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                               {gestorLink.postCount} post{gestorLink.postCount !== 1 ? 's' : ''} · revisão interna
                             </Typography>
                           )}
@@ -1245,14 +1267,14 @@ const ApprovalsPage: React.FC = () => {
                       <TableCell>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                           {link.label ? (
-                            <Chip label={link.label} size="small" sx={{ fontFamily: '"Poppins", sans-serif', fontSize: '0.75rem', width: 'fit-content' }} />
+                            <Chip label={link.label} size="small" sx={{ fontSize: '0.75rem', width: 'fit-content' }} />
                           ) : (
                             <Typography variant="caption" color="text.disabled">
                               —
                             </Typography>
                           )}
                           {gestorLink && (
-                            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                            <Typography variant="caption" color="text.secondary">
                               {gestorLink.postCount} post{gestorLink.postCount !== 1 ? 's' : ''}
                             </Typography>
                           )}
@@ -1260,25 +1282,25 @@ const ApprovalsPage: React.FC = () => {
                       </TableCell>
                     )}
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                      <Typography variant="body2">
                         {format(parseISO(link.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                      <Typography variant="body2">
                         {format(parseISO(link.expiresAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                       </Typography>
                     </TableCell>
                     {!isMobile && (
                       <TableCell>
-                        <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', color: 'text.secondary' }}>
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                           {link.createdByLabel}
                         </Typography>
                       </TableCell>
                     )}
                     <TableCell align="right">
                       <Tooltip title="Abrir link">
-                        <IconButton size="small" onClick={() => openLink(item)} sx={{ color: theme.palette.primary.main }}>
+                        <IconButton size="small" onClick={() => openLink(item)} sx={{ color: GLASS.accent.orange }}>
                           <OpenIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
@@ -1314,7 +1336,6 @@ const ApprovalsPage: React.FC = () => {
           </TabsRadix.Root>
         </motion.div>
       </Container>
-    </Box>
 
       <ApprovalRequestDialog
         open={dialogOpen}

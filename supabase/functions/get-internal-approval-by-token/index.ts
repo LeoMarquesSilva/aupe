@@ -85,7 +85,7 @@ serve(async (req) => {
 
     const { data: orgRow, error: orgError } = await supabase
       .from('organizations')
-      .select('id, name')
+      .select('id, name, agency_logo_url')
       .eq('id', linkRow.organization_id)
       .single();
 
@@ -99,10 +99,20 @@ serve(async (req) => {
       .eq('internal_approval_link_id', linkRow.id)
       .order('sort_order', { ascending: true });
 
+    const orgPayload = {
+      id: orgRow.id,
+      name: orgRow.name,
+      agencyLogoUrl:
+        (orgRow as { agency_logo_url?: string | null }).agency_logo_url &&
+        String((orgRow as { agency_logo_url?: string | null }).agency_logo_url).trim()
+          ? String((orgRow as { agency_logo_url?: string | null }).agency_logo_url).trim()
+          : undefined,
+    };
+
     if (junctionError || !junctionRows?.length) {
       return new Response(
         JSON.stringify({
-          organization: { id: orgRow.id, name: orgRow.name },
+          organization: orgPayload,
           label: linkRow.label ?? undefined,
           posts: [],
           expiresAt: linkRow.expires_at,
@@ -124,7 +134,7 @@ serve(async (req) => {
     if (postsError || !postsRows?.length) {
       return new Response(
         JSON.stringify({
-          organization: { id: orgRow.id, name: orgRow.name },
+          organization: orgPayload,
           label: linkRow.label ?? undefined,
           posts: [],
           expiresAt: linkRow.expires_at,
@@ -175,7 +185,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        organization: { id: orgRow.id, name: orgRow.name },
+        organization: orgPayload,
         label: linkRow.label ?? undefined,
         posts,
         expiresAt: linkRow.expires_at,

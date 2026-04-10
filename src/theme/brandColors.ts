@@ -1,12 +1,14 @@
-// Paleta minimalista e tecnológica (alinhada ao theme.tsx)
 const BRAND_COLORS = {
-  primary: '#0f766e',
-  secondary: '#64748b',
-  lightGray: '#e2e8f0',
-  neutralGray: '#cbd5e1',
-  softBlack: '#0f172a',
-  greenBlack: '#0f172a', // texto escuro (compatível com Login/Signup)
-  offWhite: '#fafafa',
+  primary: '#f74211',
+  secondary: '#525663',
+  navy: '#0a0f2d',
+  mediumBlue: '#3e54b5',
+  lightBlue: '#bbc9f9',
+  offWhite: '#f6f6f6',
+  lightGray: 'rgba(82, 86, 99, 0.18)',
+  neutralGray: '#525663',
+  softBlack: '#0a0f2d',
+  greenBlack: '#0a0f2d',
 };
 
 export default BRAND_COLORS;

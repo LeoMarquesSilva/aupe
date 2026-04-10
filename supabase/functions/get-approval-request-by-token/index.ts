@@ -89,12 +89,24 @@ serve(async (req) => {
 
     const { data: clientRow, error: clientError } = await supabase
       .from('clients')
-      .select('id, name, instagram, logo_url, profile_picture')
+      .select('id, name, instagram, logo_url, profile_picture, organization_id')
       .eq('id', clientId)
       .single();
 
     if (clientError || !clientRow) {
       return invalidTokenResponse();
+    }
+
+    let agencyLogoUrl: string | undefined;
+    const orgId = (clientRow as { organization_id?: string | null }).organization_id;
+    if (orgId) {
+      const { data: orgRow } = await supabase
+        .from('organizations')
+        .select('agency_logo_url')
+        .eq('id', orgId)
+        .single();
+      const raw = (orgRow as { agency_logo_url?: string | null } | null)?.agency_logo_url;
+      agencyLogoUrl = raw && String(raw).trim() ? String(raw).trim() : undefined;
     }
 
     const { data: junctionRows, error: junctionError } = await supabase
@@ -113,6 +125,7 @@ serve(async (req) => {
             logoUrl: clientRow.logo_url ?? undefined,
             profilePicture: clientRow.profile_picture ?? undefined,
           },
+          agencyLogoUrl,
           posts: [],
           expiresAt: requestRow.expires_at,
         }),
@@ -139,6 +152,7 @@ serve(async (req) => {
             logoUrl: clientRow.logo_url ?? undefined,
             profilePicture: clientRow.profile_picture ?? undefined,
           },
+          agencyLogoUrl,
           posts: [],
           expiresAt: requestRow.expires_at,
         }),
@@ -184,6 +198,7 @@ serve(async (req) => {
           logoUrl: clientRow.logo_url ?? undefined,
           profilePicture: clientRow.profile_picture ?? undefined,
         },
+        agencyLogoUrl,
         posts,
         expiresAt: requestRow.expires_at,
       }),

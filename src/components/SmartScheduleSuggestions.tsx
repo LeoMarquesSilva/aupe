@@ -13,6 +13,7 @@ import {
   Schedule as ScheduleIcon,
   Info as InfoIcon
 } from '@mui/icons-material';
+import { GLASS } from '../theme/glassTokens';
 
 interface SmartScheduleSuggestionsProps {
   onSelectDateTime: (date: string, time: string) => void;
@@ -125,18 +126,22 @@ const SmartScheduleSuggestions: React.FC<SmartScheduleSuggestionsProps> = ({ onS
       elevation={0} 
       sx={{ 
         p: 3, 
-        border: '1px solid rgba(0,0,0,0.08)',
-        borderRadius: 2,
-        backgroundColor: '#f8f9ff'
+        background: GLASS.surface.bg,
+        backdropFilter: `blur(${GLASS.surface.blur})`,
+        WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+        border: `1px solid ${GLASS.border.outer}`,
+        borderRadius: GLASS.radius.card,
+        boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="h6" sx={{ 
           fontWeight: 'medium',
           display: 'flex',
-          alignItems: 'center'
+          alignItems: 'center',
+          color: GLASS.text.heading,
         }}>
-          <TrendingUpIcon sx={{ mr: 1, color: 'primary.main' }} />
+          <TrendingUpIcon sx={{ mr: 1, color: GLASS.accent.orange }} />
           Sugestões Inteligentes
         </Typography>
         
@@ -165,13 +170,17 @@ const SmartScheduleSuggestions: React.FC<SmartScheduleSuggestionsProps> = ({ onS
                     label={time}
                     onClick={() => onSelectDateTime(suggestion.date, time)}
                     variant="outlined"
-                    color={suggestion.priority === 'high' ? 'primary' : 'default'}
                     size="small"
                     sx={{ 
                       cursor: 'pointer',
+                      ...(suggestion.priority === 'high' ? {
+                        borderColor: GLASS.accent.orange,
+                        color: GLASS.accent.orange,
+                      } : {}),
                       '&:hover': { 
-                        backgroundColor: suggestion.priority === 'high' ? 'primary.light' : 'action.hover',
-                        color: suggestion.priority === 'high' ? 'white' : 'inherit'
+                        backgroundColor: suggestion.priority === 'high' ? GLASS.accent.orange : 'action.hover',
+                        color: suggestion.priority === 'high' ? 'white' : 'inherit',
+                        borderColor: suggestion.priority === 'high' ? GLASS.accent.orange : undefined,
                       }
                     }}
                   />
@@ -224,8 +233,8 @@ const SmartScheduleSuggestions: React.FC<SmartScheduleSuggestionsProps> = ({ onS
         </Stack>
       </Box>
 
-      <Box sx={{ mt: 2, p: 2, backgroundColor: 'rgba(25, 118, 210, 0.08)', borderRadius: 1 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+      <Box sx={{ mt: 2, p: 2, backgroundColor: 'rgba(247, 66, 17, 0.08)', borderRadius: GLASS.radius.button }}>
+        <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', color: GLASS.text.muted }}>
           <InfoIcon sx={{ fontSize: 14, mr: 0.5 }} />
           Dica: Os melhores horários podem variar conforme seu público. Monitore o engajamento para otimizar.
         </Typography>

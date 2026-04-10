@@ -142,18 +142,7 @@ class PDFExportService {
     }
     const margin = baseMargin;
     const fontSizeMultiplier = opts.fontSize === 'small' ? 0.9 : opts.fontSize === 'large' ? 1.1 : 1;
-    const spacingMultiplier = opts.sectionSpacing === 'compact' ? 0.7 : opts.sectionSpacing === 'spacious' ? 1.5 : 1;
     let yPosition = margin;
-    
-    // Função helper para obter alinhamento
-    const getAlignment = (sectionKey: string): 'left' | 'center' | 'right' => {
-      return opts.sectionAlignment?.[sectionKey] || 'left';
-    };
-    
-    // Função helper para adicionar espaçamento entre seções
-    const addSectionSpacing = (baseSpacing: number = 15) => {
-      yPosition += baseSpacing * spacingMultiplier;
-    };
 
     // Converter cores hex para RGB
     const hexToRgb = (hex: string): [number, number, number] => {
@@ -164,10 +153,8 @@ class PDFExportService {
     };
 
     const primaryColor: [number, number, number] = hexToRgb(opts.primaryColor);
-    const secondaryColor: [number, number, number] = hexToRgb(opts.secondaryColor);
     const successColor: [number, number, number] = [46, 125, 50];
     const textColor: [number, number, number] = [33, 33, 33];
-    const lightGray: [number, number, number] = opts.layoutStyle === 'minimal' ? [250, 250, 250] : [245, 245, 245];
 
     // Função auxiliar para adicionar nova página se necessário
     const checkPageBreak = (requiredSpace: number) => {

@@ -40,7 +40,7 @@ class UrlRefreshService {
     
     if (expiredClients.length > 0) {
       // Fazer refresh de todos os perfis
-      const result = await instagramService.refreshAllClientProfiles();
+      await instagramService.refreshAllClientProfiles();
       
       // Atualizar timestamps no cache
       expiredClients.forEach(clientId => {

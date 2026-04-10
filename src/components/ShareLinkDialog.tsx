@@ -34,6 +34,7 @@ import {
 } from '../services/shareLinkService';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { GLASS } from '../theme/glassTokens';
 
 interface ShareLinkDialogProps {
   open: boolean;
@@ -84,6 +85,7 @@ const ShareLinkDialog: React.FC<ShareLinkDialogProps> = ({
       setError(null);
       setLinkLabel('');
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, clientId]);
 
   const handleCreate = async (days: number) => {
@@ -120,7 +122,18 @@ const ShareLinkDialog: React.FC<ShareLinkDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: GLASS.radius.card,
+          bgcolor: GLASS.surface.bgStrong,
+          backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }
+      }}
+    >
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <LinkIcon color="primary" />
         Compartilhar dashboard com o cliente{clientName ? `: ${clientName}` : ''}
@@ -187,9 +200,9 @@ const ShareLinkDialog: React.FC<ShareLinkDialogProps> = ({
                 sx={{ '& .MuiInputBase-input': { fontSize: '0.8rem' } }}
               />
               <IconButton
-                color="primary"
                 onClick={() => handleCopy(createdLink.url)}
                 title="Copiar link"
+                sx={{ color: GLASS.accent.orange, '&:hover': { bgcolor: 'rgba(247,66,17,0.1)' } }}
               >
                 <CopyIcon />
               </IconButton>

@@ -13,7 +13,6 @@ export class ImageUrlService {
    * Gera uma URL de placeholder personalizada
    */
   static getPlaceholder(width: number = 400, height: number = 400, text: string = 'Imagem'): string {
-    const encodedText = encodeURIComponent(text);
     return `data:image/svg+xml;base64,${btoa(`
       <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" fill="none" xmlns="http://www.w3.org/2000/svg">
         <rect width="${width}" height="${height}" fill="#F5F5F5"/>
@@ -290,6 +289,16 @@ export class ImageUrlService {
       return this.DEFAULT_PLACEHOLDER;
     }
   }
+}
+
+/** Fallback when no organization logo is configured */
+export const DEFAULT_AGENCY_LOGO_PATH = '/LOGO-AUPE.jpg';
+
+/** Public app URL for agency logo (org branding or default asset). */
+export function resolveAgencyLogoSrc(agencyLogoUrl?: string | null): string {
+  const u = agencyLogoUrl?.trim();
+  if (u) return ImageUrlService.getPublicUrl(u);
+  return DEFAULT_AGENCY_LOGO_PATH;
 }
 
 // Exportar uma instância para uso direto

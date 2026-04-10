@@ -19,6 +19,7 @@ import {
 } from '@mui/icons-material';
 import { Client } from '../types';
 import { clientService } from '../services/supabaseClient';
+import { GLASS } from '../theme/glassTokens';
 
 interface EditClientDialogProps {
   open: boolean;
@@ -93,6 +94,16 @@ const EditClientDialog: React.FC<EditClientDialogProps> = ({
       onClose={handleClose}
       maxWidth="sm"
       fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: GLASS.radius.card,
+          bgcolor: GLASS.surface.bgStrong,
+          backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }
+      }}
     >
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -158,6 +169,11 @@ const EditClientDialog: React.FC<EditClientDialogProps> = ({
           onClick={handleSave}
           disabled={loading}
           startIcon={loading ? <CircularProgress size={16} /> : <SaveIcon />}
+          sx={{
+            bgcolor: GLASS.accent.orange,
+            borderRadius: GLASS.radius.button,
+            '&:hover': { bgcolor: GLASS.accent.orangeDark },
+          }}
         >
           {loading ? 'Salvando...' : 'Salvar'}
         </Button>

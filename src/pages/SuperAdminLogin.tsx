@@ -27,6 +27,7 @@ import {
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { roleService } from '../services/roleService';
+import { GLASS } from '../theme/glassTokens';
 
 const SuperAdminLogin: React.FC = () => {
   const navigate = useNavigate();
@@ -150,6 +151,31 @@ const SuperAdminLogin: React.FC = () => {
     setError(null);
   };
 
+  const glassInputSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: GLASS.radius.button,
+      backgroundColor: GLASS.surface.bg,
+      backdropFilter: `blur(${GLASS.surface.blur})`,
+      '& fieldset': {
+        borderColor: GLASS.border.outer,
+      },
+      '&:hover fieldset': {
+        borderColor: GLASS.accent.orange,
+      },
+      '&.Mui-focused fieldset': {
+        borderColor: GLASS.accent.orange,
+        borderWidth: 2,
+        boxShadow: `0 0 0 3px ${alpha(GLASS.accent.orange, 0.12)}`,
+      },
+    },
+    '& .MuiInputLabel-root': {
+      color: GLASS.text.muted,
+      '&.Mui-focused': {
+        color: GLASS.accent.orange,
+      },
+    },
+  };
+
   return (
     <Box
       sx={{
@@ -157,7 +183,7 @@ const SuperAdminLogin: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: `linear-gradient(135deg, ${GLASS.accent.orangeDark} 0%, ${GLASS.text.heading} 60%, ${GLASS.accent.orange} 100%)`,
         position: 'relative',
         overflow: 'hidden'
       }}
@@ -168,7 +194,7 @@ const SuperAdminLogin: React.FC = () => {
           position: 'absolute',
           width: '100%',
           height: '100%',
-          opacity: 0.1,
+          opacity: 0.07,
           backgroundImage: `radial-gradient(circle at 2px 2px, white 1px, transparent 0)`,
           backgroundSize: '40px 40px'
         }}
@@ -177,40 +203,65 @@ const SuperAdminLogin: React.FC = () => {
       <Container maxWidth="sm">
         <Fade in timeout={600}>
           <Paper
-            elevation={24}
+            elevation={0}
             sx={{
               p: 4,
-              borderRadius: 3,
-              background: 'rgba(255, 255, 255, 0.98)',
-              backdropFilter: 'blur(10px)',
+              borderRadius: GLASS.radius.card,
+              background: GLASS.surface.bgStrong,
+              backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+              WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+              border: `1px solid ${GLASS.border.outer}`,
+              boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
               position: 'relative',
-              zIndex: 1
+              zIndex: 1,
+              overflow: 'hidden',
             }}
           >
+            {/* Green accent bar */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 4,
+                background: `linear-gradient(90deg, ${GLASS.accent.orange}, ${GLASS.accent.orangeLight})`,
+              }}
+            />
+
             {/* Header */}
-            <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Box sx={{ textAlign: 'center', mb: 4, mt: 1 }}>
               <Box
                 sx={{
                   display: 'inline-flex',
                   p: 2,
-                  borderRadius: '50%',
-                  bgcolor: 'error.main',
-                  color: 'white',
+                  borderRadius: GLASS.radius.inner,
+                  background: alpha(GLASS.accent.orange, 0.1),
+                  border: `1px solid ${alpha(GLASS.accent.orange, 0.2)}`,
+                  color: GLASS.accent.orange,
                   mb: 2
                 }}
               >
                 <AdminIcon sx={{ fontSize: 40 }} />
               </Box>
-              <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
+              <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom sx={{ color: GLASS.text.heading }}>
                 Super Admin
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
                 Área restrita para administradores globais
               </Typography>
             </Box>
 
             {error && (
-              <Alert severity="error" sx={{ mb: 3 }}>
+              <Alert
+                severity="error"
+                sx={{
+                  mb: 3,
+                  borderRadius: GLASS.radius.button,
+                  backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                }}
+              >
                 {error}
               </Alert>
             )}
@@ -227,10 +278,11 @@ const SuperAdminLogin: React.FC = () => {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <EmailIcon color="action" />
+                      <EmailIcon sx={{ color: GLASS.accent.orange }} />
                     </InputAdornment>
                   ),
                 }}
+                sx={glassInputSx}
               />
 
               <TextField
@@ -244,7 +296,7 @@ const SuperAdminLogin: React.FC = () => {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <LockIcon color="action" />
+                      <LockIcon sx={{ color: GLASS.accent.orange }} />
                     </InputAdornment>
                   ),
                   endAdornment: (
@@ -258,6 +310,7 @@ const SuperAdminLogin: React.FC = () => {
                     </InputAdornment>
                   ),
                 }}
+                sx={glassInputSx}
               />
 
               <Button
@@ -270,10 +323,21 @@ const SuperAdminLogin: React.FC = () => {
                   mt: 3,
                   mb: 2,
                   py: 1.5,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: GLASS.radius.button,
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  background: `linear-gradient(45deg, ${GLASS.accent.orange}, ${GLASS.accent.orangeLight})`,
+                  boxShadow: `0 4px 14px ${alpha(GLASS.accent.orange, 0.3)}`,
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #5568d3 0%, #653a8f 100%)',
-                  }
+                    background: `linear-gradient(45deg, ${GLASS.accent.orangeDark}, ${GLASS.accent.orange})`,
+                    boxShadow: `0 6px 20px ${alpha(GLASS.accent.orange, 0.4)}`,
+                    transform: 'translateY(-1px)',
+                  },
+                  '&:disabled': {
+                    background: GLASS.border.outer,
+                    color: GLASS.text.muted,
+                  },
+                  transition: `all ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
                 }}
               >
                 {loading ? 'Entrando...' : 'Entrar'}
@@ -286,8 +350,9 @@ const SuperAdminLogin: React.FC = () => {
                 onClick={() => setResetDialogOpen(true)}
                 sx={{
                   textTransform: 'none',
-                  color: 'primary.main',
-                  fontSize: '0.875rem'
+                  color: GLASS.accent.orange,
+                  fontSize: '0.875rem',
+                  '&:hover': { background: alpha(GLASS.accent.orange, 0.08) },
                 }}
               >
                 Esqueceu sua senha?
@@ -295,7 +360,7 @@ const SuperAdminLogin: React.FC = () => {
             </Box>
 
             <Box sx={{ mt: 2, textAlign: 'center' }}>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" sx={{ color: GLASS.text.muted }}>
                 Apenas Super Administradores têm acesso a esta área
               </Typography>
             </Box>
@@ -309,16 +374,34 @@ const SuperAdminLogin: React.FC = () => {
         onClose={handleCloseResetDialog}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: GLASS.radius.card,
+            background: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          },
+        }}
       >
-        <DialogTitle>Redefinir Senha</DialogTitle>
+        <DialogTitle sx={{ color: GLASS.text.heading }}>Redefinir Senha</DialogTitle>
         <DialogContent>
           {resetSuccess ? (
-            <Alert severity="success" sx={{ mt: 2 }}>
+            <Alert
+              severity="success"
+              sx={{
+                mt: 2,
+                borderRadius: GLASS.radius.button,
+                backgroundColor: alpha(GLASS.accent.orange, 0.08),
+                border: `1px solid ${alpha(GLASS.accent.orange, 0.2)}`,
+              }}
+            >
               Email de redefinição enviado! Verifique sua caixa de entrada.
             </Alert>
           ) : (
             <>
-              <Typography variant="body2" sx={{ mb: 2 }}>
+              <Typography variant="body2" sx={{ mb: 2, color: GLASS.text.muted }}>
                 Digite seu email para receber o link de redefinição de senha.
               </Typography>
               <TextField
@@ -329,12 +412,20 @@ const SuperAdminLogin: React.FC = () => {
                 onChange={(e) => setResetEmail(e.target.value)}
                 margin="normal"
                 required
+                sx={glassInputSx}
               />
             </>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseResetDialog}>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={handleCloseResetDialog}
+            sx={{
+              borderRadius: GLASS.radius.button,
+              textTransform: 'none',
+              color: GLASS.text.muted,
+            }}
+          >
             {resetSuccess ? 'Fechar' : 'Cancelar'}
           </Button>
           {!resetSuccess && (
@@ -342,6 +433,14 @@ const SuperAdminLogin: React.FC = () => {
               onClick={handleResetPassword}
               variant="contained"
               disabled={resetLoading || !resetEmail}
+              sx={{
+                borderRadius: GLASS.radius.button,
+                textTransform: 'none',
+                background: `linear-gradient(45deg, ${GLASS.accent.orange}, ${GLASS.accent.orangeLight})`,
+                '&:hover': {
+                  background: `linear-gradient(45deg, ${GLASS.accent.orangeDark}, ${GLASS.accent.orange})`,
+                },
+              }}
             >
               {resetLoading ? 'Enviando...' : 'Enviar'}
             </Button>

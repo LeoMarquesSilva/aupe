@@ -202,7 +202,6 @@ class InstagramMetricsService {
       }
 
       let permissionError = false;
-      let lastError: any = null;
 
       // Tentar cada estratégia - OTIMIZADO
       for (let i = 0; i < metricsStrategies.length; i++) {
@@ -262,15 +261,11 @@ class InstagramMetricsService {
             // Detectar erro de permissão (#10)
             if (errorCode === 10 || errorMessage.includes('permission')) {
               permissionError = true;
-              lastError = errorData;
               // Se é erro de permissão, não adianta tentar outras estratégias
               break;
             }
-            
-            lastError = errorData;
           }
-        } catch (strategyError) {
-          lastError = strategyError;
+        } catch {
           continue;
         }
       }
@@ -307,8 +302,6 @@ class InstagramMetricsService {
       };
     }
 
-    const totalLikes = posts.reduce((sum, post) => sum + (post.like_count || 0), 0);
-    const totalComments = posts.reduce((sum, post) => sum + (post.comments_count || 0), 0);
     const totalReach = posts.reduce((sum, post) => sum + (post.insights?.reach || 0), 0);
     const totalImpressions = posts.reduce((sum, post) => sum + (post.insights?.impressions || 0), 0);
     const totalSaved = posts.reduce((sum, post) => sum + (post.insights?.saved || 0), 0);
@@ -441,6 +434,7 @@ class InstagramMetricsService {
         console.log(`📦 Lote ${Math.floor(i/batchSize) + 1}/${Math.ceil(posts.length/batchSize)} (${batch.length} posts)`);
         
         // Processar lote em paralelo
+        // eslint-disable-next-line no-loop-func
         const batchPromises = batch.map(async (post: any, batchIndex: number) => {
           const postIndex = i + batchIndex + 1;
           

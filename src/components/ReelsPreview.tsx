@@ -30,6 +30,7 @@ import {
 } from '@mui/icons-material';
 // ✅ CORRIGIDO: Usar o serviço correto
 import { VideoUploadResult } from '../services/supabaseVideoStorageService';
+import { GLASS } from '../theme/glassTokens';
 
 interface ReelsPreviewProps {
   video: {
@@ -118,9 +119,11 @@ const ReelsPreview: React.FC<ReelsPreviewProps> = ({
           maxWidth: 350,
           mx: 'auto',
           backgroundColor: 'black',
-          borderRadius: 3,
+          borderRadius: GLASS.radius.card,
           overflow: 'hidden',
-          position: 'relative'
+          position: 'relative',
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
         }}
       >
         {/* Vídeo */}
@@ -297,7 +300,18 @@ const ReelsPreview: React.FC<ReelsPreviewProps> = ({
       </Menu>
 
       {/* Dialog de detalhes */}
-      <Dialog open={showDialog} onClose={() => setShowDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog open={showDialog} onClose={() => setShowDialog(false)} maxWidth="sm" fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: GLASS.radius.card,
+            bgcolor: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }
+        }}
+      >
         <DialogTitle>Detalhes do Reel</DialogTitle>
         <DialogContent>
           <Stack spacing={2}>

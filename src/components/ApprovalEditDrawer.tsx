@@ -32,6 +32,7 @@ import { uploadImagesToSupabaseStorage } from '../services/postService';
 import { postService } from '../services/supabaseClient';
 import { imageUrlService } from '../services/imageUrlService';
 import type { ApprovalKanbanPostInput } from './ApprovalKanban';
+import { GLASS } from '../theme/glassTokens';
 
 export type EditablePostType = 'post' | 'carousel' | 'stories' | 'reels' | 'roteiro';
 
@@ -119,7 +120,7 @@ const ApprovalEditDrawer: React.FC<ApprovalEditDrawerProps> = ({
       }
       setError(null);
     }
-  }, [open, post?.id]);
+  }, [open, post]);
 
   const handleClose = () => {
     setError(null);
@@ -190,13 +191,23 @@ const ApprovalEditDrawer: React.FC<ApprovalEditDrawerProps> = ({
       onClose={handleClose}
       maxWidth="sm"
       fullWidth
-      PaperProps={{ sx: { borderRadius: 3, maxHeight: '90vh' } }}
+      PaperProps={{
+        sx: {
+          borderRadius: GLASS.radius.card,
+          maxHeight: '90vh',
+          bgcolor: GLASS.surface.bgStrong,
+          backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        },
+      }}
     >
       <DialogTitle sx={{ p: 2.5, pb: 1.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <EditIcon sx={{ color: 'warning.main', fontSize: 22 }} />
-            <Typography variant="h6" fontWeight={700} sx={{ fontFamily: '"Poppins", sans-serif' }}>
+            <Typography variant="h6" fontWeight={700}>
               Editar e reenviar
             </Typography>
           </Box>
@@ -204,14 +215,14 @@ const ApprovalEditDrawer: React.FC<ApprovalEditDrawerProps> = ({
             <CloseIcon />
           </IconButton>
         </Box>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontFamily: '"Poppins", sans-serif' }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           Faça os ajustes solicitados e clique em "Reenviar para aprovação". O post voltará para "Aguardando aprovação".
         </Typography>
       </DialogTitle>
 
       <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
         <Box>
-          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif', mb: 1, display: 'block' }}>
+          <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ mb: 1, display: 'block' }}>
             Tipo de conteúdo
           </Typography>
           <Stack direction="row" flexWrap="wrap" gap={1}>
@@ -228,7 +239,7 @@ const ApprovalEditDrawer: React.FC<ApprovalEditDrawerProps> = ({
                   setVideo(null);
                   setCoverImage([]);
                 }}
-                sx={{ fontSize: '0.8rem', fontFamily: '"Poppins", sans-serif' }}
+                sx={{ fontSize: '0.8rem' }}
               />
             ))}
           </Stack>
@@ -253,7 +264,7 @@ const ApprovalEditDrawer: React.FC<ApprovalEditDrawerProps> = ({
         {contentType === 'reels' && (
           <>
             <VideoUploader video={video} onChange={setVideo} />
-            <Typography variant="subtitle2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+            <Typography variant="subtitle2">
               Capa (opcional)
             </Typography>
             <ImageUploader images={coverImage} onChange={setCoverImage} maxImages={1} aspectRatio="1:1" />
@@ -261,7 +272,7 @@ const ApprovalEditDrawer: React.FC<ApprovalEditDrawerProps> = ({
         )}
 
         <Box>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontFamily: '"Poppins", sans-serif' }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
             Data e horário de agendamento
           </Typography>
           <DateTimePicker
@@ -286,7 +297,7 @@ const ApprovalEditDrawer: React.FC<ApprovalEditDrawerProps> = ({
       <DialogActions sx={{ p: 2.5, pt: 2 }}>
         <Button
           onClick={handleClose}
-          sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+          sx={{ textTransform: 'none' }}
         >
           Cancelar
         </Button>
@@ -296,7 +307,7 @@ const ApprovalEditDrawer: React.FC<ApprovalEditDrawerProps> = ({
           startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SendIcon />}
           onClick={handleSave}
           disabled={saving || !canSave()}
-          sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none', fontWeight: 600 }}
+          sx={{ textTransform: 'none', fontWeight: 600 }}
         >
           {saving ? 'Salvando…' : `Reenviar ${typeLabel} para aprovação`}
         </Button>

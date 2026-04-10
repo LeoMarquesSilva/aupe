@@ -13,10 +13,7 @@ import {
   useTheme,
   useMediaQuery,
   Chip,
-  Card,
-  CardContent,
   Badge,
-  Tooltip,
   Stack,
   CircularProgress,
   Switch,
@@ -24,12 +21,10 @@ import {
 } from '@mui/material';
 import { 
   Instagram as InstagramIcon, 
-  Schedule as ScheduleIcon, 
   Save as SaveIcon,
   ArrowBack as ArrowBackIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
-  Info as InfoIcon,
   VideoLibrary as VideoIcon,
   Image as ImageIcon,
   ViewCarousel as CarouselIcon
@@ -40,14 +35,16 @@ import VideoUploader from '../components/VideoUploader';
 import CaptionEditor from '../components/CaptionEditor';
 import DateTimePicker from '../components/DateTimePicker';
 import AppSnackbar from '../components/AppSnackbar';
-import { getUserFriendlyMessage } from '../utils/errorMessages';
 import { uploadImagesToSupabaseStorage } from '../services/postService';
 import { supabaseVideoStorageService } from '../services/supabaseVideoStorageService';
+import { GLASS } from '../theme/glassTokens';
+import { appShellContainerSx } from '../theme/appShellLayout';
 
 const EditPost: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
   const theme = useTheme();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const [post, setPost] = useState<ScheduledPost | null>(null);
@@ -412,7 +409,7 @@ const EditPost: React.FC = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+      <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
         <CircularProgress />
       </Container>
     );
@@ -420,7 +417,7 @@ const EditPost: React.FC = () => {
 
   if (!post) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 4 }}>
         <Alert severity="error">Post não encontrado</Alert>
       </Container>
     );
@@ -429,7 +426,7 @@ const EditPost: React.FC = () => {
   const editable = canEdit();
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 4 }}>
       {/* Header */}
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -444,7 +441,7 @@ const EditPost: React.FC = () => {
             <Typography variant="h4" component="h1" sx={{ 
               fontWeight: 'bold',
               fontFamily: '"Montserrat", sans-serif',
-              color: '#121212',
+              color: GLASS.text.heading,
               display: 'flex',
               alignItems: 'center',
               gap: 1
@@ -489,9 +486,12 @@ const EditPost: React.FC = () => {
           sx={{ 
             p: 3, 
             mb: 4, 
-            border: '1px solid rgba(0,0,0,0.08)',
-            borderRadius: 2,
-            backgroundColor: '#fff'
+            background: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            borderRadius: GLASS.radius.card,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -514,11 +514,11 @@ const EditPost: React.FC = () => {
             </Badge>
             
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 'medium' }}>
+              <Typography variant="h6" sx={{ fontWeight: 'medium', color: GLASS.text.heading }}>
                 {client.name}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <InstagramIcon sx={{ fontSize: 16, color: theme.palette.primary.main }} />
+                <InstagramIcon sx={{ fontSize: 16, color: GLASS.accent.orange }} />
                 <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                   @{client.instagram}
                 </Typography>
@@ -534,9 +534,12 @@ const EditPost: React.FC = () => {
         sx={{ 
           p: 3, 
           mb: 4, 
-          border: '1px solid rgba(0,0,0,0.08)',
-          borderRadius: 2,
-          backgroundColor: '#fff'
+          background: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          borderRadius: GLASS.radius.card,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
         }}
       >
         <Box sx={{ 
@@ -544,9 +547,9 @@ const EditPost: React.FC = () => {
           alignItems: 'center', 
           mb: 3, 
           pb: 2, 
-          borderBottom: '1px solid rgba(0,0,0,0.08)' 
+          borderBottom: `1px solid ${GLASS.border.subtle}`,
         }}>
-          <InstagramIcon sx={{ mr: 1.5, color: theme.palette.primary.main }} />
+          <InstagramIcon sx={{ mr: 1.5, color: GLASS.accent.orange }} />
           <Typography variant="h5" sx={{ fontWeight: 'medium' }}>
             Editar Conteúdo
           </Typography>
@@ -624,15 +627,17 @@ const EditPost: React.FC = () => {
           </Button>
           <Button
             variant="contained"
-            color="primary"
             startIcon={<SaveIcon />}
             onClick={handleSave}
             disabled={saving || !editable}
             sx={{ 
               textTransform: 'none',
-              backgroundColor: '#121212',
+              borderRadius: GLASS.radius.button,
+              backgroundColor: GLASS.accent.orange,
+              boxShadow: GLASS.shadow.button,
               '&:hover': {
-                backgroundColor: '#333'
+                backgroundColor: GLASS.accent.orangeDark,
+                boxShadow: GLASS.shadow.buttonHover,
               }
             }}
           >

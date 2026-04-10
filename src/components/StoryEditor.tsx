@@ -9,11 +9,6 @@ import {
   Slider, 
   Tooltip, 
   Divider, 
-  Stack,
-  Menu,
-  MenuItem,
-  Tabs,
-  Tab,
   CircularProgress,
   Popover
 } from '@mui/material';
@@ -34,20 +29,17 @@ import {
   Redo as RedoIcon,
   Delete as DeleteIcon,
   AddPhotoAlternate as AddPhotoIcon,
-  Save as SaveIcon,
-  Close as CloseIcon,
-  Edit as EditIcon
+  Save as SaveIcon
 } from '@mui/icons-material';
 import { SketchPicker } from 'react-color';
 import EmojiPicker from 'emoji-picker-react';
 import StoryPreview from './StoryPreview';
+import { GLASS } from '../theme/glassTokens';
 import { 
   Story, 
   StoryElement, 
   StoryElementType, 
   StoryImage, 
-  Position, 
-  Size, 
   StoryEditHistory 
 } from '../types';
 
@@ -98,6 +90,7 @@ const StoryEditor: React.FC<StoryEditorProps> = ({ clientId, onSave, initialStor
       };
       setHistory(newHistory);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elements]);
   
   // Função para carregar uma imagem
@@ -247,18 +240,29 @@ const StoryEditor: React.FC<StoryEditorProps> = ({ clientId, onSave, initialStor
           alignItems: 'center', 
           justifyContent: 'center',
           height: 400,
-          border: '2px dashed #ccc',
-          borderRadius: 2,
-          p: 3
+          border: `2px dashed ${GLASS.border.outer}`,
+          borderRadius: GLASS.radius.inner,
+          p: 3,
+          background: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+          boxShadow: GLASS.shadow.cardInset,
+          transition: `border-color ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
+          '&:hover': { borderColor: GLASS.accent.orange },
         }}
       >
-        <Typography variant="h6" sx={{ mb: 2 }}>
+        <Typography variant="h6" sx={{ mb: 2, color: GLASS.text.heading }}>
           Selecione uma imagem para o Story
         </Typography>
         <Button
           variant="contained"
           startIcon={<AddPhotoIcon />}
           onClick={() => fileInputRef.current?.click()}
+          sx={{
+            backgroundColor: GLASS.accent.orange,
+            borderRadius: GLASS.radius.button,
+            '&:hover': { backgroundColor: GLASS.accent.orangeDark },
+          }}
         >
           Carregar Imagem
         </Button>
@@ -280,8 +284,17 @@ const StoryEditor: React.FC<StoryEditorProps> = ({ clientId, onSave, initialStor
     <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2 }}>
       {/* Painel de ferramentas à esquerda */}
       <Box sx={{ width: { xs: '100%', md: '25%' }, minWidth: { md: '300px' } }}>
-        <Paper sx={{ p: 2, height: '100%' }}>
-          <Typography variant="h6" sx={{ mb: 2 }}>
+        <Paper sx={{
+          p: 2,
+          height: '100%',
+          background: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          borderRadius: GLASS.radius.card,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }}>
+          <Typography variant="h6" sx={{ mb: 2, color: GLASS.text.heading }}>
             Ferramentas
           </Typography>
           
@@ -644,7 +657,12 @@ const StoryEditor: React.FC<StoryEditorProps> = ({ clientId, onSave, initialStor
             display: 'flex', 
             justifyContent: 'center', 
             alignItems: 'center',
-            bgcolor: '#f5f5f5',
+            background: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            borderRadius: GLASS.radius.card,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
             p: 2,
             position: 'relative',
             overflow: 'hidden'

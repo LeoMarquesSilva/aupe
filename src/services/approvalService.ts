@@ -320,7 +320,7 @@ export async function getPostIdsInActiveInternalLinks(): Promise<Set<string>> {
 
 /** Response from get-internal-approval-by-token Edge Function */
 export interface InternalApprovalPublicData {
-  organization: { id: string; name: string };
+  organization: { id: string; name: string; agencyLogoUrl?: string };
   label?: string;
   posts: {
     id: string;
@@ -770,6 +770,8 @@ export async function deleteInternalApprovalLink(linkId: string): Promise<void> 
 /** Response shape from get-approval-request-by-token (public approval page) */
 export interface ApprovalRequestPublicData {
   client: { id: string; name: string; instagram: string; logoUrl?: string; profilePicture?: string };
+  /** Agency / workspace logo (organizations.agency_logo_url) */
+  agencyLogoUrl?: string;
   posts: {
     id: string;
     caption: string;

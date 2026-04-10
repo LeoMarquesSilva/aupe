@@ -24,6 +24,7 @@ import {
   Grid,
   ButtonGroup
 } from '@mui/material';
+import { GLASS } from '../../theme/glassTokens';
 import {
   PictureAsPdf as PdfIcon,
   CheckCircle as CheckCircleIcon,
@@ -188,8 +189,12 @@ const PDFExportDialog: React.FC<PDFExportDialogProps> = ({
       fullWidth
       PaperProps={{
         sx: {
-          borderRadius: 3,
-          boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.2)}`
+          borderRadius: GLASS.radius.card,
+          bgcolor: GLASS.surface.bgStrong,
+          backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
         }
       }}
     >
@@ -247,19 +252,22 @@ const PDFExportDialog: React.FC<PDFExportDialogProps> = ({
                     sx={{
                       p: 2,
                       mb: 1.5,
-                      borderRadius: 2,
-                      border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+                      borderRadius: GLASS.radius.inner,
+                      border: `1px solid ${options[section.key] ? GLASS.accent.orange : GLASS.border.outer}`,
                       bgcolor: options[section.key]
-                        ? alpha(theme.palette.primary.main, 0.05)
-                        : 'transparent',
+                        ? 'rgba(247,66,17,0.05)'
+                        : GLASS.surface.bg,
+                      backdropFilter: `blur(${GLASS.surface.blur})`,
+                      WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+                      boxShadow: GLASS.shadow.cardInset,
                       transition: 'all 0.2s ease',
                       '&:hover': {
                         borderColor: options[section.key]
-                          ? theme.palette.primary.main
-                          : alpha(theme.palette.divider, 0.8),
+                          ? GLASS.accent.orange
+                          : GLASS.border.outer,
                         bgcolor: options[section.key]
-                          ? alpha(theme.palette.primary.main, 0.08)
-                          : alpha(theme.palette.action.hover, 0.5)
+                          ? 'rgba(247,66,17,0.08)'
+                          : GLASS.surface.bgHover,
                       }
                     }}
                   >

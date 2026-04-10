@@ -30,6 +30,7 @@ import { Client } from '../types';
 import { supabase } from '../services/supabaseClient';
 import InstagramConnectionFix from './InstagramConnectionFix';
 import { logClientError } from '../utils/clientLogger';
+import { GLASS } from '../theme/glassTokens';
 
 interface ConnectInstagramProps {
   client: Client;
@@ -37,7 +38,7 @@ interface ConnectInstagramProps {
 }
 
 const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectionUpdate }) => {
-  const theme = useTheme();
+  const _theme = useTheme();
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState<boolean>(false);
@@ -170,6 +171,7 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
     };
     
     checkInstagramAuth();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client.id, client.instagramAccountId, client.accessToken, client.username, initialCheckDone]);
 
   // Função para lidar com a correção da conexão
@@ -497,13 +499,13 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
             onClick={handleConnect}
             disabled={loading}
             sx={{ 
-              bgcolor: theme.palette.primary.main,
+              bgcolor: GLASS.accent.orange,
               '&:hover': {
-                bgcolor: theme.palette.primary.dark
+                bgcolor: GLASS.accent.orangeDark,
               },
-              borderRadius: 2,
+              borderRadius: GLASS.radius.button,
               px: 3,
-              py: 1.2
+              py: 1.2,
             }}
           >
             {loading ? (
@@ -533,13 +535,15 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
           elevation={0}
           sx={{
             p: 2,
-            border: '1px solid rgba(0,0,0,0.08)',
-            borderRadius: 2,
+            borderRadius: GLASS.radius.inner,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            bgcolor: 'rgba(76, 175, 80, 0.05)',
-            borderColor: 'rgba(76, 175, 80, 0.2)'
+            bgcolor: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -650,7 +654,18 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       )}
       
       {/* Dialog para mostrar informações do token */}
-      <Dialog open={showTokenInfo} onClose={() => setShowTokenInfo(false)} maxWidth="sm" fullWidth>
+      <Dialog open={showTokenInfo} onClose={() => setShowTokenInfo(false)} maxWidth="sm" fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: GLASS.radius.card,
+            bgcolor: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }
+        }}
+      >
         <DialogTitle>Informações do Token</DialogTitle>
         <DialogContent>
           {tokenInfo ? (
@@ -695,10 +710,14 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
           <Button onClick={() => setShowTokenInfo(false)}>Fechar</Button>
           <Button 
             variant="contained" 
-            color="primary" 
             onClick={() => {
               setShowTokenInfo(false);
               handleConnect();
+            }}
+            sx={{
+              bgcolor: GLASS.accent.orange,
+              borderRadius: GLASS.radius.button,
+              '&:hover': { bgcolor: GLASS.accent.orangeDark },
             }}
           >
             Reconectar
@@ -707,7 +726,18 @@ const ConnectInstagram: React.FC<ConnectInstagramProps> = ({ client, onConnectio
       </Dialog>
       
       {/* Dialog para mostrar informações de debug */}
-      <Dialog open={showDebugInfo} onClose={() => setShowDebugInfo(false)} maxWidth="md" fullWidth>
+      <Dialog open={showDebugInfo} onClose={() => setShowDebugInfo(false)} maxWidth="md" fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: GLASS.radius.card,
+            bgcolor: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }
+        }}
+      >
         <DialogTitle>Informações de Debug</DialogTitle>
         <DialogContent>
           {debugData ? (

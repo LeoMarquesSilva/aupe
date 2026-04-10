@@ -7,6 +7,8 @@ import {
   Chip,
   Typography,
   Avatar,
+  alpha,
+  useTheme,
 } from '@mui/material';
 import {
   Image as ImageIcon,
@@ -24,6 +26,7 @@ import { format, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { Client } from '../types';
 import { imageUrlService } from '../services/imageUrlService';
+import { GLASS } from '../theme/glassTokens';
 
 export type ApprovalKanbanColumn = 'internal' | 'awaiting' | 'approved' | 'scheduled' | 'adjustments';
 
@@ -53,14 +56,6 @@ interface ApprovalKanbanCardProps {
   column: ApprovalKanbanColumn;
   onClick?: () => void;
 }
-
-const BORDER = '#e2e8f0';
-const TEXT_PRIMARY = '#1e293b';
-const TEXT_SECONDARY = '#64748b';
-const ACCENT = '#10b981';
-const ACCENT_HOVER = '#059669';
-const BG_SLATE_100 = '#f1f5f9';
-const BORDER_SLATE_100 = '#f1f5f9';
 
 const getThumbnailUrl = (post: ApprovalKanbanPost): string | null => {
   const cover = post.coverImage ?? (post as { cover_image?: string }).cover_image;
@@ -116,6 +111,7 @@ const getCardTitle = (post: ApprovalKanbanPost, typeLabel: string): string => {
 };
 
 const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, onClick }) => {
+  const theme = useTheme();
   const isRoteiro = (post.postType ?? post.post_type) === 'roteiro';
   const thumbnailUrl = isRoteiro ? null : getThumbnailUrl(post);
   const typeLabel = getTypeLabel(post);
@@ -134,18 +130,20 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
       elevation={0}
       onClick={onClick}
       sx={{
-        borderRadius: '16px',
-        border: `1px solid ${BORDER}`,
-        bgcolor: '#ffffff',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+        borderRadius: GLASS.radius.inner,
+        border: `1px solid ${GLASS.border.outer}`,
+        bgcolor: GLASS.surface.bgStrong,
+        backdropFilter: `blur(${GLASS.surface.blur})`,
+        WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+        boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
         overflow: 'hidden',
-        transition: 'box-shadow 0.2s ease, transform 0.15s ease',
+        transition: `box-shadow ${GLASS.motion.duration.normal} ${GLASS.motion.easing}, transform ${GLASS.motion.duration.fast} ${GLASS.motion.easing}`,
         cursor: onClick ? 'pointer' : undefined,
         '&:hover': {
-          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          boxShadow: GLASS.shadow.cardHover,
         },
         '&:focus-visible': {
-          outline: `2px solid ${ACCENT}`,
+          outline: `2px solid ${GLASS.accent.orange}`,
           outlineOffset: 2,
         },
       }}
@@ -168,8 +166,8 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: BG_SLATE_100,
-            color: TEXT_SECONDARY,
+            bgcolor: alpha(theme.palette.text.secondary, 0.08),
+            color: 'text.secondary',
             borderRadius: 0,
           }}
         >
@@ -183,9 +181,8 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
             variant="subtitle2"
             fontWeight={600}
             sx={{
-              fontFamily: '"Poppins", sans-serif',
               fontSize: '0.875rem',
-              color: TEXT_PRIMARY,
+              color: 'text.primary',
               display: '-webkit-box',
               WebkitLineClamp: 1,
               WebkitBoxOrient: 'vertical',
@@ -201,11 +198,10 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
             label={typeLabel}
             sx={{
               height: 20,
-              fontFamily: '"Poppins", sans-serif',
               fontSize: '0.6875rem',
               fontWeight: 500,
-              bgcolor: BG_SLATE_100,
-              color: '#475569',
+              bgcolor: alpha(theme.palette.text.secondary, 0.08),
+              color: 'text.secondary',
               border: 'none',
               borderRadius: '9999px',
               flexShrink: 0,
@@ -213,7 +209,7 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
           />
         </Box>
 
-        <Typography variant="caption" sx={{ color: TEXT_SECONDARY, fontSize: '0.75rem', display: 'block', mb: 1, fontFamily: '"Poppins", sans-serif' }}>
+        <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem', display: 'block', mb: 1 }}>
           Tipo: {typeLabel}
         </Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
@@ -223,11 +219,10 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
               label="Revisão do gestor"
               sx={{
                 height: 20,
-                fontFamily: '"Poppins", sans-serif',
                 fontSize: '0.6875rem',
                 fontWeight: 600,
-                bgcolor: 'rgba(139, 92, 246, 0.12)',
-                color: '#6d28d9',
+                bgcolor: alpha(theme.palette.secondary.main, 0.18),
+                color: theme.palette.secondary.dark,
                 border: 'none',
                 borderRadius: '9999px',
               }}
@@ -237,7 +232,7 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
             size="small"
             icon={
               isLinkedInPlatform ? (
-                <SocialPlatformIcons.LinkedInBrandIcon sx={{ fontSize: '16px !important', color: '#0A66C2 !important' }} />
+                <SocialPlatformIcons.LinkedInBrandIcon sx={{ fontSize: '16px !important', color: `${theme.palette.primary.main} !important` }} />
               ) : (
                 <SocialPlatformIcons.InstagramBrandIcon sx={{ fontSize: '16px !important' }} />
               )
@@ -245,11 +240,10 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
             label={isLinkedInPlatform ? 'LinkedIn' : 'Instagram'}
             sx={{
               height: 20,
-              fontFamily: '"Poppins", sans-serif',
               fontSize: '0.6875rem',
               fontWeight: 600,
-              bgcolor: isLinkedInPlatform ? 'rgba(10, 102, 194, 0.12)' : 'rgba(225, 48, 108, 0.1)',
-              color: isLinkedInPlatform ? '#0A66C2' : '#C13584',
+              bgcolor: isLinkedInPlatform ? 'rgba(247,66,17,0.12)' : alpha(theme.palette.secondary.main, 0.16),
+              color: isLinkedInPlatform ? GLASS.accent.orange : theme.palette.secondary.dark,
               border: 'none',
               borderRadius: '9999px',
               '& .MuiChip-icon': { ml: '6px' },
@@ -263,11 +257,10 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
             sx={{
               mb: 1,
               height: 20,
-              fontFamily: '"Poppins", sans-serif',
               fontSize: '0.6875rem',
               fontWeight: 600,
-              bgcolor: 'rgba(37, 99, 235, 0.12)',
-              color: '#1d4ed8',
+              bgcolor: 'rgba(247,66,17,0.12)',
+              color: GLASS.accent.orangeDark,
               border: 'none',
               borderRadius: '9999px',
             }}
@@ -275,18 +268,18 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
         )}
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1.5 }}>
-          <CalendarIcon sx={{ fontSize: 14, color: TEXT_SECONDARY }} />
+          <CalendarIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
           {isOverdue ? (
-            <Typography variant="caption" sx={{ fontFamily: '"Poppins", sans-serif', fontSize: '0.75rem', color: '#ef4444', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'error.main', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <WarningIcon sx={{ fontSize: 14 }} />
               Vencido
             </Typography>
           ) : scheduledStr ? (
-            <Typography variant="caption" sx={{ fontFamily: '"Poppins", sans-serif', fontSize: '0.75rem', color: TEXT_SECONDARY }}>
+            <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
               Agendado: {scheduledStr}
             </Typography>
           ) : (
-            <Typography variant="caption" sx={{ fontFamily: '"Poppins", sans-serif', fontSize: '0.75rem', color: TEXT_SECONDARY }}>
+            <Typography variant="caption" sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
               Sem data
             </Typography>
           )}
@@ -296,7 +289,7 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
           sx={{
             pt: 1.5,
             mt: 1.5,
-            borderTop: `1px solid ${BORDER_SLATE_100}`,
+            borderTop: `1px solid ${GLASS.border.subtle}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -310,19 +303,18 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
                 display: 'flex',
                 alignItems: 'center',
                 gap: 0.5,
-                color: ACCENT,
-                fontFamily: '"Poppins", sans-serif',
+                color: GLASS.accent.orange,
                 fontSize: '0.75rem',
                 fontWeight: 600,
-                '&:hover': { color: ACCENT_HOVER },
+                '&:hover': { color: GLASS.accent.orangeDark },
               }}
             >
               <VisibilityIcon sx={{ fontSize: 16 }} />
               Ver detalhes
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: TEXT_SECONDARY }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}>
               <CommentIcon sx={{ fontSize: 14 }} />
-              <Typography variant="caption" sx={{ fontFamily: '"Poppins", sans-serif', fontSize: '0.75rem' }}>
+              <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
                 {commentCount}
               </Typography>
             </Box>
@@ -334,9 +326,8 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
                 width: 28,
                 height: 28,
                 fontSize: '0.75rem',
-                bgcolor: '#e2e8f0',
-                color: TEXT_PRIMARY,
-                fontFamily: '"Poppins", sans-serif',
+                bgcolor: theme.palette.divider,
+                color: 'text.primary',
                 border: '2px solid white',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
               }}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography, TextField } from '@mui/material';
+import { GLASS } from '../theme/glassTokens';
 
 interface CaptionEditorProps {
   caption: string;
@@ -10,8 +11,17 @@ interface CaptionEditorProps {
 
 const CaptionEditor: React.FC<CaptionEditorProps> = ({ caption, onChange, disabled = false, label }) => {
   return (
-    <Box sx={{ mb: 4 }}>
-      <Typography variant="h6" sx={{ mb: 2 }}>
+    <Box sx={{
+      mb: 4,
+      p: 3,
+      background: GLASS.surface.bg,
+      backdropFilter: `blur(${GLASS.surface.blur})`,
+      WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+      border: `1px solid ${GLASS.border.outer}`,
+      borderRadius: GLASS.radius.inner,
+      boxShadow: GLASS.shadow.cardInset,
+    }}>
+      <Typography variant="h6" sx={{ mb: 2, color: GLASS.text.heading }}>
         {label || 'Legenda da Postagem'}
       </Typography>
       <TextField
@@ -23,8 +33,20 @@ const CaptionEditor: React.FC<CaptionEditorProps> = ({ caption, onChange, disabl
         value={caption}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
+        sx={{
+          '& .MuiOutlinedInput-root': {
+            borderRadius: GLASS.radius.button,
+            background: GLASS.surface.bgStrong,
+            '&:hover .MuiOutlinedInput-notchedOutline': {
+              borderColor: GLASS.accent.orange,
+            },
+            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+              borderColor: GLASS.accent.orange,
+            },
+          },
+        }}
       />
-      <Typography variant="body2" color="textSecondary" sx={{ mt: 1, textAlign: 'right' }}>
+      <Typography variant="body2" sx={{ mt: 1, textAlign: 'right', color: GLASS.text.muted }}>
         {caption.length} caracteres
       </Typography>
     </Box>

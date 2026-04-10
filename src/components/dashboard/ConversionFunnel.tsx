@@ -1,12 +1,11 @@
 import React from 'react';
-import { Paper, Typography, Box, Chip, alpha, useTheme } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import {
   RemoveRedEye as ImpressionsIcon,
   People as ReachIcon,
   TouchApp as EngagementIcon,
   BookmarkBorder as SaveIcon,
-  Share as ShareIcon,
-  ArrowDownward as ArrowDownIcon
+  IosShare as ShareIcon,
 } from '@mui/icons-material';
 
 interface ConversionFunnelProps {
@@ -19,129 +18,174 @@ interface ConversionFunnelProps {
   };
 }
 
-const STEPS_CONFIG = [
-  { key: 'impressions', name: 'Impressões', icon: <ImpressionsIcon />, color: '#2563eb', desc: 'Total de visualizações' },
-  { key: 'reach', name: 'Alcance', icon: <ReachIcon />, color: '#7c3aed', desc: 'Pessoas únicas alcançadas' },
-  { key: 'engagement', name: 'Engajamento', icon: <EngagementIcon />, color: '#d97706', desc: 'Curtidas + Comentários + Salvamentos + Compartilhamentos' },
-  { key: 'saves', name: 'Salvamentos', icon: <SaveIcon />, color: '#059669', desc: 'Conteúdo salvo' },
-  { key: 'shares', name: 'Compartilhamentos', icon: <ShareIcon />, color: '#0891b2', desc: 'Conteúdo compartilhado' },
-] as const;
+const STEPS = [
+  { key: 'impressions' as const, label: 'Impressões', icon: ImpressionsIcon, color: '#3b82f6' },
+  { key: 'reach' as const, label: 'Alcance', icon: ReachIcon, color: '#8b5cf6' },
+  { key: 'engagement' as const, label: 'Engajamento', icon: EngagementIcon, color: '#f59e0b' },
+  { key: 'saves' as const, label: 'Salvamentos', icon: SaveIcon, color: '#10b981' },
+  { key: 'shares' as const, label: 'Compartilhamentos', icon: ShareIcon, color: '#06b6d4' },
+];
+
+const formatNumber = (n: number) => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString('pt-BR');
+};
 
 const ConversionFunnel: React.FC<ConversionFunnelProps> = ({ data }) => {
-  const theme = useTheme();
-
-  const steps = STEPS_CONFIG
-    .map(cfg => ({ ...cfg, value: data[cfg.key] }))
-    .filter(step => step.value > 0);
+  const steps = STEPS
+    .map(s => ({ ...s, value: data[s.key] }))
+    .filter(s => s.value > 0);
 
   if (steps.length === 0) return null;
 
   const maxValue = steps[0].value;
 
-  const rates = {
-    reach: data.impressions > 0 ? (data.reach / data.impressions) * 100 : 0,
-    engagement: data.reach > 0 ? (data.engagement / data.reach) * 100 : 0,
-    saves: data.reach > 0 ? (data.saves / data.reach) * 100 : 0,
-    shares: data.reach > 0 ? (data.shares / data.reach) * 100 : 0,
-  };
-
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        borderRadius: 3,
-        border: '1px solid',
-        borderColor: 'divider',
-        overflow: 'hidden',
-      }}
-    >
-      <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2.5, pb: 1.5 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.25 }}>
-          Funil de Conversão
-        </Typography>
-        <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.72rem' }}>
-          Da impressão ao engajamento - taxa de conversão do conteúdo
+    <Box sx={{
+      bgcolor: '#fff',
+      border: '1px solid #e5e7eb',
+      borderRadius: '16px',
+      overflow: 'hidden',
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
+      {/* Header */}
+      <Box sx={{
+        px: 2.5,
+        py: 1.75,
+        borderBottom: '1px solid #f3f4f6',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            bgcolor: '#3b82f6',
+            flexShrink: 0,
+          }} />
+          <Typography sx={{
+            fontWeight: 600,
+            fontSize: '0.82rem',
+            color: '#111827',
+            letterSpacing: '-0.01em',
+          }}>
+            Funil de conversão
+          </Typography>
+        </Box>
+        <Typography sx={{ fontSize: '0.65rem', color: '#d1d5db', fontWeight: 500 }}>
+          Impressão → Ação
         </Typography>
       </Box>
 
-      <Box sx={{ px: { xs: 2, md: 2.5 }, pb: 2.5 }}>
-        {steps.map((step, index) => {
-          const barWidth = maxValue > 0 ? (step.value / maxValue) * 100 : 0;
-          const conversionFromTop = index > 0 ? (step.value / steps[0].value) * 100 : 100;
-          const dropFromPrev = index > 0 ? ((1 - step.value / steps[index - 1].value) * 100) : 0;
+      {/* Funnel Steps */}
+      <Box sx={{ flex: 1, px: 2.5, py: 2, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+        {steps.map((step, idx) => {
+          const barWidth = maxValue > 0 ? Math.max((step.value / maxValue) * 100, 4) : 0;
+          const convRate = idx > 0 ? (step.value / steps[0].value) * 100 : 100;
+          const dropRate = idx > 0 ? (1 - step.value / steps[idx - 1].value) * 100 : 0;
+          const Icon = step.icon;
 
           return (
             <React.Fragment key={step.key}>
-              {index > 0 && (
+              {/* Drop indicator */}
+              {idx > 0 && (
                 <Box sx={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  py: 0.5,
-                  gap: 0.75,
+                  py: 0.15,
                 }}>
-                  <ArrowDownIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                  <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.62rem', fontWeight: 600 }}>
-                    -{dropFromPrev.toFixed(1)}%
-                  </Typography>
+                  <Box sx={{
+                    width: 1,
+                    height: 8,
+                    bgcolor: '#e5e7eb',
+                  }} />
+                  {dropRate > 0 && (
+                    <Typography sx={{
+                      fontSize: '0.58rem',
+                      fontWeight: 600,
+                      color: '#d1d5db',
+                      ml: 0.75,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}>
+                      -{dropRate.toFixed(0)}%
+                    </Typography>
+                  )}
                 </Box>
               )}
 
-              <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                py: 1,
-              }}>
+              {/* Step Row */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                {/* Icon */}
                 <Box sx={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 2,
-                  bgcolor: alpha(step.color, 0.08),
+                  width: 30,
+                  height: 30,
+                  borderRadius: '8px',
+                  bgcolor: `${step.color}0A`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: step.color,
                   flexShrink: 0,
-                  '& .MuiSvgIcon-root': { fontSize: 18 }
                 }}>
-                  {step.icon}
+                  <Icon sx={{ fontSize: 15, color: step.color }} />
                 </Box>
 
+                {/* Bar + Label */}
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 0.5 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.82rem' }}>
-                      {step.name}
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    justifyContent: 'space-between',
+                    mb: 0.4,
+                  }}>
+                    <Typography sx={{
+                      fontSize: '0.7rem',
+                      fontWeight: 500,
+                      color: '#6b7280',
+                    }}>
+                      {step.label}
                     </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: step.color, fontSize: '0.9rem' }}>
-                        {step.value.toLocaleString('pt-BR')}
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+                      <Typography sx={{
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        color: '#111827',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}>
+                        {formatNumber(step.value)}
                       </Typography>
-                      {index > 0 && (
-                        <Typography variant="caption" sx={{
+                      {idx > 0 && (
+                        <Typography sx={{
+                          fontSize: '0.6rem',
                           fontWeight: 600,
-                          fontSize: '0.65rem',
-                          color: conversionFromTop >= 50 ? '#059669' : conversionFromTop >= 10 ? '#d97706' : '#dc2626',
+                          color: convRate >= 30 ? '#059669' : convRate >= 10 ? '#d97706' : '#ef4444',
+                          fontVariantNumeric: 'tabular-nums',
                         }}>
-                          {conversionFromTop.toFixed(1)}%
+                          {convRate.toFixed(1)}%
                         </Typography>
                       )}
                     </Box>
                   </Box>
 
+                  {/* Progress Bar */}
                   <Box sx={{
                     width: '100%',
-                    height: 6,
-                    borderRadius: 3,
-                    bgcolor: alpha(step.color, 0.08),
+                    height: 4,
+                    borderRadius: 2,
+                    bgcolor: '#f3f4f6',
                     overflow: 'hidden',
                   }}>
                     <Box sx={{
                       width: `${barWidth}%`,
                       height: '100%',
-                      borderRadius: 3,
+                      borderRadius: 2,
                       bgcolor: step.color,
-                      transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
                     }} />
                   </Box>
                 </Box>
@@ -151,40 +195,36 @@ const ConversionFunnel: React.FC<ConversionFunnelProps> = ({ data }) => {
         })}
       </Box>
 
-      {/* Summary */}
+      {/* Footer Summary */}
       <Box sx={{
-        px: { xs: 2, md: 2.5 },
+        px: 2.5,
         py: 1.5,
-        borderTop: '1px solid',
-        borderColor: 'divider',
-        bgcolor: alpha(theme.palette.text.primary, 0.015),
+        borderTop: '1px solid #f3f4f6',
         display: 'flex',
         flexWrap: 'wrap',
-        gap: 0.75,
+        gap: 2,
       }}>
         {[
-          { label: `Alcance ${rates.reach.toFixed(1)}%`, ok: rates.reach >= 50 },
-          { label: `Engajamento ${rates.engagement.toFixed(1)}%`, ok: rates.engagement >= 3 },
-          { label: `Salvamento ${rates.saves.toFixed(1)}%`, ok: rates.saves >= 1 },
-          { label: `Compartilhamento ${rates.shares.toFixed(1)}%`, ok: rates.shares >= 0.5 },
-        ].map(r => (
-          <Chip
-            key={r.label}
-            label={r.label}
-            size="small"
-            sx={{
-              height: 24,
-              fontSize: '0.68rem',
-              fontWeight: 600,
-              bgcolor: alpha(r.ok ? '#059669' : '#d97706', 0.08),
-              color: r.ok ? '#059669' : '#d97706',
-              border: '1px solid',
-              borderColor: alpha(r.ok ? '#059669' : '#d97706', 0.2),
-            }}
-          />
+          { label: 'Alcance', rate: data.impressions > 0 ? (data.reach / data.impressions) * 100 : 0, ok: 50 },
+          { label: 'Eng.', rate: data.reach > 0 ? (data.engagement / data.reach) * 100 : 0, ok: 3 },
+          { label: 'Salvamento', rate: data.reach > 0 ? (data.saves / data.reach) * 100 : 0, ok: 1 },
+        ].filter(r => r.rate > 0 || data[r.label === 'Eng.' ? 'engagement' : r.label === 'Alcance' ? 'reach' : 'saves' as keyof typeof data] > 0).map(r => (
+          <Box key={r.label} sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+            <Typography sx={{ fontSize: '0.62rem', color: '#9ca3af', fontWeight: 500 }}>
+              {r.label}
+            </Typography>
+            <Typography sx={{
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              color: r.rate >= r.ok ? '#059669' : '#d97706',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              {r.rate.toFixed(1)}%
+            </Typography>
+          </Box>
         ))}
       </Box>
-    </Paper>
+    </Box>
   );
 };
 

@@ -41,11 +41,12 @@ import {
   getImageUrls,
   POST_TYPE,
 } from '../components/PublicApprovalPostMedia';
+import { GLASS } from '../theme/glassTokens';
+import { resolveAgencyLogoSrc } from '../services/imageUrlService';
 
 type PostRow = InternalApprovalPublicData['posts'][number];
 
-const AGENCY_LOGO_URL = '/LOGO-AUPE.jpg';
-const APP_NAME = 'AUPE';
+const APP_NAME = 'INSYT';
 
 const ManagerInternalApprovalView: React.FC = () => {
   const theme = useTheme();
@@ -117,7 +118,7 @@ const ManagerInternalApprovalView: React.FC = () => {
         open: true,
         message:
           result.message ||
-          'Aprovado. No painel AUPE o post aparece na coluna "Aguardando cliente". Gere o link ao cliente na página Aprovações.',
+          'Aprovado. No painel INSYT o post aparece na coluna "Aguardando cliente". Gere o link ao cliente na página Aprovações.',
         severity: 'success',
       });
     } catch (e) {
@@ -182,25 +183,39 @@ const ManagerInternalApprovalView: React.FC = () => {
       elevation={0}
       sx={{
         borderRadius: '0 0 20px 20px',
-        backgroundColor: theme.palette.background.paper,
-        boxShadow: `0 4px 20px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.08)'}`,
+        backgroundColor: GLASS.surface.bgStrong,
+        backdropFilter: `blur(${GLASS.surface.blur})`,
+        WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+        border: `1px solid ${GLASS.border.outer}`,
+        borderTop: 'none',
+        boxShadow: GLASS.shadow.card,
       }}
     >
       <Toolbar sx={{ minHeight: 56, py: 0, px: { xs: 1.5, sm: 2 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mr: { xs: 1, md: 3 } }}>
-          <Avatar src={AGENCY_LOGO_URL} alt={APP_NAME} sx={{ width: 36, height: 36, flexShrink: 0 }} />
+          <Avatar
+            src={resolveAgencyLogoSrc(data?.organization?.agencyLogoUrl)}
+            alt={APP_NAME}
+            sx={{
+              width: 36,
+              height: 36,
+              flexShrink: 0,
+              boxShadow: GLASS.shadow.avatar,
+              border: `2px solid ${GLASS.accent.orange}`,
+            }}
+          />
           <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-            <Typography variant="subtitle1" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>
+            <Typography variant="subtitle1" sx={{  fontWeight: 600, color: GLASS.text.heading }}>
               {APP_NAME}
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+            <Typography variant="caption" sx={{  color: GLASS.text.muted }}>
               Revisão interna (gestor)
             </Typography>
           </Box>
         </Box>
-        <FactCheckIcon sx={{ ml: 1, color: 'secondary.main', display: { xs: 'none', sm: 'block' } }} />
+        <FactCheckIcon sx={{ ml: 1, color: GLASS.accent.orange, display: { xs: 'none', sm: 'block' } }} />
         {expiresAt && (
-          <Typography variant="caption" sx={{ ml: 'auto', color: 'text.secondary', fontWeight: 500 }}>
+          <Typography variant="caption" sx={{ ml: 'auto', color: GLASS.text.muted, fontWeight: 500 }}>
             Link expira em {format(parseISO(expiresAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
           </Typography>
         )}
@@ -227,11 +242,21 @@ const ManagerInternalApprovalView: React.FC = () => {
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: 6 }}>
         {renderHeader()}
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-          <Paper sx={{ p: 4, maxWidth: 400, textAlign: 'center' }}>
+          <Paper elevation={0} sx={{
+            p: 4,
+            maxWidth: 400,
+            textAlign: 'center',
+            borderRadius: GLASS.radius.card,
+            bgcolor: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }}>
             <Typography variant="h6" color="error" gutterBottom>
               Link inválido ou expirado
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
               {error || 'Peça um novo link à equipe.'}
             </Typography>
           </Paper>
@@ -260,8 +285,18 @@ const ManagerInternalApprovalView: React.FC = () => {
         </Box>
 
         {data.posts.length === 0 ? (
-          <Paper sx={{ mx: 2, p: 3, textAlign: 'center' }}>
-            <Typography color="text.secondary">Nenhum item nesta solicitação.</Typography>
+          <Paper elevation={0} sx={{
+            mx: 2,
+            p: 3,
+            textAlign: 'center',
+            borderRadius: GLASS.radius.inner,
+            bgcolor: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }}>
+            <Typography sx={{ color: GLASS.text.muted }}>Nenhum item nesta solicitação.</Typography>
           </Paper>
         ) : (
           data.posts.map((post: PostRow) => {
@@ -279,8 +314,19 @@ const ManagerInternalApprovalView: React.FC = () => {
             return (
               <Paper
                 key={post.id}
-                elevation={1}
-                sx={{ mb: 2, overflow: 'hidden', borderRadius: 2, maxWidth: 500, mx: isMobile ? 1 : 0 }}
+                elevation={0}
+                sx={{
+                  mb: 2,
+                  overflow: 'hidden',
+                  borderRadius: GLASS.radius.inner,
+                  maxWidth: 500,
+                  mx: isMobile ? 1 : 0,
+                  bgcolor: GLASS.surface.bg,
+                  backdropFilter: `blur(${GLASS.surface.blur})`,
+                  WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+                  border: `1px solid ${GLASS.border.outer}`,
+                  boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+                }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1.5, flexWrap: 'wrap' }}>
                   <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1, minWidth: 0 }}>
@@ -312,7 +358,6 @@ const ManagerInternalApprovalView: React.FC = () => {
                 <Box sx={{ px: 1.5, pb: 1, pt: 0 }}>
                   <Button
                     variant="outlined"
-                    color="primary"
                     size="medium"
                     fullWidth={isMobile}
                     startIcon={<OpenInFullIcon />}
@@ -321,8 +366,14 @@ const ManagerInternalApprovalView: React.FC = () => {
                     sx={{
                       py: 1,
                       minHeight: 44,
-                      fontFamily: '"Poppins", sans-serif',
                       textTransform: 'none',
+                      color: GLASS.accent.orange,
+                      borderColor: GLASS.accent.orange,
+                      borderRadius: GLASS.radius.button,
+                      '&:hover': {
+                        borderColor: GLASS.accent.orangeDark,
+                        bgcolor: GLASS.status.connected.bg,
+                      },
                     }}
                   >
                     Ampliar conteúdo
@@ -382,10 +433,18 @@ const ManagerInternalApprovalView: React.FC = () => {
                         <Button
                           fullWidth
                           variant="contained"
-                          color="success"
                           startIcon={<CheckCircleIcon />}
                           disabled={!!submitting}
                           onClick={() => handleApprove(post.id)}
+                          sx={{
+                            bgcolor: GLASS.accent.orange,
+                            borderRadius: GLASS.radius.button,
+                            boxShadow: GLASS.shadow.button,
+                            '&:hover': {
+                              bgcolor: GLASS.accent.orangeDark,
+                              boxShadow: GLASS.shadow.buttonHover,
+                            },
+                          }}
                         >
                           {submitting === post.id ? '...' : 'Aprovar'}
                         </Button>

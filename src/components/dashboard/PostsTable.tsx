@@ -11,17 +11,16 @@ import {
   TableHead,
   TableRow,
   TablePagination,
-  Avatar,
   Chip,
   IconButton,
   Tooltip,
   useTheme,
+  useMediaQuery,
   alpha,
   TableSortLabel
 } from '@mui/material';
 import {
   Visibility as VisibilityIcon,
-  Link as LinkIcon,
   Image as ImageIcon,
   VideoLibrary as VideoIcon,
   ViewCarousel as CarouselIcon,
@@ -45,10 +44,13 @@ interface PostsTableProps {
 
 const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTimestamp }) => {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(10);
   const [sortField, setSortField] = React.useState<SortField>('date');
   const [sortOrder, setSortOrder] = React.useState<SortOrder>('desc');
+  const showReachColumn = !isMobile;
+  const showCommentsColumn = !isMobile;
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
@@ -68,17 +70,17 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
 
   const getMediaTypeIcon = (post: InstagramPost) => {
     if (post.media_product_type === 'REELS') {
-      return <ReelsIcon sx={{ color: '#7c3aed' }} />;
+      return <ReelsIcon sx={{ color: '#3e54b5' }} />;
     }
     switch (post.media_type) {
       case 'IMAGE':
-        return <ImageIcon sx={{ color: '#0891b2' }} />;
+        return <ImageIcon sx={{ color: theme.palette.info.main }} />;
       case 'VIDEO':
-        return <VideoIcon sx={{ color: '#d97706' }} />;
+        return <VideoIcon sx={{ color: theme.palette.warning.main }} />;
       case 'CAROUSEL_ALBUM':
-        return <CarouselIcon sx={{ color: '#6366f1' }} />;
+        return <CarouselIcon sx={{ color: theme.palette.secondary.main }} />;
       default:
-        return <ImageIcon sx={{ color: '#0891b2' }} />;
+        return <ImageIcon sx={{ color: theme.palette.info.main }} />;
     }
   };
 
@@ -89,16 +91,6 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
       case 'VIDEO': return 'Vídeo';
       case 'CAROUSEL_ALBUM': return 'Carrossel';
       default: return post.media_type;
-    }
-  };
-
-  const getMediaTypeColor = (post: InstagramPost) => {
-    if (post.media_product_type === 'REELS') return '#7c3aed';
-    switch (post.media_type) {
-      case 'IMAGE': return '#0891b2';
-      case 'VIDEO': return '#d97706';
-      case 'CAROUSEL_ALBUM': return '#6366f1';
-      default: return '#0891b2';
     }
   };
 
@@ -134,10 +126,10 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
   };
 
   const getEngagementColor = (rate: number): string => {
-    if (rate >= 6) return '#059669';
-    if (rate >= 3) return '#d97706';
-    if (rate >= 1) return '#ca8a04';
-    return '#dc2626';
+    if (rate >= 6) return theme.palette.success.main;
+    if (rate >= 3) return theme.palette.warning.dark;
+    if (rate >= 1) return theme.palette.warning.main;
+    return theme.palette.error.main;
   };
 
   // Função para ordenar os posts
@@ -190,11 +182,11 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
       <Paper 
         elevation={0} 
         sx={{ 
-          borderRadius: 2,
+          borderRadius: '14px',
           overflow: 'hidden',
-          border: '1px solid',
-          borderColor: 'divider',
-          bgcolor: 'background.paper'
+          border: '1px solid #e8eaed',
+          bgcolor: '#fff',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         }}
       >
         {/* Header - Minimalista */}
@@ -267,7 +259,7 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
         
         {/* Table */}
         <TableContainer sx={{ maxHeight: 600 }}>
-          <Table stickyHeader sx={{ minWidth: 1000 }}>
+          <Table stickyHeader sx={{ minWidth: isMobile ? 760 : 980 }}>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ 
@@ -299,15 +291,6 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                   </TableSortLabel>
                 </TableCell>
                 
-                <TableCell sx={{ 
-                  fontWeight: 600, 
-                  bgcolor: 'grey.50',
-                  minWidth: 100,
-                  py: 1.5
-                }}>
-                  Tipo
-                </TableCell>
-                
                 <TableCell align="right" sx={{ 
                   fontWeight: 600, 
                   bgcolor: 'grey.50',
@@ -326,65 +309,67 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
-                      <FavoriteIcon fontSize="small" sx={{ color: '#d97706', fontSize: 16 }} />
+                      <FavoriteIcon fontSize="small" sx={{ color: 'warning.main', fontSize: 16 }} />
                       <Typography component="span" variant="body2" fontWeight={600}>
                         Curtidas
                       </Typography>
                     </Box>
                   </TableSortLabel>
                 </TableCell>
-                
-                <TableCell align="right" sx={{ 
-                  fontWeight: 600, 
-                  bgcolor: 'grey.50',
-                  minWidth: 120,
-                  py: 1.5
-                }}>
-                  <TableSortLabel
-                    active={sortField === 'comments'}
-                    direction={sortField === 'comments' ? sortOrder : 'desc'}
-                    onClick={() => handleSort('comments')}
-                    sx={{
-                      flexDirection: 'row-reverse',
-                      '& .MuiTableSortLabel-icon': {
-                        opacity: sortField === 'comments' ? 1 : 0.3,
-                      },
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
-                      <CommentIcon fontSize="small" sx={{ color: 'primary.main', fontSize: 16 }} />
-                      <Typography component="span" variant="body2" fontWeight={600}>
-                        Comentários
-                      </Typography>
-                    </Box>
-                  </TableSortLabel>
-                </TableCell>
-                
-                <TableCell align="right" sx={{ 
-                  fontWeight: 600, 
-                  bgcolor: 'grey.50',
-                  minWidth: 100,
-                  py: 1.5
-                }}>
-                  <TableSortLabel
-                    active={sortField === 'reach'}
-                    direction={sortField === 'reach' ? sortOrder : 'desc'}
-                    onClick={() => handleSort('reach')}
-                    sx={{
-                      flexDirection: 'row-reverse',
-                      '& .MuiTableSortLabel-icon': {
-                        opacity: sortField === 'reach' ? 1 : 0.3,
-                      },
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
-                      <ReachIcon fontSize="small" sx={{ color: 'info.main', fontSize: 16 }} />
-                      <Typography component="span" variant="body2" fontWeight={600}>
-                        Alcance
-                      </Typography>
-                    </Box>
-                  </TableSortLabel>
-                </TableCell>
+                {showCommentsColumn && (
+                  <TableCell align="right" sx={{ 
+                    fontWeight: 600, 
+                    bgcolor: 'grey.50',
+                    minWidth: 120,
+                    py: 1.5
+                  }}>
+                    <TableSortLabel
+                      active={sortField === 'comments'}
+                      direction={sortField === 'comments' ? sortOrder : 'desc'}
+                      onClick={() => handleSort('comments')}
+                      sx={{
+                        flexDirection: 'row-reverse',
+                        '& .MuiTableSortLabel-icon': {
+                          opacity: sortField === 'comments' ? 1 : 0.3,
+                        },
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
+                        <CommentIcon fontSize="small" sx={{ color: 'primary.main', fontSize: 16 }} />
+                        <Typography component="span" variant="body2" fontWeight={600}>
+                          Comentários
+                        </Typography>
+                      </Box>
+                    </TableSortLabel>
+                  </TableCell>
+                )}
+                {showReachColumn && (
+                  <TableCell align="right" sx={{ 
+                    fontWeight: 600, 
+                    bgcolor: 'grey.50',
+                    minWidth: 100,
+                    py: 1.5
+                  }}>
+                    <TableSortLabel
+                      active={sortField === 'reach'}
+                      direction={sortField === 'reach' ? sortOrder : 'desc'}
+                      onClick={() => handleSort('reach')}
+                      sx={{
+                        flexDirection: 'row-reverse',
+                        '& .MuiTableSortLabel-icon': {
+                          opacity: sortField === 'reach' ? 1 : 0.3,
+                        },
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
+                        <ReachIcon fontSize="small" sx={{ color: 'info.main', fontSize: 16 }} />
+                        <Typography component="span" variant="body2" fontWeight={600}>
+                          Alcance
+                        </Typography>
+                      </Box>
+                    </TableSortLabel>
+                  </TableCell>
+                )}
                 
                 <TableCell align="right" sx={{ 
                   fontWeight: 600, 
@@ -535,57 +520,36 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
                         </Typography>
                       </TableCell>
 
-                      {/* Tipo - Removido, já está no preview */}
-                      <TableCell sx={{ py: 1.5 }}>
-                        <Chip 
-                          icon={getMediaTypeIcon(post)}
-                          label={getMediaTypeLabel(post)}
-                          size="small"
-                          sx={{ 
-                            height: 22,
-                            fontSize: '0.7rem',
-                            fontWeight: 500,
-                            bgcolor: alpha(getMediaTypeColor(post), 0.1),
-                            color: getMediaTypeColor(post),
-                            border: '1px solid',
-                            borderColor: alpha(getMediaTypeColor(post), 0.3),
-                            '& .MuiChip-icon': {
-                              color: getMediaTypeColor(post),
-                              fontSize: 14
-                            }
-                          }}
-                        />
-                      </TableCell>
-
                       {/* Curtidas */}
                       <TableCell align="right" sx={{ py: 1.5 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
-                          <FavoriteIcon fontSize="small" sx={{ color: '#d97706', fontSize: 16 }} />
+                          <FavoriteIcon fontSize="small" sx={{ color: 'warning.main', fontSize: 16 }} />
                           <Typography variant="body2" fontWeight={600} color="text.primary">
                             {formatNumber(post.like_count || 0)}
                           </Typography>
                         </Box>
                       </TableCell>
 
-                      {/* Comentários */}
-                      <TableCell align="right" sx={{ py: 1.5 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
-                          <CommentIcon fontSize="small" sx={{ color: 'primary.main', fontSize: 16 }} />
-                          <Typography variant="body2" fontWeight={600} color="text.primary">
-                            {formatNumber(post.comments_count || 0)}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-
-                      {/* Alcance */}
-                      <TableCell align="right" sx={{ py: 1.5 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
-                          <ReachIcon fontSize="small" sx={{ color: 'info.main', fontSize: 16 }} />
-                          <Typography variant="body2" fontWeight={600} color="text.primary">
-                            {reach > 0 ? formatNumber(reach) : '-'}
-                          </Typography>
-                        </Box>
-                      </TableCell>
+                      {showCommentsColumn && (
+                        <TableCell align="right" sx={{ py: 1.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
+                            <CommentIcon fontSize="small" sx={{ color: 'primary.main', fontSize: 16 }} />
+                            <Typography variant="body2" fontWeight={600} color="text.primary">
+                              {formatNumber(post.comments_count || 0)}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                      )}
+                      {showReachColumn && (
+                        <TableCell align="right" sx={{ py: 1.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
+                            <ReachIcon fontSize="small" sx={{ color: 'info.main', fontSize: 16 }} />
+                            <Typography variant="body2" fontWeight={600} color="text.primary">
+                              {reach > 0 ? formatNumber(reach) : '-'}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                      )}
 
                       {/* Engajamento */}
                       <TableCell align="right" sx={{ py: 1.5 }}>
@@ -706,9 +670,9 @@ const PostsTable: React.FC<PostsTableProps> = ({ posts, onViewDetails, formatTim
             <Box sx={{ 
               p: 3, 
               borderRadius: '50%', 
-              backgroundColor: alpha(theme.palette.primary.main, 0.1)
+              backgroundColor: 'rgba(62, 84, 181, 0.1)'
             }}>
-              <ImageIcon sx={{ fontSize: 48, color: theme.palette.primary.main }} />
+              <ImageIcon sx={{ fontSize: 48, color: '#3e54b5' }} />
             </Box>
             <Typography variant="h6" color="text.secondary">
               Nenhum post encontrado

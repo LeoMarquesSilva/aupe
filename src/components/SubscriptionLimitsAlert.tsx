@@ -9,8 +9,7 @@ import {
   Box,
   LinearProgress,
   Typography,
-  Button,
-  Link as MuiLink
+  Button
 } from '@mui/material';
 import { subscriptionLimitsService, SubscriptionLimits } from '../services/subscriptionLimitsService';
 import { Link } from 'react-router-dom';

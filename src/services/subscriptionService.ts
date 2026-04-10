@@ -13,6 +13,8 @@ export interface Organization {
   zip_code: string | null;
   country: string;
   active: boolean;
+  /** Public URL for agency branding (sidebar, shared links, etc.) */
+  agency_logo_url?: string | null;
   created_at: string;
   updated_at: string;
 }

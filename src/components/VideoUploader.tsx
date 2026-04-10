@@ -26,7 +26,6 @@ import {
   Pause as PauseIcon,
   Info as InfoIcon,
   CheckCircle as CheckIcon,
-  Error as ErrorIcon,
   VideoLibrary as VideoIcon
 } from '@mui/icons-material';
 import { supabaseVideoStorageService, VideoUploadResult } from '../services/supabaseVideoStorageService';
@@ -35,6 +34,7 @@ import { ReelVideo } from '../types';
 import { detectVideoFormat, VideoFormatInfo } from '../services/videoFormatValidator';
 import { devLog, devWarn, logClientError } from '../utils/clientLogger';
 import VideoConversionDialog from './VideoConversionDialog';
+import { GLASS } from '../theme/glassTokens';
 
 interface VideoUploaderProps {
   video: ReelVideo | null;
@@ -55,7 +55,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
   showPreview = true,
   disabled = false
 }) => {
-  const theme = useTheme();
+  const _theme = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   
@@ -88,6 +88,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
         setLocalVideoUrl(null);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [video?.id, localVideoUrl]);
 
   // ✅ Cleanup ao desmontar componente
@@ -293,6 +294,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
     }
 
     await uploadFile(file);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maxFileSize, maxDuration, onChange, uploadFile]);
 
   // Callback quando o arquivo convertido está pronto
@@ -460,8 +462,8 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
 
   return (
     <Box>
-      <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-        <VideoIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+      <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', color: GLASS.text.heading }}>
+        <VideoIcon sx={{ mr: 1, color: GLASS.accent.orange }} />
         Upload de Vídeo
       </Typography>
 
@@ -480,16 +482,19 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
         <Paper
           elevation={0}
           sx={{
-            border: `2px dashed ${theme.palette.divider}`,
-            borderRadius: 2,
+            border: `2px dashed ${GLASS.border.outer}`,
+            borderRadius: GLASS.radius.inner,
             p: 4,
             textAlign: 'center',
-            backgroundColor: disabled ? 'action.disabledBackground' : 'background.paper',
+            background: disabled ? 'action.disabledBackground' : GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            boxShadow: GLASS.shadow.cardInset,
             cursor: disabled || isUploading ? 'not-allowed' : 'pointer',
-            transition: 'all 0.3s ease',
+            transition: `all ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
             '&:hover': {
-              borderColor: disabled || isUploading ? theme.palette.divider : theme.palette.primary.main,
-              backgroundColor: disabled || isUploading ? 'action.disabledBackground' : 'action.hover'
+              borderColor: disabled || isUploading ? GLASS.border.outer : GLASS.accent.orange,
+              background: disabled || isUploading ? 'action.disabledBackground' : GLASS.surface.bgHover,
             }
           }}
           onDrop={handleDrop}
@@ -537,7 +542,17 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
         // ✅ Preview do vídeo com dimensões adaptáveis
         showPreview && (
           <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-            <Card sx={{ width: previewDimensions.width, maxWidth: '100%' }}>
+            <Card sx={{
+              width: previewDimensions.width,
+              maxWidth: '100%',
+              background: GLASS.surface.bg,
+              backdropFilter: `blur(${GLASS.surface.blur})`,
+              WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+              border: `1px solid ${GLASS.border.outer}`,
+              borderRadius: GLASS.radius.inner,
+              boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+              overflow: 'hidden',
+            }}>
               <Box sx={{ position: 'relative' }}>
                 <CardMedia
                   component="video"

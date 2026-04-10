@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Container,
   Typography,
@@ -16,7 +16,6 @@ import {
   DialogContent,
   DialogActions,
   Chip,
-  Avatar,
   Tooltip,
   CircularProgress,
   Alert,
@@ -29,12 +28,10 @@ import {
   ListItem,
   ListItemAvatar,
   Divider,
-  Badge,
   Card,
   CardContent,
   SelectChangeEvent,
   TextField,
-  Collapse,
   Pagination
 } from '@mui/material';
 import {
@@ -58,30 +55,29 @@ import {
   PlayArrow as PlayArrowIcon,
   Person as PersonIcon,
   FilterList as FilterListIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  FactCheck as FactCheckIcon
 } from '@mui/icons-material';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, parseISO, isValid, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useTheme } from '@mui/material/styles';
-import { postService, clientService, userProfileService, UserProfile, supabase } from '../services/supabaseClient';
+import { postService, clientService, supabase } from '../services/supabaseClient';
 import { Client, ScheduledPost, Story, PostStatus } from '../types';
 import StoryPreview from '../components/StoryPreview';
 import ClientManager from '../components/ClientManager';
 import SmartImage from '../components/SmartImage';
 import { imageUrlService } from '../services/imageUrlService';
-import { urlRefreshService } from '../services/urlRefreshService';
-import UrlCacheMonitor from '../components/UrlCacheMonitor';
+import { motion, AnimatePresence } from 'framer-motion';
+import { GLASS } from '../theme/glassTokens';
+import { appShellContainerSx } from '../theme/appShellLayout';
 
 const StoryCalendar: React.FC = () => {
   const navigate = useNavigate();
   const { clientId: clientIdParam } = useParams<{ clientId?: string }>();
-  const theme = useTheme();
   
   // Estados principais
   const [content, setContent] = useState<ScheduledPost[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -108,33 +104,19 @@ const StoryCalendar: React.FC = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
 
-  // ✅ ADICIONAR useEffect para carregar dados
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Inicializar filtro de cliente quando clientId vem na URL (ex.: redirect após agendamento)
-  useEffect(() => {
-    if (clientIdParam && clients.length > 0 && clients.some((c) => c.id === clientIdParam)) {
-      setSelectedClient(clientIdParam);
-    }
-  }, [clientIdParam, clients]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
       // Carregar dados em paralelo
-      const [postsData, clientsData, profileData] = await Promise.all([
+      const [postsData, clientsData] = await Promise.all([
         postService.getScheduledPostsWithClient(),
-        clientService.getClients(),
-        userProfileService.getCurrentUserProfile()
+        clientService.getClients()
       ]);
       
       setContent(postsData || []);
       setClients(clientsData || []);
-      setUserProfile(profileData);
       
       // Buscar lista de usuários únicos dos posts
       await loadUsersFromPosts(postsData || []);
@@ -144,7 +126,19 @@ const StoryCalendar: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // ✅ ADICIONAR useEffect para carregar dados
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Inicializar filtro de cliente quando clientId vem na URL (ex.: redirect após agendamento)
+  useEffect(() => {
+    if (clientIdParam && clients.length > 0 && clients.some((c) => c.id === clientIdParam)) {
+      setSelectedClient(clientIdParam);
+    }
+  }, [clientIdParam, clients]);
 
   // Função para carregar usuários únicos dos posts
   const loadUsersFromPosts = async (posts: ScheduledPost[]) => {
@@ -310,24 +304,26 @@ const StoryCalendar: React.FC = () => {
     return imageUrlService.getPlaceholder(40, 40, client?.name?.charAt(0) || 'C');
   };
 
-  // Função otimizada para obter a primeira URL de imagem
-  const getClientImageForContent = (content: ScheduledPost): string | undefined => {
-    const client = content.clients || getClientById(content.clientId);
-    return getClientLogo(client);
-  };
-
-  // Função para obter cor por tipo de conteúdo (usando brand colors)
   const getContentTypeColor = (type: string): string => {
     switch (type) {
-      case 'post': return theme.palette.primary.main;
-      case 'carousel': return '#833AB4'; // Instagram purple
-      case 'reels': return '#F56040'; // Instagram orange
-      case 'stories': return '#FCAF45'; // Instagram yellow
-      default: return theme.palette.primary.main;
+      case 'post': return '#f74211';
+      case 'carousel': return '#e8590c';
+      case 'reels': return '#3e54b5';
+      case 'stories': return '#7c3aed';
+      default: return '#f74211';
     }
   };
 
-  // Função para obter ícone por tipo de conteúdo
+  const getContentTypeBg = (type: string): string => {
+    switch (type) {
+      case 'post': return 'rgba(247, 66, 17, 0.07)';
+      case 'carousel': return 'rgba(232, 89, 12, 0.07)';
+      case 'reels': return 'rgba(62, 84, 181, 0.07)';
+      case 'stories': return 'rgba(124, 58, 237, 0.07)';
+      default: return 'rgba(247, 66, 17, 0.07)';
+    }
+  };
+
   const getContentTypeIcon = (type: string) => {
     const iconProps = { fontSize: 'small' as const };
     switch (type) {
@@ -336,6 +332,18 @@ const StoryCalendar: React.FC = () => {
       case 'reels': return <VideoLibraryIcon {...iconProps} />;
       case 'stories': return <InstagramIcon {...iconProps} />;
       default: return <ImageIcon {...iconProps} />;
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'posted':
+      case 'published': return <CheckCircleIcon sx={{ fontSize: 12, color: '#10b981' }} />;
+      case 'failed': return <ErrorIcon sx={{ fontSize: 12, color: '#ef4444' }} />;
+      case 'pending': return <ScheduleIcon sx={{ fontSize: 12, color: '#f59e0b' }} />;
+      case 'sent_to_n8n':
+      case 'processing': return <ScheduleIcon sx={{ fontSize: 12, color: '#3b82f6' }} />;
+      default: return null;
     }
   };
 
@@ -414,6 +422,20 @@ const StoryCalendar: React.FC = () => {
     }
   });
 
+  const contentSummary = useMemo(() => {
+    const pending = filteredContent.filter((item) => item.status === 'pending').length;
+    const sent = filteredContent.filter((item) => item.status === 'sent_to_n8n' || item.status === 'processing').length;
+    const published = filteredContent.filter((item) => item.status === 'posted').length;
+    const failed = filteredContent.filter((item) => item.status === 'failed').length;
+    return {
+      total: filteredContent.length,
+      pending,
+      sent,
+      published,
+      failed,
+    };
+  }, [filteredContent]);
+
   // Agrupar conteúdo por dia para visualização de calendário
   const getContentForDay = (day: Date) => {
     return filteredContent.filter(item => {
@@ -426,9 +448,21 @@ const StoryCalendar: React.FC = () => {
   // Função para renderizar preview do conteúdo na lista
   const renderContentPreview = (content: ScheduledPost) => {
     const client = content.clients || getClientById(content.clientId);
+    const typeColor = getContentTypeColor(content.postType);
+
+    const typeBadge = (
+      <Box sx={{ 
+        position: 'absolute', top: 4, right: 4, 
+        bgcolor: typeColor, borderRadius: '50%',
+        width: 20, height: 20,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#fff',
+      }}>
+        {getContentTypeIcon(content.postType)}
+      </Box>
+    );
     
     if (content.postType === 'stories') {
-      // Renderizar story preview
       const storyData: Story = {
         id: content.id,
         clientId: content.clientId,
@@ -448,68 +482,36 @@ const StoryCalendar: React.FC = () => {
       
       return (
         <Box sx={{ 
-          width: 80, 
-          height: 140, 
-          position: 'relative',
-          borderRadius: 2,
-          overflow: 'hidden',
-          border: '2px solid',
-          borderColor: getContentTypeColor(content.postType)
+          width: 80, height: 140, position: 'relative',
+          borderRadius: 2, overflow: 'hidden',
+          border: `2px solid ${typeColor}`,
         }}>
           <StoryPreview story={storyData} />
-          <Box sx={{ 
-            position: 'absolute', 
-            top: 4, 
-            right: 4, 
-            bgcolor: getContentTypeColor(content.postType),
-            borderRadius: '50%',
-            width: 20,
-            height: 20,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            {getContentTypeIcon(content.postType)}
-          </Box>
+          {typeBadge}
         </Box>
       );
     } else if (content.postType === 'reels') {
-      // Renderizar reel preview
       return (
         <Box sx={{ 
-          width: 80, 
-          height: 140, 
-          position: 'relative',
-          borderRadius: 2,
-          overflow: 'hidden',
-          border: '2px solid',
-          borderColor: getContentTypeColor(content.postType)
+          width: 80, height: 140, position: 'relative',
+          borderRadius: 2, overflow: 'hidden',
+          border: `2px solid ${typeColor}`,
         }}>
           {content.video ? (
             <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
               <video
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover'
-                }}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 muted
                 preload="metadata"
               >
                 <source src={imageUrlService.getPublicUrl(content.video)} type="video/mp4" />
               </video>
               <Box sx={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
+                position: 'absolute', top: '50%', left: '50%',
                 transform: 'translate(-50%, -50%)',
-                bgcolor: 'rgba(0,0,0,0.6)',
-                borderRadius: '50%',
-                width: 32,
-                height: 32,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
+                bgcolor: 'rgba(0,0,0,0.6)', borderRadius: '50%',
+                width: 32, height: 32,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <PlayArrowIcon sx={{ color: 'white', fontSize: 20 }} />
               </Box>
@@ -525,33 +527,15 @@ const StoryCalendar: React.FC = () => {
               sx={{ objectFit: 'cover' }}
             />
           )}
-          <Box sx={{ 
-            position: 'absolute', 
-            top: 4, 
-            right: 4, 
-            bgcolor: getContentTypeColor(content.postType),
-            borderRadius: '50%',
-            width: 20,
-            height: 20,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            {getContentTypeIcon(content.postType)}
-          </Box>
+          {typeBadge}
         </Box>
       );
     } else {
-      // Renderizar post ou carrossel
       return (
         <Box sx={{ 
-          width: 80, 
-          height: 80, 
-          position: 'relative',
-          borderRadius: 2,
-          overflow: 'hidden',
-          border: '2px solid',
-          borderColor: getContentTypeColor(content.postType)
+          width: 80, height: 80, position: 'relative',
+          borderRadius: 2, overflow: 'hidden',
+          border: `2px solid ${typeColor}`,
         }}>
           <SmartImage
             src={getFirstImageUrl(content)}
@@ -563,20 +547,7 @@ const StoryCalendar: React.FC = () => {
             fallbackText={content.postType.toUpperCase()}
             sx={{ objectFit: 'cover' }}
           />
-          <Box sx={{ 
-            position: 'absolute', 
-            top: 4, 
-            right: 4, 
-            bgcolor: getContentTypeColor(content.postType),
-            borderRadius: '50%',
-            width: 20,
-            height: 20,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
-            {getContentTypeIcon(content.postType)}
-          </Box>
+          {typeBadge}
         </Box>
       );
     }
@@ -688,59 +659,80 @@ const StoryCalendar: React.FC = () => {
     return (
       <Box>
         {/* Cabeçalho com informações do usuário e cliente */}
-        <Card sx={{ mb: 3, bgcolor: 'background.default' }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <SmartImage
-                      src={getClientLogo(client)}
-                      clientId={client?.id} // ✅ ADICIONAR clientId
-                      alt={client?.name || 'Cliente'}
-                      width={24}
-                      height={24}
-                      borderRadius="50%"
-                      fallbackText={client?.name?.charAt(0) || 'C'}
-                      sx={{ mr: 1 }}
-              />
-              <Box sx={{ flex: 1 }}>
-                <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
-                  {client?.name || 'Cliente não encontrado'}
-                  <Chip 
-                    icon={getContentTypeIcon(selectedContent.postType)}
-                    label={selectedContent.postType.toUpperCase()}
-                    size="small"
-                    sx={{ 
-                      ml: 1,
-                      bgcolor: getContentTypeColor(selectedContent.postType),
-                      color: 'white'
-                    }}
-                  />
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                  <AccessTimeIcon fontSize="small" sx={{ mr: 0.5 }} />
-                  {contentDate ? safeFormatDate(selectedContent.scheduledDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : 'Data inválida'}
-                </Typography>
+        <Card elevation={0} sx={{
+          mb: 3,
+          bgcolor: GLASS.surface.bg,
+          border: `1px solid ${GLASS.border.subtle}`,
+          borderRadius: GLASS.radius.inner,
+          boxShadow: GLASS.shadow.cardInset,
+        }}>
+          <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2, mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0 }}>
+                <SmartImage
+                  src={getClientLogo(client)}
+                  clientId={client?.id}
+                  alt={client?.name || 'Cliente'}
+                  width={48}
+                  height={48}
+                  borderRadius="50%"
+                  fallbackText={client?.name?.charAt(0) || 'C'}
+                  sx={{ flexShrink: 0, border: `2px solid ${GLASS.surface.bg}`, boxShadow: GLASS.shadow.avatar }}
+                />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: GLASS.text.heading, mb: 0.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {client?.name || 'Cliente não encontrado'}
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    <Chip 
+                      icon={<Box component="span" sx={{ display: 'flex', color: getContentTypeColor(selectedContent.postType) }}>{getContentTypeIcon(selectedContent.postType)}</Box>}
+                      label={selectedContent.postType.toUpperCase()}
+                      size="small"
+                      sx={{ 
+                        bgcolor: getContentTypeBg(selectedContent.postType),
+                        color: getContentTypeColor(selectedContent.postType),
+                        fontWeight: 700,
+                        fontSize: '0.7rem',
+                        height: 24,
+                        border: `1px solid ${getContentTypeColor(selectedContent.postType)}30`,
+                      }}
+                    />
+                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', color: GLASS.text.muted, fontWeight: 500 }}>
+                      <AccessTimeIcon sx={{ fontSize: 16, mr: 0.5 }} />
+                      {contentDate ? safeFormatDate(selectedContent.scheduledDate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : 'Data inválida'}
+                    </Typography>
+                  </Box>
+                </Box>
               </Box>
-              <Chip 
-                icon={selectedContent.status === 'failed' ? <ErrorIcon /> : <CheckCircleIcon />} 
-                label={getStatusLabel(selectedContent.status)}
-                size="small"
-                color={getStatusColor(selectedContent.status)}
-              />
+              
+              <Box sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}>
+                <Chip 
+                  icon={selectedContent.status === 'failed' ? <ErrorIcon /> : <CheckCircleIcon />} 
+                  label={getStatusLabel(selectedContent.status)}
+                  size="small"
+                  color={getStatusColor(selectedContent.status)}
+                  sx={{ fontWeight: 700, borderRadius: GLASS.radius.badge }}
+                />
+              </Box>
             </Box>
             
-            {/* Informações do usuário que criou */}
             {(() => {
               const creatorUser = getCreatorUser(selectedContent.userId);
               if (!creatorUser) return null;
               
               return (
-                <Box sx={{ display: 'flex', alignItems: 'center', pt: 2, borderTop: 1, borderColor: 'divider' }}>
-                  <PersonIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
-                  <Typography variant="body2" color="text.secondary">
-                    Criado por: {creatorUser.full_name || creatorUser.email}
-                  </Typography>
+                <Box sx={{ 
+                  display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5,
+                  pt: 2, borderTop: `1px dashed ${GLASS.border.subtle}` 
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <PersonIcon sx={{ fontSize: 16, color: GLASS.text.muted }} />
+                    <Typography variant="body2" sx={{ color: GLASS.text.muted, fontWeight: 500 }}>
+                      Criado por: <Box component="span" sx={{ color: GLASS.text.body, fontWeight: 600 }}>{creatorUser.full_name || creatorUser.email}</Box>
+                    </Typography>
+                  </Box>
                   {createdDate && (
-                    <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                    <Typography variant="body2" sx={{ color: GLASS.text.muted, fontWeight: 500 }}>
                       em {safeFormatDate(selectedContent.createdAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                     </Typography>
                   )}
@@ -822,7 +814,6 @@ const StoryCalendar: React.FC = () => {
           {selectedContent.postType === 'stories' ? (
             // Renderizar story
             (() => {
-              const client = selectedContent.clients || getClientById(selectedContent.clientId);
               const storyData: Story = {
                 id: selectedContent.id,
                 clientId: selectedContent.clientId,
@@ -877,8 +868,7 @@ const StoryCalendar: React.FC = () => {
                 <Chip 
                   label="Compartilhar no Feed" 
                   size="small" 
-                  color="primary" 
-                  sx={{ mb: 2 }}
+                  sx={{ mb: 2, bgcolor: GLASS.accent.orange, color: '#fff', borderRadius: GLASS.radius.badge }}
                 />
               )}
             </Box>
@@ -900,8 +890,15 @@ const StoryCalendar: React.FC = () => {
 
         {/* Legenda */}
         {selectedContent.caption && (
-          <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
+          <Paper elevation={0} sx={{
+            p: 2,
+            bgcolor: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            border: `1px solid ${GLASS.border.subtle}`,
+            borderRadius: GLASS.radius.inner,
+            boxShadow: GLASS.shadow.cardInset,
+          }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold', color: GLASS.text.heading }}>
               Legenda:
             </Typography>
             <Typography 
@@ -951,7 +948,7 @@ const StoryCalendar: React.FC = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 4 }}>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
           <Box sx={{ textAlign: 'center' }}>
             <CircularProgress size={48} />
@@ -966,7 +963,7 @@ const StoryCalendar: React.FC = () => {
 
   return (
     <>
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 4 }}>
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
             {error}
@@ -978,11 +975,11 @@ const StoryCalendar: React.FC = () => {
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center', 
-          mb: 4,
+          mb: 3,
           flexWrap: 'wrap',
           gap: 2
         }}>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', color: GLASS.text.heading, letterSpacing: '-0.02em' }}>
             Calendário de Conteúdo
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -990,6 +987,22 @@ const StoryCalendar: React.FC = () => {
               variant="outlined"
               startIcon={<PersonAddIcon />}
               onClick={() => setClientDialogOpen(true)}
+              sx={{
+                borderColor: GLASS.border.outer,
+                color: GLASS.text.body,
+                borderRadius: GLASS.radius.button,
+                backdropFilter: `blur(${GLASS.surface.blur})`,
+                bgcolor: GLASS.surface.bg,
+                boxShadow: GLASS.shadow.button,
+                textTransform: 'none',
+                fontWeight: 600,
+                '&:hover': {
+                  borderColor: GLASS.accent.orange,
+                  bgcolor: GLASS.surface.bgHover,
+                  boxShadow: GLASS.shadow.buttonHover,
+                  color: GLASS.accent.orange,
+                },
+              }}
             >
               Gerenciar Clientes
             </Button>
@@ -997,84 +1010,316 @@ const StoryCalendar: React.FC = () => {
               variant="contained"
               startIcon={<AddIcon />}
               onClick={() => navigate('/create-story')}
+              sx={{
+                bgcolor: GLASS.accent.orange,
+                borderRadius: GLASS.radius.button,
+                boxShadow: GLASS.shadow.button,
+                textTransform: 'none',
+                fontWeight: 600,
+                '&:hover': {
+                  bgcolor: GLASS.accent.orangeDark,
+                  boxShadow: GLASS.shadow.buttonHover,
+                },
+              }}
             >
               Criar Conteúdo
             </Button>
           </Box>
         </Box>
 
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 4 }}>
+          <Box sx={{ 
+            display: 'flex', alignItems: 'center', gap: 1, 
+            px: 2, py: 0.75, 
+            bgcolor: 'rgba(82, 86, 99, 0.04)', 
+            border: `1px solid ${GLASS.border.subtle}`,
+            borderRadius: GLASS.radius.badge 
+          }}>
+            <Typography variant="caption" sx={{ color: GLASS.text.muted, fontWeight: 600 }}>Total agendado</Typography>
+            <Typography variant="caption" sx={{ color: GLASS.text.heading, fontWeight: 800, fontSize: '0.85rem' }}>{contentSummary.total}</Typography>
+          </Box>
+          
+          {contentSummary.pending > 0 && (
+            <Box sx={{ 
+              display: 'flex', alignItems: 'center', gap: 1, 
+              px: 2, py: 0.75, 
+              bgcolor: 'rgba(245, 158, 11, 0.08)', 
+              border: '1px solid rgba(245, 158, 11, 0.2)',
+              borderRadius: GLASS.radius.badge 
+            }}>
+              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#f59e0b' }} />
+              <Typography variant="caption" sx={{ color: '#b45309', fontWeight: 600 }}>Pendentes</Typography>
+              <Typography variant="caption" sx={{ color: '#92400e', fontWeight: 800, fontSize: '0.85rem' }}>{contentSummary.pending}</Typography>
+            </Box>
+          )}
+          
+          {contentSummary.sent > 0 && (
+            <Box sx={{ 
+              display: 'flex', alignItems: 'center', gap: 1, 
+              px: 2, py: 0.75, 
+              bgcolor: 'rgba(59, 130, 246, 0.08)', 
+              border: '1px solid rgba(59, 130, 246, 0.2)',
+              borderRadius: GLASS.radius.badge 
+            }}>
+              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#3b82f6' }} />
+              <Typography variant="caption" sx={{ color: '#1d4ed8', fontWeight: 600 }}>Processando</Typography>
+              <Typography variant="caption" sx={{ color: '#1e3a8a', fontWeight: 800, fontSize: '0.85rem' }}>{contentSummary.sent}</Typography>
+            </Box>
+          )}
+          
+          {contentSummary.published > 0 && (
+            <Box sx={{ 
+              display: 'flex', alignItems: 'center', gap: 1, 
+              px: 2, py: 0.75, 
+              bgcolor: GLASS.status.connected.bg, 
+              border: `1px solid ${GLASS.status.connected.bgStrong}`,
+              borderRadius: GLASS.radius.badge 
+            }}>
+              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: GLASS.status.connected.dot }} />
+              <Typography variant="caption" sx={{ color: GLASS.status.connected.colorDark, fontWeight: 600 }}>Publicados</Typography>
+              <Typography variant="caption" sx={{ color: GLASS.status.connected.colorDark, fontWeight: 800, fontSize: '0.85rem' }}>{contentSummary.published}</Typography>
+            </Box>
+          )}
+          
+          {contentSummary.failed > 0 && (
+            <Box sx={{ 
+              display: 'flex', alignItems: 'center', gap: 1, 
+              px: 2, py: 0.75, 
+              bgcolor: 'rgba(239, 68, 68, 0.08)', 
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              borderRadius: GLASS.radius.badge 
+            }}>
+              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#ef4444' }} />
+              <Typography variant="caption" sx={{ color: '#b91c1c', fontWeight: 600 }}>Falhas</Typography>
+              <Typography variant="caption" sx={{ color: '#7f1d1d', fontWeight: 800, fontSize: '0.85rem' }}>{contentSummary.failed}</Typography>
+            </Box>
+          )}
+        </Box>
+
         {/* Filtros e controles */}
-        <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-          <Grid container spacing={3} alignItems="center">
-            <Grid item xs={12} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Cliente</InputLabel>
-                <Select
-                  value={selectedClient}
-                  onChange={handleClientChange}
-                  label="Cliente"
-                >
-                  <MenuItem value="all">Todos os Clientes</MenuItem>
-                  {clients.map((client) => (
-                    <MenuItem key={client.id} value={client.id}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                <SmartImage
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25 }}
+        >
+          <Paper elevation={0} sx={{
+            p: { xs: 2, md: 2.5 }, mb: 3,
+            borderRadius: GLASS.radius.card,
+            bgcolor: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }}>
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: { xs: 'column', md: 'row' },
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              gap: 2
+            }}>
+              {/* Filtro de Cliente */}
+              <Box sx={{ width: { xs: '100%', md: 'auto' }, minWidth: { md: 260 } }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: GLASS.text.muted, mb: 0.5, display: 'block', ml: 0.5 }}>
+                  Cliente
+                </Typography>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={selectedClient}
+                    onChange={handleClientChange}
+                    displayEmpty
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          mt: 1,
+                          borderRadius: GLASS.radius.inner,
+                          border: `1px solid ${GLASS.border.outer}`,
+                          boxShadow: GLASS.shadow.cardHover,
+                        }
+                      }
+                    }}
+                    sx={{ 
+                      borderRadius: GLASS.radius.button,
+                      bgcolor: 'rgba(82, 86, 99, 0.02)',
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: GLASS.border.subtle,
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: GLASS.border.outer,
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: GLASS.accent.orange,
+                        borderWidth: '1px',
+                      },
+                    }}
+                    renderValue={(selected) => {
+                      if (selected === 'all' || !selected) {
+                        return <Typography sx={{ color: GLASS.text.body, fontWeight: 600, fontSize: '0.9rem' }}>Todos os Clientes</Typography>;
+                      }
+                      const client = getClientById(selected);
+                      return (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <SmartImage
                             src={getClientLogo(client)}
-                            clientId={client.id} // ✅ ADICIONAR clientId
+                            clientId={client?.id}
+                            alt={client?.name || 'Cliente'}
+                            width={20}
+                            height={20}
+                            borderRadius="50%"
+                            fallbackText={client?.name?.charAt(0) || 'C'}
+                          />
+                          <Typography sx={{ color: GLASS.text.heading, fontWeight: 600, fontSize: '0.9rem' }}>{client?.name}</Typography>
+                        </Box>
+                      );
+                    }}
+                  >
+                    <MenuItem value="all" sx={{ borderRadius: 1, mx: 0.5, my: 0.2 }}>
+                      <Typography sx={{ fontWeight: 600, fontSize: '0.9rem' }}>Todos os Clientes</Typography>
+                    </MenuItem>
+                    {clients.map((client) => (
+                      <MenuItem key={client.id} value={client.id} sx={{ borderRadius: 1, mx: 0.5, my: 0.2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <SmartImage
+                            src={getClientLogo(client)}
+                            clientId={client.id}
                             alt={client.name}
                             width={24}
                             height={24}
                             borderRadius="50%"
                             fallbackText={client.name.charAt(0)}
-                            sx={{ mr: 1 }}
-                            
-                        />
-                        {client.name}
-                      </Box>
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            
-            <Grid item xs={12} md={4}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <IconButton onClick={() => setSelectedMonth(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1))}>
-                  ←
+                          />
+                          <Typography sx={{ fontWeight: 500, fontSize: '0.9rem' }}>{client.name}</Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+              
+              {/* Navegação de Data */}
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                gap: 1,
+                bgcolor: 'rgba(82, 86, 99, 0.03)',
+                border: `1px solid ${GLASS.border.subtle}`,
+                borderRadius: GLASS.radius.badge,
+                p: 0.5,
+                width: { xs: '100%', md: 'auto' },
+                mt: { xs: 0, md: 2.5 }
+              }}>
+                <IconButton
+                  size="small"
+                  onClick={() => setSelectedMonth(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1))}
+                  sx={{ 
+                    color: GLASS.text.body, 
+                    bgcolor: GLASS.surface.bg,
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                    '&:hover': { bgcolor: GLASS.surface.bgHover, color: GLASS.accent.orange },
+                    width: 32, height: 32
+                  }}
+                >
+                  <Box component="span" sx={{ fontSize: '1.2rem', lineHeight: 1 }}>←</Box>
                 </IconButton>
-                <Typography variant="h6" sx={{ minWidth: 200, textAlign: 'center' }}>
+                <Typography variant="subtitle1" sx={{ 
+                  minWidth: 140, 
+                  textAlign: 'center', 
+                  color: GLASS.text.heading,
+                  fontWeight: 700,
+                  textTransform: 'capitalize',
+                  fontSize: '0.95rem'
+                }}>
                   {format(selectedMonth, 'MMMM yyyy', { locale: ptBR })}
                 </Typography>
-                <IconButton onClick={() => setSelectedMonth(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1))}>
-                  →
+                <IconButton
+                  size="small"
+                  onClick={() => setSelectedMonth(new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1))}
+                  sx={{ 
+                    color: GLASS.text.body, 
+                    bgcolor: GLASS.surface.bg,
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                    '&:hover': { bgcolor: GLASS.surface.bgHover, color: GLASS.accent.orange },
+                    width: 32, height: 32
+                  }}
+                >
+                  <Box component="span" sx={{ fontSize: '1.2rem', lineHeight: 1 }}>→</Box>
                 </IconButton>
               </Box>
-            </Grid>
-            
-            <Grid item xs={12} md={4}>
-              <ToggleButtonGroup
-                value={viewMode}
-                exclusive
-                onChange={handleViewModeChange}
-                size="small"
-              >
-                <ToggleButton value="calendar">
-                  <ViewModuleIcon sx={{ mr: 1 }} />
-                  Calendário
-                </ToggleButton>
-                <ToggleButton value="list">
-                  <ViewListIcon sx={{ mr: 1 }} />
-                  Lista
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Grid>
-          </Grid>
-        </Paper>
+              
+              {/* Modo de Visualização */}
+              <Box sx={{ 
+                width: { xs: '100%', md: 'auto' }, 
+                display: 'flex', 
+                justifyContent: { xs: 'center', md: 'flex-end' },
+                mt: { xs: 0, md: 2.5 }
+              }}>
+                <ToggleButtonGroup
+                  value={viewMode}
+                  exclusive
+                  onChange={handleViewModeChange}
+                  size="small"
+                  sx={{
+                    bgcolor: 'rgba(82, 86, 99, 0.03)',
+                    border: `1px solid ${GLASS.border.subtle}`,
+                    p: 0.5,
+                    borderRadius: GLASS.radius.badge,
+                    width: { xs: '100%', sm: 'auto' },
+                    display: 'flex',
+                    '& .MuiToggleButton-root': {
+                      border: 'none',
+                      flex: { xs: 1, sm: 'initial' },
+                      borderRadius: `${GLASS.radius.badge} !important`,
+                      color: GLASS.text.muted,
+                      px: 2.5,
+                      py: 0.75,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      fontSize: '0.85rem',
+                      transition: 'all 0.2s',
+                      '&.Mui-selected': {
+                        bgcolor: GLASS.surface.bg,
+                        color: GLASS.accent.orange,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.02)',
+                        '&:hover': { bgcolor: GLASS.surface.bgHover },
+                      },
+                      '&:hover': {
+                        bgcolor: 'transparent',
+                        color: GLASS.text.heading,
+                      }
+                    },
+                  }}
+                >
+                  <ToggleButton value="calendar">
+                    Calendário
+                  </ToggleButton>
+                  <ToggleButton value="list">
+                    Lista
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </Box>
+            </Box>
+          </Paper>
+        </motion.div>
 
+        <AnimatePresence mode="wait">
         {/* Visualização de Calendário */}
         {viewMode === 'calendar' && (
-          <Paper sx={{ p: 3, borderRadius: 2 }}>
-            <Typography variant="h6" sx={{ mb: 3 }}>
+          <motion.div
+            key="calendar-view"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25 }}
+          >
+          <Paper elevation={0} sx={{
+            p: 3,
+            borderRadius: GLASS.radius.card,
+            bgcolor: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }}>
+            <Typography variant="h6" sx={{ mb: 3, color: GLASS.text.heading }}>
               {format(selectedMonth, 'MMMM yyyy', { locale: ptBR })}
             </Typography>
             
@@ -1085,7 +1330,7 @@ const StoryCalendar: React.FC = () => {
                   <Typography 
                     variant="subtitle2" 
                     align="center" 
-                    sx={{ fontWeight: 'bold', color: 'text.secondary' }}
+                    sx={{ fontWeight: 'bold', color: GLASS.text.muted }}
                   >
                     {day}
                   </Typography>
@@ -1108,6 +1353,7 @@ const StoryCalendar: React.FC = () => {
                         minHeight: 120,
                         bgcolor: 'transparent',
                         border: 'none',
+                        borderRadius: GLASS.radius.inner,
                         display: 'flex',
                         flexDirection: 'column'
                       }}
@@ -1127,20 +1373,26 @@ const StoryCalendar: React.FC = () => {
                       p: 1, 
                       height: '100%', 
                       minHeight: 120,
-                      bgcolor: isDayToday ? 'rgba(25, 118, 210, 0.08)' : 
-                               !isCurrentMonth ? 'rgba(0, 0, 0, 0.03)' : 'background.paper',
-                      border: isDayToday ? `1px solid ${theme.palette.primary.main}` : '1px solid #eee',
-                      borderRadius: 1,
+                      bgcolor: isDayToday ? 'rgba(247, 66, 17, 0.10)' :
+                               !isCurrentMonth ? 'rgba(0, 0, 0, 0.02)' : GLASS.surface.bg,
+                      backdropFilter: `blur(${GLASS.surface.blur})`,
+                      border: isDayToday ? `1.5px solid ${GLASS.accent.orange}` : `1px solid ${GLASS.border.subtle}`,
+                      borderRadius: GLASS.radius.inner,
                       display: 'flex',
                       flexDirection: 'column',
-                      opacity: isCurrentMonth ? 1 : 0.6
+                      opacity: isCurrentMonth ? 1 : 0.6,
+                      transition: `all ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
+                      '&:hover': {
+                        bgcolor: isDayToday ? 'rgba(247, 66, 17, 0.14)' : GLASS.surface.bgHover,
+                        boxShadow: GLASS.shadow.card,
+                      },
                     }}
                   >
                     <Typography 
                       variant="body2" 
                       sx={{ 
                         fontWeight: isDayToday ? 'bold' : 'normal',
-                        color: isDayToday ? 'primary.main' : 'text.primary',
+                        color: isDayToday ? GLASS.accent.orange : GLASS.text.body,
                         mb: 1
                       }}
                     >
@@ -1159,17 +1411,22 @@ const StoryCalendar: React.FC = () => {
                             <Box 
                               key={content.id} 
                               sx={{ 
-                                p: 0.5, 
-                                mb: 0.5, 
-                                bgcolor: getContentTypeColor(content.postType),
-                                color: '#fff',
-                                borderRadius: 1,
-                                fontSize: '0.75rem',
+                                p: 1,
+                                mb: 0.75, 
+                                bgcolor: GLASS.surface.bg,
+                                border: `1px solid ${GLASS.border.subtle}`,
+                                borderRadius: GLASS.radius.buttonSm,
                                 display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
+                                flexDirection: 'column',
+                                gap: 0.5,
                                 cursor: 'pointer',
-                                '&:hover': { opacity: 0.9 }
+                                transition: `all ${GLASS.motion.duration.fast} ${GLASS.motion.easing}`,
+                                '&:hover': { 
+                                  bgcolor: GLASS.surface.bgHover,
+                                  borderColor: GLASS.border.outer,
+                                  transform: 'translateY(-1px)',
+                                  boxShadow: GLASS.shadow.card,
+                                }
                               }}
                               onClick={() => {
                                 setSelectedContent(content);
@@ -1177,48 +1434,81 @@ const StoryCalendar: React.FC = () => {
                                 setMenuAnchorEl(null);
                               }}
                             >
-                              <Box sx={{ display: 'flex', alignItems: 'center', overflow: 'hidden', flex: 1, minWidth: 0 }}>
-                                <Tooltip title={client?.name || 'Cliente'}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.5 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, flex: 1 }}>
                                   <SmartImage
-                                        src={getClientLogo(client)}
-                                        clientId={client?.id}
-                                        alt={client?.name || 'Cliente'}
-                                        width={16}
-                                        height={16}
-                                        borderRadius="50%"
-                                        fallbackText={client?.name?.charAt(0) || 'C'}
-                                        sx={{ mr: 0.5 }}
+                                    src={getClientLogo(client)}
+                                    clientId={client?.id}
+                                    alt={client?.name || 'Cliente'}
+                                    width={18}
+                                    height={18}
+                                    borderRadius="50%"
+                                    fallbackText={client?.name?.charAt(0) || 'C'}
+                                    sx={{ flexShrink: 0 }}
                                   />
-                                </Tooltip>
-                                <Typography 
-                                  variant="caption" 
-                                  sx={{ 
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                    flex: 1
+                                  <Typography 
+                                    variant="caption" 
+                                    sx={{ 
+                                      fontWeight: 600,
+                                      color: GLASS.text.heading,
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      fontSize: '0.75rem',
+                                    }}
+                                  >
+                                    {client?.name || 'Cliente'}
+                                  </Typography>
+                                </Box>
+                                <IconButton 
+                                  size="small" 
+                                  sx={{ color: GLASS.text.muted, p: 0, flexShrink: 0, '&:hover': { color: GLASS.accent.orange } }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMenuOpen(e, content);
                                   }}
                                 >
-                                  {safeFormatDate(content.scheduledDate, 'HH:mm')}
-                                </Typography>
+                                  <MoreVertIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
                               </Box>
-                              <Box sx={{ display: 'flex', alignItems: 'center', ml: 0.5 }}>
-                                <Tooltip title={content.postType}>
+
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                  <Tooltip title={content.postType.toUpperCase()}>
+                                    <Box component="span" sx={{ display: 'flex', alignItems: 'center', color: getContentTypeColor(content.postType) }}>
+                                      {getContentTypeIcon(content.postType)}
+                                    </Box>
+                                  </Tooltip>
+                                  <Typography 
+                                    variant="caption" 
+                                    sx={{ 
+                                      fontWeight: 600,
+                                      color: GLASS.text.muted,
+                                      fontSize: '0.75rem',
+                                    }}
+                                  >
+                                    {safeFormatDate(content.scheduledDate, 'HH:mm')}
+                                  </Typography>
+                                </Box>
+                                <Tooltip title={getStatusLabel(content.status)}>
                                   <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
-                                    {getContentTypeIcon(content.postType)}
+                                    {getStatusIcon(content.status)}
                                   </Box>
                                 </Tooltip>
+                                {(() => {
+                                  const raw = content as unknown as Record<string, unknown>;
+                                  const requiresApproval = (content.requiresApproval ?? raw.requires_approval) as boolean | undefined;
+                                  const approvalStatus = (content.approvalStatus ?? raw.approval_status) as string | undefined;
+                                  const isApprovalFlow = requiresApproval || approvalStatus;
+                                  return isApprovalFlow ? (
+                                    <Tooltip title="Fluxo de Aprovação do Cliente">
+                                      <Box component="span" sx={{ display: 'flex', alignItems: 'center', color: GLASS.accent.blue, ml: 0.5 }}>
+                                        <FactCheckIcon sx={{ fontSize: 14 }} />
+                                      </Box>
+                                    </Tooltip>
+                                  ) : null;
+                                })()}
                               </Box>
-                              <IconButton 
-                                size="small" 
-                                sx={{ color: 'inherit', p: 0.25 }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleMenuOpen(e, content);
-                                }}
-                              >
-                                <MoreVertIcon fontSize="small" />
-                              </IconButton>
                             </Box>
                           );
                         })}
@@ -1232,42 +1522,71 @@ const StoryCalendar: React.FC = () => {
             </Box>
             
             {/* Legenda */}
-            <Box sx={{ mt: 3, display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Box sx={{ width: 16, height: 16, bgcolor: getContentTypeColor('post'), borderRadius: 1, mr: 1 }} />
-                <Typography variant="caption">Post</Typography>
+            <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${GLASS.border.subtle}` }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 1.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: GLASS.text.muted, mr: 1 }}>Tipo:</Typography>
+                {[
+                  { type: 'post', label: 'Post' },
+                  { type: 'carousel', label: 'Carrossel' },
+                  { type: 'reels', label: 'Reels' },
+                  { type: 'stories', label: 'Stories' },
+                ].map(({ type, label }) => (
+                  <Box key={type} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box sx={{ 
+                      width: 14, height: 14, borderRadius: '4px', 
+                      bgcolor: getContentTypeBg(type),
+                      border: `1.5px solid ${getContentTypeColor(type)}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Box component="span" sx={{ color: getContentTypeColor(type), display: 'flex', '& svg': { fontSize: 10 } }}>
+                        {getContentTypeIcon(type)}
+                      </Box>
+                    </Box>
+                    <Typography variant="caption" sx={{ color: GLASS.text.body }}>{label}</Typography>
+                  </Box>
+                ))}
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Box sx={{ width: 16, height: 16, bgcolor: getContentTypeColor('carousel'), borderRadius: 1, mr: 1 }} />
-                <Typography variant="caption">Carrossel</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Box sx={{ width: 16, height: 16, bgcolor: getContentTypeColor('reels'), borderRadius: 1, mr: 1 }} />
-                <Typography variant="caption">Reels</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Box sx={{ width: 16, height: 16, bgcolor: getContentTypeColor('stories'), borderRadius: 1, mr: 1 }} />
-                <Typography variant="caption">Stories</Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: GLASS.text.muted, mr: 0.5 }}>Status:</Typography>
+                <Chip label="Pendente" size="small" color="warning" sx={{ height: 20, fontSize: '0.65rem' }} />
+                <Chip label="Enviado" size="small" color="info" sx={{ height: 20, fontSize: '0.65rem' }} />
+                <Chip label="Publicado" size="small" color="success" sx={{ height: 20, fontSize: '0.65rem' }} />
+                <Chip label="Falhou" size="small" color="error" sx={{ height: 20, fontSize: '0.65rem' }} />
               </Box>
             </Box>
           </Paper>
+          </motion.div>
         )}
         
         {/* Visualização de Lista */}
         {viewMode === 'list' && (
+          <motion.div
+            key="list-view"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25 }}
+          >
           <>
             {/* Filtros do modo lista */}
-            <Paper sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Paper elevation={0} sx={{
+              p: { xs: 2, md: 2.5 }, mb: 3,
+              borderRadius: GLASS.radius.card,
+              bgcolor: GLASS.surface.bg,
+              backdropFilter: `blur(${GLASS.surface.blur})`,
+              border: `1px solid ${GLASS.border.outer}`,
+              boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <FilterListIcon color="primary" />
-                  <Typography variant="h6">
-                    Filtros
+                  <FilterListIcon sx={{ color: GLASS.accent.orange, fontSize: 20 }} />
+                  <Typography variant="subtitle1" sx={{ color: GLASS.text.heading, fontWeight: 700 }}>
+                    Filtros Avançados
                   </Typography>
                 </Box>
                 <Button
                   size="small"
-                  startIcon={<ClearIcon />}
+                  startIcon={<ClearIcon fontSize="small" />}
                   onClick={() => {
                     setSelectedUserId('all');
                     setSelectedStatus('all');
@@ -1275,25 +1594,40 @@ const StoryCalendar: React.FC = () => {
                     setEndDate('');
                   }}
                   disabled={selectedUserId === 'all' && selectedStatus === 'all' && !startDate && !endDate}
+                  sx={{ 
+                    textTransform: 'none', 
+                    fontWeight: 600,
+                    color: GLASS.text.muted,
+                    '&:hover': { bgcolor: 'rgba(82, 86, 99, 0.04)', color: GLASS.text.heading }
+                  }}
                 >
-                  Limpar Filtros
+                  Limpar
                 </Button>
               </Box>
               
               <Grid container spacing={2}>
                 {/* Filtro por Usuário */}
                 <Grid item xs={12} sm={6} md={3}>
-                  <FormControl fullWidth>
-                    <InputLabel>Usuário</InputLabel>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: GLASS.text.muted, mb: 0.5, display: 'block', ml: 0.5 }}>
+                    Usuário
+                  </Typography>
+                  <FormControl fullWidth size="small">
                     <Select
                       value={selectedUserId}
                       onChange={(e) => setSelectedUserId(e.target.value)}
-                      label="Usuário"
+                      displayEmpty
+                      sx={{ 
+                        borderRadius: GLASS.radius.button,
+                        bgcolor: 'rgba(82, 86, 99, 0.02)',
+                        '& .MuiOutlinedInput-notchedOutline': { borderColor: GLASS.border.subtle },
+                        '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: GLASS.border.outer },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: GLASS.accent.orange, borderWidth: '1px' },
+                      }}
                     >
-                      <MenuItem value="all">Todos os Usuários</MenuItem>
+                      <MenuItem value="all"><Typography sx={{ fontSize: '0.9rem', fontWeight: 500 }}>Todos os Usuários</Typography></MenuItem>
                       {users.map((user) => (
                         <MenuItem key={user.id} value={user.id}>
-                          {user.full_name || user.email || user.id.substring(0, 8) + '...'}
+                          <Typography sx={{ fontSize: '0.9rem' }}>{user.full_name || user.email || user.id.substring(0, 8) + '...'}</Typography>
                         </MenuItem>
                       ))}
                     </Select>
@@ -1302,59 +1636,93 @@ const StoryCalendar: React.FC = () => {
                 
                 {/* Filtro por Status */}
                 <Grid item xs={12} sm={6} md={3}>
-                  <FormControl fullWidth>
-                    <InputLabel>Status</InputLabel>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: GLASS.text.muted, mb: 0.5, display: 'block', ml: 0.5 }}>
+                    Status
+                  </Typography>
+                  <FormControl fullWidth size="small">
                     <Select
                       value={selectedStatus}
                       onChange={(e) => setSelectedStatus(e.target.value)}
-                      label="Status"
+                      displayEmpty
+                      sx={{ 
+                        borderRadius: GLASS.radius.button,
+                        bgcolor: 'rgba(82, 86, 99, 0.02)',
+                        '& .MuiOutlinedInput-notchedOutline': { borderColor: GLASS.border.subtle },
+                        '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: GLASS.border.outer },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: GLASS.accent.orange, borderWidth: '1px' },
+                      }}
                     >
-                      <MenuItem value="all">Todos os Status</MenuItem>
-                      <MenuItem value="pending">Pendente</MenuItem>
-                      <MenuItem value="sent_to_n8n">Enviado</MenuItem>
-                      <MenuItem value="processing">Processando</MenuItem>
-                      <MenuItem value="posted">Publicado</MenuItem>
-                      <MenuItem value="failed">Falhou</MenuItem>
-                      <MenuItem value="cancelled">Cancelado</MenuItem>
+                      <MenuItem value="all"><Typography sx={{ fontSize: '0.9rem', fontWeight: 500 }}>Todos os Status</Typography></MenuItem>
+                      <MenuItem value="pending"><Typography sx={{ fontSize: '0.9rem' }}>Pendente</Typography></MenuItem>
+                      <MenuItem value="sent_to_n8n"><Typography sx={{ fontSize: '0.9rem' }}>Enviado</Typography></MenuItem>
+                      <MenuItem value="processing"><Typography sx={{ fontSize: '0.9rem' }}>Processando</Typography></MenuItem>
+                      <MenuItem value="posted"><Typography sx={{ fontSize: '0.9rem' }}>Publicado</Typography></MenuItem>
+                      <MenuItem value="failed"><Typography sx={{ fontSize: '0.9rem' }}>Falhou</Typography></MenuItem>
+                      <MenuItem value="cancelled"><Typography sx={{ fontSize: '0.9rem' }}>Cancelado</Typography></MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
                 
                 {/* Filtro por Data Inicial */}
                 <Grid item xs={12} sm={6} md={3}>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: GLASS.text.muted, mb: 0.5, display: 'block', ml: 0.5 }}>
+                    Data Inicial
+                  </Typography>
                   <TextField
                     fullWidth
-                    label="Data Inicial"
+                    size="small"
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    InputLabelProps={{
-                      shrink: true,
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: GLASS.radius.button,
+                        bgcolor: 'rgba(82, 86, 99, 0.02)',
+                        '& fieldset': { borderColor: GLASS.border.subtle },
+                        '&:hover fieldset': { borderColor: GLASS.border.outer },
+                        '&.Mui-focused fieldset': { borderColor: GLASS.accent.orange, borderWidth: '1px' },
+                      },
+                      '& .MuiInputBase-input': { fontSize: '0.9rem' }
                     }}
                   />
                 </Grid>
                 
                 {/* Filtro por Data Final */}
                 <Grid item xs={12} sm={6} md={3}>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: GLASS.text.muted, mb: 0.5, display: 'block', ml: 0.5 }}>
+                    Data Final
+                  </Typography>
                   <TextField
                     fullWidth
-                    label="Data Final"
+                    size="small"
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    InputLabelProps={{
-                      shrink: true,
-                    }}
-                    inputProps={{
-                      min: startDate || undefined
+                    inputProps={{ min: startDate || undefined }}
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: GLASS.radius.button,
+                        bgcolor: 'rgba(82, 86, 99, 0.02)',
+                        '& fieldset': { borderColor: GLASS.border.subtle },
+                        '&:hover fieldset': { borderColor: GLASS.border.outer },
+                        '&.Mui-focused fieldset': { borderColor: GLASS.accent.orange, borderWidth: '1px' },
+                      },
+                      '& .MuiInputBase-input': { fontSize: '0.9rem' }
                     }}
                   />
                 </Grid>
               </Grid>
             </Paper>
             
-            <Paper sx={{ p: 3, borderRadius: 2 }}>
-              <Typography variant="h6" sx={{ mb: 3 }}>
+            <Paper elevation={0} sx={{
+              p: 3,
+              borderRadius: GLASS.radius.card,
+              bgcolor: GLASS.surface.bg,
+              backdropFilter: `blur(${GLASS.surface.blur})`,
+              border: `1px solid ${GLASS.border.outer}`,
+              boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+            }}>
+              <Typography variant="h6" sx={{ mb: 3, color: GLASS.text.heading }}>
                 Conteúdo Agendado {filteredContent.length > 0 && `(${filteredContent.length})`}
               </Typography>
             
@@ -1378,6 +1746,11 @@ const StoryCalendar: React.FC = () => {
                   variant="contained" 
                   startIcon={<AddIcon />}
                   onClick={() => navigate('/create-story')}
+                  sx={{
+                    bgcolor: GLASS.accent.orange,
+                    borderRadius: GLASS.radius.button,
+                    '&:hover': { bgcolor: GLASS.accent.orangeDark },
+                  }}
                 >
                   Criar Novo Conteúdo
                 </Button>
@@ -1415,7 +1788,6 @@ const StoryCalendar: React.FC = () => {
                     });
                     
                     // Calcular paginação
-                    const totalPages = Math.ceil(sortedContent.length / itemsPerPage);
                     const startIndex = (currentPage - 1) * itemsPerPage;
                     const endIndex = startIndex + itemsPerPage;
                     const paginatedContent = sortedContent.slice(startIndex, endIndex);
@@ -1428,9 +1800,16 @@ const StoryCalendar: React.FC = () => {
                     
                     return (
                       <React.Fragment key={content.id}>
-                        {index > 0 && <Divider component="li" />}
+                        {index > 0 && <Divider component="li" sx={{ ml: 0 }} />}
                         <ListItem
-                          sx={{ cursor: 'pointer' }}
+                          sx={{ 
+                            cursor: 'pointer',
+                            bgcolor: getContentTypeBg(content.postType),
+                            borderRadius: '8px',
+                            mb: 0.5,
+                            transition: 'background-color 0.15s ease',
+                            '&:hover': { bgcolor: getContentTypeBg(content.postType).replace('0.07', '0.12') },
+                          }}
                           onClick={() => {
                             setSelectedContent(content);
                             setPreviewOpen(true);
@@ -1452,20 +1831,32 @@ const StoryCalendar: React.FC = () => {
                           </ListItemAvatar>
                           <ListItemText
                             primary={
-                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                      <SmartImage
-                                        src={getClientLogoForAvatar(content)}
-                                        clientId={client?.id}
-                                        alt={client?.name || 'Cliente'}
-                                        width={24}
-                                        height={24}
-                                        borderRadius="50%"
-                                        fallbackText={client?.name?.charAt(0) || 'C'}
-                                        sx={{ mr: 1 }}
-                                      />
-                                <Typography variant="subtitle1" component="span">
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <SmartImage
+                                  src={getClientLogoForAvatar(content)}
+                                  clientId={client?.id}
+                                  alt={client?.name || 'Cliente'}
+                                  width={24}
+                                  height={24}
+                                  borderRadius="50%"
+                                  fallbackText={client?.name?.charAt(0) || 'C'}
+                                />
+                                <Typography variant="subtitle1" component="span" sx={{ fontWeight: 600 }}>
                                   {client?.name || 'Cliente não encontrado'}
                                 </Typography>
+                                <Chip
+                                  icon={<Box component="span" sx={{ display: 'flex', color: getContentTypeColor(content.postType) }}>{getContentTypeIcon(content.postType)}</Box>}
+                                  label={content.postType.toUpperCase()}
+                                  size="small"
+                                  sx={{
+                                    bgcolor: getContentTypeBg(content.postType),
+                                    color: getContentTypeColor(content.postType),
+                                    fontWeight: 600,
+                                    fontSize: '0.65rem',
+                                    height: 22,
+                                    border: `1px solid ${getContentTypeColor(content.postType)}30`,
+                                  }}
+                                />
                               </Box>
                             }
                             secondary={
@@ -1478,11 +1869,28 @@ const StoryCalendar: React.FC = () => {
                                     variant="outlined"
                                   />
                                   <Chip 
-                                    icon={content.status === 'failed' ? <ErrorIcon /> : <CheckCircleIcon />} 
+                                    icon={content.status === 'failed' ? <ErrorIcon /> : <CheckCircleIcon />}
                                     label={getStatusLabel(content.status)}
                                     size="small"
                                     color={getStatusColor(content.status)}
                                   />
+                                  {(() => {
+                                    const raw = content as unknown as Record<string, unknown>;
+                                    const requiresApproval = (content.requiresApproval ?? raw.requires_approval) as boolean | undefined;
+                                    const approvalStatus = (content.approvalStatus ?? raw.approval_status) as string | undefined;
+                                    if (requiresApproval || approvalStatus) {
+                                      return (
+                                        <Chip 
+                                          icon={<FactCheckIcon />}
+                                          label="Aprovação"
+                                          size="small"
+                                          variant="outlined"
+                                          color="info"
+                                        />
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                   {(() => {
                                     const creatorUser = getCreatorUser(content.userId);
                                     if (!creatorUser) return null;
@@ -1534,10 +1942,25 @@ const StoryCalendar: React.FC = () => {
                         count={totalPages}
                         page={currentPage}
                         onChange={(_, page) => setCurrentPage(page)}
-                        color="primary"
+                        color="standard"
                         size="large"
                         showFirstButton
                         showLastButton
+                        sx={{
+                          '& .MuiPaginationItem-root': {
+                            borderRadius: GLASS.radius.button,
+                            border: `1px solid ${GLASS.border.outer}`,
+                            bgcolor: GLASS.surface.bg,
+                            backdropFilter: `blur(${GLASS.surface.blur})`,
+                            color: GLASS.text.body,
+                            '&.Mui-selected': {
+                              bgcolor: GLASS.accent.orange,
+                              color: '#fff',
+                              borderColor: GLASS.accent.orange,
+                              '&:hover': { bgcolor: GLASS.accent.orangeDark },
+                            },
+                          },
+                        }}
                       />
                     </Box>
                   );
@@ -1546,7 +1969,9 @@ const StoryCalendar: React.FC = () => {
             )}
           </Paper>
           </>
+          </motion.div>
         )}
+        </AnimatePresence>
       </Container>
 
       {/* Menu de contexto */}
@@ -1554,6 +1979,15 @@ const StoryCalendar: React.FC = () => {
         anchorEl={menuAnchorEl}
         open={Boolean(menuAnchorEl)}
         onClose={handleMenuClose}
+        PaperProps={{
+          sx: {
+            borderRadius: GLASS.radius.inner,
+            bgcolor: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: GLASS.shadow.card,
+          }
+        }}
       >
         <MenuItem onClick={handlePreview}>
           <ListItemIcon>
@@ -1582,22 +2016,29 @@ const StoryCalendar: React.FC = () => {
         open={previewOpen} 
         onClose={() => {
           setPreviewOpen(false);
-          setSelectedContent(null); // Limpar apenas quando fechar o modal
+          setSelectedContent(null);
         }}
         maxWidth="md"
         fullWidth
         PaperProps={{
-          sx: { borderRadius: 2 }
+          sx: {
+            borderRadius: GLASS.radius.card,
+            bgcolor: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }
         }}
       >
         <DialogTitle sx={{ 
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'space-between',
-          pb: 1
+          pb: 1,
+          color: GLASS.text.heading,
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <VisibilityIcon sx={{ mr: 1 }} />
+            <VisibilityIcon sx={{ mr: 1, color: GLASS.accent.orange }} />
             Visualizar Conteúdo
           </Box>
           {selectedContent && (
@@ -1606,7 +2047,8 @@ const StoryCalendar: React.FC = () => {
               size="small"
               sx={{ 
                 bgcolor: getContentTypeColor(selectedContent.postType),
-                color: 'white'
+                color: 'white',
+                borderRadius: GLASS.radius.badge,
               }}
             />
           )}
@@ -1614,11 +2056,14 @@ const StoryCalendar: React.FC = () => {
         <DialogContent sx={{ pt: 2 }}>
           {renderPreviewContent()}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => {
-            setPreviewOpen(false);
-            setSelectedContent(null); // Limpar quando fechar
-          }}>
+        <DialogActions sx={{ borderTop: `1px solid ${GLASS.border.subtle}`, pt: 2 }}>
+          <Button
+            onClick={() => {
+              setPreviewOpen(false);
+              setSelectedContent(null);
+            }}
+            sx={{ borderRadius: GLASS.radius.button, color: GLASS.text.muted }}
+          >
             Fechar
           </Button>
           {selectedContent && canEditPost(selectedContent.status) && (
@@ -1626,6 +2071,11 @@ const StoryCalendar: React.FC = () => {
               variant="contained" 
               onClick={handleEdit}
               startIcon={<EditIcon />}
+              sx={{
+                bgcolor: GLASS.accent.orange,
+                borderRadius: GLASS.radius.button,
+                '&:hover': { bgcolor: GLASS.accent.orangeDark },
+              }}
             >
               Editar
             </Button>
@@ -1638,14 +2088,20 @@ const StoryCalendar: React.FC = () => {
         open={deleteConfirmOpen} 
         onClose={() => {
           setDeleteConfirmOpen(false);
-          setSelectedContent(null); // Limpar apenas quando fechar o modal
+          setSelectedContent(null);
         }}
         maxWidth="sm"
         PaperProps={{
-          sx: { borderRadius: 2 }
+          sx: {
+            borderRadius: GLASS.radius.card,
+            bgcolor: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }
         }}
       >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center' }}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', color: GLASS.text.heading }}>
           <DeleteIcon sx={{ mr: 1, color: 'error.main' }} />
           Confirmar Exclusão
         </DialogTitle>
@@ -1659,7 +2115,13 @@ const StoryCalendar: React.FC = () => {
             Tem certeza que deseja excluir este conteúdo? Esta ação não pode ser desfeita.
           </Typography>
           {selectedContent ? (
-            <Box sx={{ mt: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+            <Box sx={{
+              mt: 2, p: 2,
+              bgcolor: GLASS.surface.bg,
+              backdropFilter: `blur(${GLASS.surface.blur})`,
+              border: `1px solid ${GLASS.border.subtle}`,
+              borderRadius: GLASS.radius.inner,
+            }}>
               <Typography variant="body2" color="text.secondary">
                 <strong>Cliente:</strong> {getClientById(selectedContent.clientId)?.name || 'Cliente não encontrado'}
               </Typography>
@@ -1679,11 +2141,14 @@ const StoryCalendar: React.FC = () => {
             </Alert>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => {
-            setDeleteConfirmOpen(false);
-            setSelectedContent(null); // Limpar quando cancelar
-          }}>
+        <DialogActions sx={{ borderTop: `1px solid ${GLASS.border.subtle}`, pt: 2 }}>
+          <Button
+            onClick={() => {
+              setDeleteConfirmOpen(false);
+              setSelectedContent(null);
+            }}
+            sx={{ borderRadius: GLASS.radius.button, color: GLASS.text.muted }}
+          >
             Cancelar
           </Button>
           <Button 
@@ -1692,6 +2157,7 @@ const StoryCalendar: React.FC = () => {
             onClick={handleDelete}
             startIcon={<DeleteIcon />}
             disabled={!selectedContent}
+            sx={{ borderRadius: GLASS.radius.button }}
           >
             Excluir
           </Button>
@@ -1705,10 +2171,16 @@ const StoryCalendar: React.FC = () => {
         maxWidth="md"
         fullWidth
         PaperProps={{
-          sx: { borderRadius: 2 }
+          sx: {
+            borderRadius: GLASS.radius.card,
+            bgcolor: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }
         }}
       >
-        <DialogTitle>
+        <DialogTitle sx={{ color: GLASS.text.heading }}>
           Gerenciar Clientes
         </DialogTitle>
         <DialogContent>
@@ -1719,8 +2191,11 @@ const StoryCalendar: React.FC = () => {
             onClientDeleted={handleDeleteClient}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setClientDialogOpen(false)}>
+        <DialogActions sx={{ borderTop: `1px solid ${GLASS.border.subtle}`, pt: 2 }}>
+          <Button
+            onClick={() => setClientDialogOpen(false)}
+            sx={{ borderRadius: GLASS.radius.button, color: GLASS.text.muted }}
+          >
             Fechar
           </Button>
         </DialogActions>

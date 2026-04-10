@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, CircularProgress, Alert, Button, useTheme } from '@mui/material';
+import { Box, Typography, CircularProgress, Alert, Button, alpha } from '@mui/material';
 import InstagramAccountSelector from '../components/InstagramAccountSelector';
 import { getAuthorizationUrl, InstagramAuthData } from '../services/instagramAuthService';
 import { clientService } from '../services/supabaseClient';
 import { devLog, logClientError } from '../utils/clientLogger';
+import { GLASS } from '../theme/glassTokens';
 
 const Callback: React.FC = () => {
-  const theme = useTheme();
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
@@ -238,24 +238,56 @@ const Callback: React.FC = () => {
         minHeight: '100vh',
         p: 3,
         textAlign: 'center',
-        bgcolor: 'background.default',
+        background: `linear-gradient(135deg, ${alpha(GLASS.accent.orange, 0.08)} 0%, ${alpha(GLASS.accent.orangeLight, 0.05)} 100%)`,
       }}
     >
       {loading && (
-        <>
-          <CircularProgress size={60} sx={{ mb: 3, color: theme.palette.primary.main }} />
-          <Typography variant="h6" sx={{ mb: 1 }}>
+        <Box
+          sx={{
+            p: 5,
+            borderRadius: GLASS.radius.card,
+            background: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+            maxWidth: 500,
+            width: '100%',
+          }}
+        >
+          <CircularProgress size={60} sx={{ mb: 3, color: GLASS.accent.orange }} />
+          <Typography variant="h6" sx={{ mb: 1, color: GLASS.text.heading }}>
             Processando login Facebook…
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
             Carregando páginas e contas Instagram vinculadas.
           </Typography>
-        </>
+        </Box>
       )}
 
       {error && (
-        <Box sx={{ maxWidth: 500, width: '100%' }}>
-          <Alert severity="error" sx={{ mb: 3 }}>
+        <Box
+          sx={{
+            maxWidth: 500,
+            width: '100%',
+            p: 4,
+            borderRadius: GLASS.radius.card,
+            background: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }}
+        >
+          <Alert
+            severity="error"
+            sx={{
+              mb: 3,
+              borderRadius: GLASS.radius.button,
+              backgroundColor: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+            }}
+          >
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
               Erro na autenticação
             </Typography>
@@ -263,30 +295,90 @@ const Callback: React.FC = () => {
           </Alert>
 
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mb: 3 }}>
-            <Button variant="contained" onClick={handleRetry} sx={{ bgcolor: theme.palette.primary.main }}>
+            <Button
+              variant="contained"
+              onClick={handleRetry}
+              sx={{
+                borderRadius: GLASS.radius.button,
+                fontWeight: 600,
+                textTransform: 'none',
+                background: `linear-gradient(45deg, ${GLASS.accent.orange}, ${GLASS.accent.orangeLight})`,
+                boxShadow: `0 4px 14px ${alpha(GLASS.accent.orange, 0.3)}`,
+                '&:hover': {
+                  background: `linear-gradient(45deg, ${GLASS.accent.orangeDark}, ${GLASS.accent.orange})`,
+                  boxShadow: `0 6px 20px ${alpha(GLASS.accent.orange, 0.4)}`,
+                },
+              }}
+            >
               Tentar novamente
             </Button>
-            <Button variant="outlined" onClick={handleClose}>
+            <Button
+              variant="outlined"
+              onClick={handleClose}
+              sx={{
+                borderRadius: GLASS.radius.button,
+                textTransform: 'none',
+                borderColor: GLASS.border.outer,
+                color: GLASS.text.body,
+                '&:hover': {
+                  borderColor: GLASS.accent.orange,
+                  background: alpha(GLASS.accent.orange, 0.05),
+                },
+              }}
+            >
               Fechar
             </Button>
           </Box>
 
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
             Esta janela pode fechar automaticamente em alguns segundos…
           </Typography>
         </Box>
       )}
 
       {success && (
-        <Box sx={{ maxWidth: 500, width: '100%' }}>
-          <Alert severity="success" sx={{ mb: 3 }}>
+        <Box
+          sx={{
+            maxWidth: 500,
+            width: '100%',
+            p: 4,
+            borderRadius: GLASS.radius.card,
+            background: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }}
+        >
+          <Alert
+            severity="success"
+            sx={{
+              mb: 3,
+              borderRadius: GLASS.radius.button,
+              backgroundColor: alpha(GLASS.accent.orange, 0.08),
+              border: `1px solid ${alpha(GLASS.accent.orange, 0.2)}`,
+            }}
+          >
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
               Sucesso
             </Typography>
             Conta Instagram conectada. Fechando…
           </Alert>
           {!closing && (
-            <Button variant="outlined" onClick={handleClose}>
+            <Button
+              variant="outlined"
+              onClick={handleClose}
+              sx={{
+                borderRadius: GLASS.radius.button,
+                textTransform: 'none',
+                borderColor: GLASS.accent.orange,
+                color: GLASS.accent.orange,
+                '&:hover': {
+                  borderColor: GLASS.accent.orangeDark,
+                  background: alpha(GLASS.accent.orange, 0.05),
+                },
+              }}
+            >
               Fechar agora
             </Button>
           )}

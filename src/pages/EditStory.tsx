@@ -15,15 +15,15 @@ import {
   NavigateNext as NavigateNextIcon,
   Edit as EditIcon
 } from '@mui/icons-material';
-import Header from '../components/Header';
-import { postService } from '../services/supabaseClient';
 import { Story } from '../types';
+import { GLASS } from '../theme/glassTokens';
+import { appShellContainerSx } from '../theme/appShellLayout';
 
 const EditStory: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(true);
-  const [story, setStory] = useState<Story | null>(null);
+  const [, setStory] = useState<Story | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -65,10 +65,7 @@ const EditStory: React.FC = () => {
   }, [id]);
 
   return (
-    <>
-      <Header />
-      
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 4 }}>
         {/* Breadcrumbs de navegação */}
         <Breadcrumbs 
           separator={<NavigateNextIcon fontSize="small" />} 
@@ -107,7 +104,7 @@ const EditStory: React.FC = () => {
           </Typography>
         </Breadcrumbs>
         
-        <Typography variant="h4" sx={{ mb: 4, fontWeight: 'bold' }}>
+        <Typography variant="h4" sx={{ mb: 4, fontWeight: 'bold', color: GLASS.text.heading }}>
           Editar Story
         </Typography>
         
@@ -116,35 +113,59 @@ const EditStory: React.FC = () => {
             <CircularProgress />
           </Box>
         ) : error ? (
-          <Paper sx={{ p: 3, bgcolor: 'error.light', color: 'error.contrastText' }}>
+          <Paper sx={{
+            p: 3,
+            bgcolor: 'error.light',
+            color: 'error.contrastText',
+            borderRadius: GLASS.radius.card,
+          }}>
             <Typography>{error}</Typography>
             <Button 
               variant="contained" 
-              color="primary"
               onClick={() => navigate('/story-calendar')}
-              sx={{ mt: 2 }}
+              sx={{
+                mt: 2,
+                borderRadius: GLASS.radius.button,
+                backgroundColor: GLASS.accent.orange,
+                '&:hover': { backgroundColor: GLASS.accent.orangeDark },
+              }}
               startIcon={<ArrowBackIcon />}
             >
               Voltar ao Calendário
             </Button>
           </Paper>
         ) : (
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="body1" sx={{ mb: 3 }}>
+          <Paper sx={{
+            p: 3,
+            background: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            borderRadius: GLASS.radius.card,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }}>
+            <Typography variant="body1" sx={{ mb: 3, color: GLASS.text.body }}>
               Página de edição em desenvolvimento. ID do Story: {id}
             </Typography>
             <Button 
               variant="contained" 
-              color="primary"
               onClick={() => navigate('/story-calendar')}
               startIcon={<ArrowBackIcon />}
+              sx={{
+                borderRadius: GLASS.radius.button,
+                backgroundColor: GLASS.accent.orange,
+                boxShadow: GLASS.shadow.button,
+                '&:hover': {
+                  backgroundColor: GLASS.accent.orangeDark,
+                  boxShadow: GLASS.shadow.buttonHover,
+                },
+              }}
             >
               Voltar ao Calendário
             </Button>
           </Paper>
         )}
       </Container>
-    </>
   );
 };
 

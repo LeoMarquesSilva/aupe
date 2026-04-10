@@ -10,7 +10,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Components
-import Header from './components/Header';
+import AppShell from './components/AppShell';
 
 // Pages - Public
 import Login from './pages/Login';
@@ -46,27 +46,7 @@ import ApprovalsPage from './pages/ApprovalsPage';
 
 // Layout compartilhado para todas as páginas protegidas
 const PageLayout = ({ children }: { children: React.ReactNode }) => (
-  <Box 
-    sx={{ 
-      minHeight: '100vh', 
-      bgcolor: 'background.default', 
-      display: 'flex', 
-      flexDirection: 'column',
-      color: 'text.primary'
-    }}
-  >
-    <Header />
-    <Box 
-      className="page-container fade-in" 
-      sx={{ 
-        flex: 1, 
-        pt: 2,
-        pb: 4
-      }}
-    >
-      {children}
-    </Box>
-  </Box>
+  <AppShell>{children}</AppShell>
 );
 
 // Layout sem cabeçalho para páginas de callback
@@ -92,6 +72,19 @@ const PublicLayout = ({ children }: { children: React.ReactNode }) => (
       bgcolor: 'background.default',
       display: 'flex',
       flexDirection: 'column'
+    }}
+  >
+    {children}
+  </Box>
+);
+
+const MarketingLayout = ({ children }: { children: React.ReactNode }) => (
+  <Box
+    className="marketing-shell"
+    sx={{
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
     }}
   >
     {children}
@@ -137,7 +130,7 @@ const router = createBrowserRouter([
   // Rotas públicas
   {
     path: "/landing",
-    element: <PublicLayout><Landing /></PublicLayout>,
+    element: <MarketingLayout><Landing /></MarketingLayout>,
   },
   {
     path: "/login",

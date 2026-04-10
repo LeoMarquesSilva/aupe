@@ -1,0 +1,51 @@
+---
+description: Prevents use of gradient or colored backgrounds on page-level sections and content containers within the product shell.
+globs:
+  - "src/pages/**/*.tsx"
+  - "src/components/**/*.tsx"
+alwaysApply: false
+---
+
+# No Inline Gradient Wrappers on Page-Level Backgrounds
+
+## Rule
+
+NEVER wrap an entire page in a `Box` with an inline `background: linear-gradient(...)` or `radial-gradient(...)` as the page's background layer. This creates an ugly tinted wash behind all content.
+
+**This rule is specifically targeted at `src/pages/HomePage.tsx`** — the greeting/hero area must never use a colored or gradient background.
+
+## Prohibited Patterns (HomePage and any new pages)
+
+- Outer `Box` wrappers with `background: 'linear-gradient(...)'` as the page background
+- `background: 'radial-gradient(...)'` on a full-height page `Box`
+- `background: var(--gradient-02)` on a page wrapper element
+- Inline gradient tints on the page root container (e.g. `rgba(247, 66, 17, 0.03) 0%, ... 12%`)
+
+## Allowed — The Premium Header Card Pattern
+
+Other product pages (Settings, ApprovalsPage, ClientDashboard, etc.) **may and should** use the dark header card:
+
+```tsx
+<Box
+  className="grain-overlay premium-header-bg"
+  sx={{
+    p: { xs: 2, md: 2.75 },
+    borderRadius: GLASS.radius.card,
+    border: `1px solid rgba(255, 255, 255, 0.18)`,
+    boxShadow: '0 16px 38px -24px rgba(10, 15, 45, 0.8)',
+    mb: 2.5,
+  }}
+>
+  <Typography variant="h4" className="premium-header-title">Page Title</Typography>
+  <Typography variant="body2" className="premium-header-subtitle">Subtitle</Typography>
+</Box>
+```
+
+This card-level gradient is **correct and encouraged** across product pages.
+
+## HomePage-Specific Rule
+
+`src/pages/HomePage.tsx` must use:
+- Greeting as plain text directly on the `#f6f6f6` page background — no dark card, no gradient wrapper
+- Quick-action shortcuts as neutral pill chips
+- White `#ffffff` cards for all content sections

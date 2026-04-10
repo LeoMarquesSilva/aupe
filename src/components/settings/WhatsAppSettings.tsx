@@ -33,12 +33,14 @@ import {
   Group as GroupIcon,
   Person as PersonIcon,
   Search as SearchIcon,
+  NotificationsActive as NotificationsActiveIcon,
 } from '@mui/icons-material';
 import {
   whatsappService,
   InstanceConnectionState,
   WhatsAppGroup,
 } from '../../services/whatsappService';
+import { GLASS } from '../../theme/glassTokens';
 
 const POLL_INTERVAL_MS = 4000;
 
@@ -255,10 +257,18 @@ const WhatsAppSettings: React.FC = () => {
         ? clientApprovalPhone
         : internalApprovalPhone;
 
+  const cardSx = {
+    border: `1px solid ${GLASS.border.outer}`,
+    borderRadius: GLASS.radius.card,
+    background: GLASS.surface.bg,
+    backdropFilter: `blur(${GLASS.surface.blur})`,
+    boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-        <CircularProgress />
+        <CircularProgress sx={{ color: GLASS.accent.orange }} />
       </Box>
     );
   }
@@ -277,18 +287,57 @@ const WhatsAppSettings: React.FC = () => {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 600 }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2.5,
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+      }}
+    >
+      <Paper
+        elevation={0}
+        className="grain-overlay premium-header-bg"
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          borderRadius: GLASS.radius.card,
+          border: `1px solid ${alpha(GLASS.accent.orange, 0.35)}`,
+          overflow: 'hidden',
+          position: 'relative',
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 1.5, flexWrap: 'wrap' }}>
+          <NotificationsActiveIcon sx={{ color: '#fff', fontSize: 26 }} />
+          <Box sx={{ flex: 1, minWidth: 220 }}>
+            <Typography variant="h6" className="premium-header-title" sx={{ mb: 0.5 }}>
+              Central de Notificações WhatsApp
+            </Typography>
+            <Typography variant="body2" className="premium-header-subtitle">
+              Conecte sua instância, defina destinos por fluxo e valide o envio com teste em um só lugar.
+            </Typography>
+          </Box>
+          <Chip
+            size="small"
+            label={STATE_LABELS[connectionState]}
+            color={STATE_COLORS[connectionState]}
+            sx={{ fontWeight: 700, alignSelf: { xs: 'flex-start', sm: 'center' } }}
+          />
+        </Box>
+      </Paper>
 
       {/* ── Conectar WhatsApp ───────────────────────────────────── */}
-      <Card elevation={0} sx={{ border: `1px solid ${alpha(theme.palette.divider, 0.6)}`, borderRadius: 3 }}>
+      <Card elevation={0} sx={cardSx}>
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
-            <WhatsAppIcon sx={{ color: '#25D366', fontSize: 24 }} />
-            <Typography variant="h6" fontWeight={600} sx={{ fontFamily: '"Poppins", sans-serif' }}>
+            <WhatsAppIcon sx={{ color: GLASS.accent.orange, fontSize: 24 }} />
+            <Typography variant="h6" fontWeight={600} sx={{ fontFamily: '"Cabinet Grotesk", sans-serif', color: GLASS.text.heading }}>
               Conectar WhatsApp
             </Typography>
           </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5, fontFamily: '"Poppins", sans-serif' }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
             Escaneie o QR code com o seu WhatsApp para receber notificações de aprovação no seu celular.
           </Typography>
 
@@ -302,7 +351,7 @@ const WhatsAppSettings: React.FC = () => {
               }
               label={STATE_LABELS[connectionState]}
               color={STATE_COLORS[connectionState]}
-              sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}
+              sx={{ fontWeight: 600 }}
             />
             <Button
               size="small"
@@ -310,14 +359,20 @@ const WhatsAppSettings: React.FC = () => {
               startIcon={checkingState ? <CircularProgress size={14} /> : <RefreshIcon />}
               onClick={handleCheckState}
               disabled={checkingState}
-              sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+              sx={{
+                textTransform: 'none',
+                borderRadius: GLASS.radius.buttonSm,
+                borderColor: alpha(GLASS.accent.orange, 0.5),
+                color: GLASS.accent.orange,
+                '&:hover': { borderColor: GLASS.accent.orangeDark, bgcolor: alpha(GLASS.accent.orange, 0.05) },
+              }}
             >
               Verificar status
             </Button>
           </Box>
 
           {connectionState === 'open' ? (
-            <Alert severity="success" sx={{ mb: 2, borderRadius: 2, fontFamily: '"Poppins", sans-serif' }}>
+            <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
               WhatsApp conectado! Configure o destino abaixo.
             </Alert>
           ) : (
@@ -325,7 +380,7 @@ const WhatsAppSettings: React.FC = () => {
               {qrError && <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>{qrError}</Alert>}
               {qrBase64 && (
                 <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                  <Typography variant="caption" color="text.secondary">
                     Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo → Escaneie:
                   </Typography>
                   <Box
@@ -346,7 +401,8 @@ const WhatsAppSettings: React.FC = () => {
                 startIcon={qrLoading ? <CircularProgress size={18} color="inherit" /> : <QrCodeIcon />}
                 onClick={handleConnect}
                 disabled={qrLoading}
-                sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none', bgcolor: '#25D366', '&:hover': { bgcolor: '#1ebe5a' } }}
+                className="grain-overlay"
+                sx={{ textTransform: 'none', bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}
               >
                 {qrLoading ? 'Gerando QR code…' : qrBase64 ? 'Novo QR code' : 'Gerar QR code'}
               </Button>
@@ -357,7 +413,7 @@ const WhatsAppSettings: React.FC = () => {
                 color="error"
                 startIcon={<LinkOffIcon />}
                 onClick={handleDisconnect}
-                sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                sx={{ textTransform: 'none', borderRadius: GLASS.radius.button }}
               >
                 Desconectar
               </Button>
@@ -367,12 +423,12 @@ const WhatsAppSettings: React.FC = () => {
       </Card>
 
       {/* ── Destino das notificações ────────────────────────────── */}
-      <Card elevation={0} sx={{ border: `1px solid ${alpha(theme.palette.divider, 0.6)}`, borderRadius: 3 }}>
+      <Card elevation={0} sx={cardSx}>
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <Typography variant="h6" fontWeight={600} sx={{ mb: 0.5, fontFamily: '"Poppins", sans-serif' }}>
+          <Typography variant="h6" fontWeight={600} sx={{ mb: 0.5, fontFamily: '"Cabinet Grotesk", sans-serif', color: GLASS.text.heading }}>
             Destino das notificações
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5, fontFamily: '"Poppins", sans-serif' }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
             Defina o número ou grupo padrão (também usado no teste). Você pode direcionar respostas do link do{' '}
             <strong>cliente</strong> e do link do <strong>gestor</strong> para pessoas diferentes.
           </Typography>
@@ -421,11 +477,11 @@ const WhatsAppSettings: React.FC = () => {
               onClick={() => void handleOpenGroupPicker('main')}
               disabled={groupsLoading || connectionState !== 'open'}
               sx={{
-                fontFamily: '"Poppins", sans-serif',
                 textTransform: 'none',
                 alignSelf: { xs: 'stretch', sm: 'center' },
                 flexShrink: 0,
                 whiteSpace: 'nowrap',
+                borderRadius: GLASS.radius.buttonSm,
               }}
             >
               {groupsLoading && groupPickerTarget === 'main' ? 'Buscando…' : 'Grupo'}
@@ -433,14 +489,14 @@ const WhatsAppSettings: React.FC = () => {
           </Box>
 
           {connectionState !== 'open' && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
               Conecte o WhatsApp acima para poder selecionar grupos.
             </Typography>
           )}
 
           <Divider sx={{ my: 2.5 }} />
 
-          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, fontFamily: '"Poppins", sans-serif' }}>
+          <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
             Destinos por tipo de resposta
           </Typography>
 
@@ -486,11 +542,11 @@ const WhatsAppSettings: React.FC = () => {
               onClick={() => void handleOpenGroupPicker('client')}
               disabled={groupsLoading || connectionState !== 'open'}
               sx={{
-                fontFamily: '"Poppins", sans-serif',
                 textTransform: 'none',
                 alignSelf: { xs: 'stretch', sm: 'center' },
                 flexShrink: 0,
                 whiteSpace: 'nowrap',
+                borderRadius: GLASS.radius.buttonSm,
               }}
             >
               {groupsLoading && groupPickerTarget === 'client' ? 'Buscando…' : 'Grupo'}
@@ -539,11 +595,11 @@ const WhatsAppSettings: React.FC = () => {
               onClick={() => void handleOpenGroupPicker('internal')}
               disabled={groupsLoading || connectionState !== 'open'}
               sx={{
-                fontFamily: '"Poppins", sans-serif',
                 textTransform: 'none',
                 alignSelf: { xs: 'stretch', sm: 'center' },
                 flexShrink: 0,
                 whiteSpace: 'nowrap',
+                borderRadius: GLASS.radius.buttonSm,
               }}
             >
               {groupsLoading && groupPickerTarget === 'internal' ? 'Buscando…' : 'Grupo'}
@@ -554,7 +610,7 @@ const WhatsAppSettings: React.FC = () => {
           {showGroupPicker && (
             <Paper
               variant="outlined"
-              sx={{ borderRadius: 2, overflow: 'hidden', mb: 2 }}
+              sx={{ borderRadius: GLASS.radius.inner, overflow: 'hidden', mb: 2, border: `1px solid ${GLASS.border.outer}`, background: GLASS.surface.bgStrong, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: GLASS.shadow.cardInset }}
             >
               <Box
                 sx={{
@@ -570,7 +626,7 @@ const WhatsAppSettings: React.FC = () => {
                   label={GROUP_PICKER_TARGET_LABEL[groupPickerTarget]}
                   color="primary"
                   variant="outlined"
-                  sx={{ alignSelf: 'flex-start', fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}
+                  sx={{ alignSelf: 'flex-start', fontWeight: 600 }}
                 />
                 <TextField
                   size="small"
@@ -599,7 +655,7 @@ const WhatsAppSettings: React.FC = () => {
               <List dense disablePadding sx={{ maxHeight: 240, overflowY: 'auto' }}>
                 {filteredGroups.length === 0 && !groupsError && (
                   <Box sx={{ p: 2, textAlign: 'center' }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                    <Typography variant="body2" color="text.secondary">
                       Nenhum grupo encontrado
                     </Typography>
                   </Box>
@@ -615,16 +671,16 @@ const WhatsAppSettings: React.FC = () => {
                     }}
                   >
                     <ListItemIcon sx={{ minWidth: 36 }}>
-                      <GroupIcon sx={{ fontSize: 20, color: '#25D366' }} />
+                      <GroupIcon sx={{ fontSize: 20, color: GLASS.accent.orange }} />
                     </ListItemIcon>
                     <ListItemText
                       primary={
-                        <Typography variant="body2" fontWeight={600} sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                        <Typography variant="body2" fontWeight={600}>
                           {group.subject}
                         </Typography>
                       }
                       secondary={
-                        <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                        <Typography variant="caption" color="text.secondary">
                           {group.size ? `${group.size} participantes` : group.id}
                         </Typography>
                       }
@@ -640,7 +696,7 @@ const WhatsAppSettings: React.FC = () => {
                 <Button
                   size="small"
                   onClick={() => { setShowGroupPicker(false); setGroupSearch(''); }}
-                  sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+                  sx={{ textTransform: 'none', borderRadius: GLASS.radius.buttonSm }}
                 >
                   Fechar
                 </Button>
@@ -657,10 +713,10 @@ const WhatsAppSettings: React.FC = () => {
             }
             label={
               <Box>
-                <Typography variant="body2" fontWeight={600} sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                <Typography variant="body2" fontWeight={600}>
                   Ativar notificações WhatsApp
                 </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                <Typography variant="caption" color="text.secondary">
                   Avisos quando o cliente ou o gestor responder aos respectivos links (conforme destinos acima)
                 </Typography>
               </Box>
@@ -670,12 +726,12 @@ const WhatsAppSettings: React.FC = () => {
       </Card>
 
       {/* ── Testar envio ────────────────────────────────────────── */}
-      <Card elevation={0} sx={{ border: `1px solid ${alpha(theme.palette.divider, 0.6)}`, borderRadius: 3 }}>
+      <Card elevation={0} sx={cardSx}>
         <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-          <Typography variant="h6" fontWeight={600} sx={{ mb: 0.5, fontFamily: '"Poppins", sans-serif' }}>
+          <Typography variant="h6" fontWeight={600} sx={{ mb: 0.5, fontFamily: '"Cabinet Grotesk", sans-serif', color: GLASS.text.heading }}>
             Testar notificação
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontFamily: '"Poppins", sans-serif' }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Envia uma mensagem de teste para o número/grupo configurado acima para confirmar que está funcionando.
           </Typography>
 
@@ -690,17 +746,18 @@ const WhatsAppSettings: React.FC = () => {
           )}
 
           <Button
-            variant="outlined"
+            variant="contained"
             startIcon={testSending ? <CircularProgress size={18} /> : <SendIcon />}
             onClick={handleSendTest}
             disabled={testSending || !hasValidNumber || connectionState !== 'open'}
-            sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none' }}
+            className="grain-overlay"
+            sx={{ textTransform: 'none', borderRadius: GLASS.radius.button, bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark } }}
           >
             {testSending ? 'Enviando…' : 'Enviar mensagem de teste'}
           </Button>
 
           {connectionState !== 'open' && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, fontFamily: '"Poppins", sans-serif' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
               Conecte o WhatsApp primeiro para testar o envio.
             </Typography>
           )}
@@ -719,17 +776,18 @@ const WhatsAppSettings: React.FC = () => {
         </Alert>
       )}
 
-      <Box>
+      <Paper elevation={0} sx={{ ...cardSx, p: 2 }}>
         <Button
           variant="contained"
           startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
           onClick={handleSave}
           disabled={saving}
-          sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'none', fontWeight: 600 }}
+          className="grain-overlay"
+          sx={{ textTransform: 'none', fontWeight: 600, bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}
         >
           {saving ? 'Salvando…' : 'Salvar configurações'}
         </Button>
-      </Box>
+      </Paper>
     </Box>
   );
 };

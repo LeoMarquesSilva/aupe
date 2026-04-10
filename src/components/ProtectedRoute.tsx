@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 import { roleService, UserRole } from '../services/roleService';
+import { GLASS } from '../theme/glassTokens';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -84,7 +85,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
 
     checkUserRole(user.id);
-  }, [user?.id, checkUserRole]); // Apenas quando o ID do usuário muda
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, checkUserRole]);
 
   // Mostrar loading apenas no carregamento inicial do auth
   if (authLoading) {
@@ -96,9 +98,20 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         justifyContent="center"
         minHeight="50vh"
         gap={2}
+        sx={{
+          borderRadius: GLASS.radius.card,
+          bgcolor: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+          mx: 'auto',
+          maxWidth: 400,
+          p: 4,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }}
       >
-        <CircularProgress />
-        <Typography variant="body2" color="text.secondary">
+        <CircularProgress sx={{ color: GLASS.accent.orange }} />
+        <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
           Carregando...
         </Typography>
       </Box>
@@ -120,9 +133,20 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         justifyContent="center"
         minHeight="50vh"
         gap={2}
+        sx={{
+          borderRadius: GLASS.radius.card,
+          bgcolor: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+          mx: 'auto',
+          maxWidth: 400,
+          p: 4,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }}
       >
-        <CircularProgress />
-        <Typography variant="body2" color="text.secondary">
+        <CircularProgress sx={{ color: GLASS.accent.orange }} />
+        <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
           Verificando permissões...
         </Typography>
       </Box>

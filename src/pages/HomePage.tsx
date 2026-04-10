@@ -4,21 +4,19 @@ import {
   Container,
   Typography,
   Card,
-  CardActionArea,
   CardContent,
   CardMedia,
   Grid,
   Button,
   LinearProgress,
   useTheme,
-  useMediaQuery,
   CircularProgress,
   Avatar,
   Dialog,
   DialogContent,
   DialogTitle,
   IconButton,
-  Divider,
+  Chip,
 } from '@mui/material';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from 'recharts';
 import { format, subMonths, startOfMonth } from 'date-fns';
@@ -33,18 +31,19 @@ import {
   AdminPanelSettings as AdminIcon,
   Schedule as ScheduleIcon,
   CheckCircle as CheckCircleIcon,
-  Business as BusinessIcon,
   BarChart as BarChartIcon,
   WarningAmber as WarningIcon,
   Edit as EditIcon,
   Refresh as RefreshIcon,
   CardMembership as PlanIcon,
   TrendingUp as TrendingUpIcon,
-  History as HistoryIcon,
   Visibility as VisibilityIcon,
   Close as CloseIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
+  ArrowForward as ArrowForwardIcon,
+  AccessTime as AccessTimeIcon,
+  CheckCircleOutline as CheckCircleOutlineIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { roleService } from '../services/roleService';
@@ -52,12 +51,32 @@ import { subscriptionService } from '../services/subscriptionService';
 import { subscriptionLimitsService, SubscriptionLimits } from '../services/subscriptionLimitsService';
 import { supabase, postService } from '../services/supabaseClient';
 import { ImageUrlService } from '../services/imageUrlService';
+import { GLASS } from '../theme/glassTokens';
+import { appShellContainerSx } from '../theme/appShellLayout';
+import { resolveAgencyLogoSrc } from '../services/imageUrlService';
 
-const COLORS = {
-  primary: '#0f766e',
-  secondary: '#64748b',
-  lightGray: '#e2e8f0',
-  offWhite: '#fafafa',
+const BRAND = {
+  orange: '#f74211',
+  orangeDark: '#d4380d',
+  navy: '#0a0f2d',
+  blue: '#3e54b5',
+  green: '#10b981',
+  muted: '#525663',
+  border: 'rgba(82, 86, 99, 0.12)',
+  borderStrong: 'rgba(82, 86, 99, 0.18)',
+  surface: '#ffffff',
+  pageBg: '#f6f6f6',
+};
+
+const CARD_SX = {
+  borderRadius: '14px',
+  border: `1px solid ${BRAND.border}`,
+  bgcolor: BRAND.surface,
+  boxShadow: '0 1px 3px rgba(10,15,45,0.06), 0 1px 2px rgba(10,15,45,0.04)',
+  transition: 'box-shadow 0.22s cubic-bezier(0.4,0,0.2,1)',
+  '&:hover': {
+    boxShadow: '0 8px 24px -4px rgba(10,15,45,0.10)',
+  },
 };
 
 const getGreeting = () => {
@@ -74,13 +93,6 @@ const getUserDisplayName = (user: { user_metadata?: { full_name?: string }; emai
   return user.email?.split('@')[0] || 'Usuário';
 };
 
-interface ShortcutCard {
-  title: string;
-  description: string;
-  path: string;
-  icon: React.ReactNode;
-}
-
 interface PostWithClient {
   id: string;
   scheduledDate: string;
@@ -91,6 +103,7 @@ interface PostWithClient {
   clientName: string;
   clientLogoUrl?: string | null;
   imagePreviewUrl?: string | null;
+  coverImageUrl?: string | null;
   imageUrls?: string[];
   videoUrl?: string | null;
   errorMessage?: string;
@@ -105,21 +118,31 @@ interface TopClientRow {
   count: number;
 }
 
+const getPostTypeLabel = (postType: string) => {
+  const map: Record<string, string> = { post: 'Post', carousel: 'Carrossel', reels: 'Reels', stories: 'Story' };
+  return map[postType] || postType;
+};
+
+const getPostTypeBadgeColor = (postType: string): string => {
+  const map: Record<string, string> = {
+    post: BRAND.blue,
+    carousel: BRAND.orange,
+    reels: '#7c3aed',
+    stories: '#db2777',
+  };
+  return map[postType] || BRAND.muted;
+};
+
 const HomePage: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { user } = useAuth();
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [organizationName, setOrganizationName] = useState<string | null>(null);
-  const [orgStats, setOrgStats] = useState<{
-    scheduledPosts: number;
-    publishedPosts: number;
-  } | null>(null);
-  const [homeClients, setHomeClients] = useState<
-    { id: string; name: string; instagram?: string | null; is_active?: boolean | null }[]
-  >([]);
+  const [agencyLogoUrl, setAgencyLogoUrl] = useState<string | null>(null);
+  const [orgStats, setOrgStats] = useState<{ scheduledPosts: number; publishedPosts: number } | null>(null);
+  const [homeClients, setHomeClients] = useState<{ id: string; name: string; instagram?: string | null; is_active?: boolean | null }[]>([]);
   const [postsByMonth, setPostsByMonth] = useState<{ name: string; posts: number; fullMonth: string }[]>([]);
   const [upcomingPosts, setUpcomingPosts] = useState<PostWithClient[]>([]);
   const [failedPosts, setFailedPosts] = useState<PostWithClient[]>([]);
@@ -130,10 +153,7 @@ const HomePage: React.FC = () => {
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
 
-  const activeClientsCount = useMemo(
-    () => homeClients.filter((c) => c.is_active !== false).length,
-    [homeClients]
-  );
+  const activeClientsCount = useMemo(() => homeClients.filter((c) => c.is_active !== false).length, [homeClients]);
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -151,162 +171,122 @@ const HomePage: React.FC = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!user) {
-        setHomeClients([]);
-        setLoading(false);
-        return;
-      }
-
+      if (!user) { setHomeClients([]); setLoading(false); return; }
       try {
         setLoading(true);
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('organization_id')
-          .eq('id', user.id)
-          .single();
-
+        const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single();
         const orgId = (profile as any)?.organization_id;
         if (!orgId) {
           setHomeClients([]);
+          setOrganizationName(null);
+          setAgencyLogoUrl(null);
           setLoading(false);
           return;
         }
 
         const [orgData, clientsDataRes, postsRes] = await Promise.all([
           subscriptionService.getOrganization(orgId),
-          supabase
-            .from('clients')
-            .select('id, name, instagram, is_active')
-            .eq('organization_id', orgId)
-            .order('name'),
-          supabase
-            .from('scheduled_posts')
-            .select('id, status, posted_at, scheduled_date')
-            .eq('organization_id', orgId),
+          supabase.from('clients').select('id, name, instagram, is_active').eq('organization_id', orgId).order('name'),
+          supabase.from('scheduled_posts').select('id, status, posted_at, scheduled_date').eq('organization_id', orgId),
         ]);
 
         setOrganizationName(orgData?.name || null);
+        setAgencyLogoUrl(orgData?.agency_logo_url ?? null);
         setHomeClients(clientsDataRes.data ?? []);
 
         const allPosts = postsRes.data || [];
-        const scheduled = allPosts.filter(
-          (p: { status: string }) => p.status === 'pending' || p.status === 'sent_to_n8n' || p.status === 'processing'
-        ).length;
-        const published = allPosts.filter(
-          (p: { status: string }) => p.status === 'posted' || p.status === 'published'
-        ).length;
+        const scheduled = allPosts.filter((p: { status: string }) => ['pending', 'sent_to_n8n', 'processing'].includes(p.status)).length;
+        const published = allPosts.filter((p: { status: string }) => ['posted', 'published'].includes(p.status)).length;
+        setOrgStats({ scheduledPosts: scheduled, publishedPosts: published });
 
-        setOrgStats({
-          scheduledPosts: scheduled,
-          publishedPosts: published,
-        });
-
-        const postedPosts = allPosts.filter(
-          (p: { status: string }) => p.status === 'posted' || p.status === 'published'
-        );
+        const postedPosts = allPosts.filter((p: { status: string }) => ['posted', 'published'].includes(p.status));
         const now = new Date();
         const months: Record<string, number> = {};
         for (let i = 5; i >= 0; i--) {
           const d = subMonths(now, i);
-          const key = format(startOfMonth(d), 'yyyy-MM');
-          months[key] = 0;
+          months[format(startOfMonth(d), 'yyyy-MM')] = 0;
         }
         postedPosts.forEach((p: { posted_at?: string; scheduled_date?: string }) => {
           const dateStr = p.posted_at || p.scheduled_date;
           if (dateStr) {
-            const d = new Date(dateStr);
-            const key = format(startOfMonth(d), 'yyyy-MM');
+            const key = format(startOfMonth(new Date(dateStr)), 'yyyy-MM');
             if (months[key] !== undefined) months[key]++;
           }
         });
-        const chartData = Object.entries(months).map(([key, count]) => {
+        setPostsByMonth(Object.entries(months).map(([key, count]) => {
           const monthName = format(new Date(key + '-01'), 'MMM', { locale: ptBR });
-          return {
-            fullMonth: key,
-            name: monthName.charAt(0).toUpperCase() + monthName.slice(1),
-            posts: count,
-          };
-        });
-        setPostsByMonth(chartData);
+          return { fullMonth: key, name: monthName.charAt(0).toUpperCase() + monthName.slice(1), posts: count };
+        }));
 
         const nowIso = new Date().toISOString();
-
         const getImageUrls = (p: any): string[] => {
           if (!p.images || !Array.isArray(p.images)) return [];
-          return p.images
-            .map((item: any) => {
-              const url = typeof item === 'string' ? item : (item?.url ?? item?.path);
-              return url ? ImageUrlService.getPublicUrl(url) : null;
-            })
-            .filter(Boolean);
+          return p.images.map((item: any) => {
+            const url = typeof item === 'string' ? item : (item?.url ?? item?.path);
+            return url ? ImageUrlService.getPublicUrl(url) : null;
+          }).filter(Boolean);
         };
-        const getFirstImageUrl = (p: any): string | null => {
-          const urls = getImageUrls(p);
-          return urls.length > 0 ? urls[0] : null;
-        };
-        const getVideoUrl = (p: any): string | null => {
-          return p.video ? ImageUrlService.getPublicUrl(p.video) : null;
-        };
+        const mapRow = (p: any): PostWithClient => {
+          const postType = p.post_type || 'post';
+          const imageUrls = getImageUrls(p);
+          const coverImageUrl = p.cover_image ? ImageUrlService.getPublicUrl(p.cover_image) : null;
+          const videoUrl = p.video ? ImageUrlService.getPublicUrl(p.video) : null;
 
-        const mapRow = (p: any): PostWithClient => ({
-          id: p.id,
-          scheduledDate: p.scheduled_date,
-          caption: p.caption || '',
-          postType: p.post_type || 'post',
-          status: p.status,
-          clientId: p.client_id,
-          clientName: p.clients?.name || 'Cliente',
-          clientLogoUrl: p.clients?.profile_picture ?? p.clients?.logo_url ?? null,
-          imagePreviewUrl: getFirstImageUrl(p),
-          imageUrls: getImageUrls(p),
-          videoUrl: getVideoUrl(p),
-          errorMessage: p.error_message,
-          retryCount: p.retry_count ?? 0,
-          postedAt: p.posted_at,
-        });
+          // For Reels: prefer cover_image, then fall back to null (video will be rendered directly)
+          // For Stories/posts: use first image from images array
+          let imagePreviewUrl: string | null = null;
+          if (postType === 'reels') {
+            imagePreviewUrl = coverImageUrl;
+          } else {
+            imagePreviewUrl = imageUrls.length > 0 ? imageUrls[0] : null;
+          }
+
+          return {
+            id: p.id,
+            scheduledDate: p.scheduled_date,
+            caption: p.caption || '',
+            postType,
+            status: p.status,
+            clientId: p.client_id,
+            clientName: p.clients?.name || 'Cliente',
+            clientLogoUrl: p.clients?.profile_picture ?? p.clients?.logo_url ?? null,
+            imagePreviewUrl,
+            coverImageUrl,
+            imageUrls,
+            videoUrl,
+            errorMessage: p.error_message,
+            retryCount: p.retry_count ?? 0,
+            postedAt: p.posted_at,
+          };
+        };
 
         const { data: upcoming } = await supabase
           .from('scheduled_posts')
-          .select('id, scheduled_date, caption, post_type, status, client_id, images, video, clients(id, name, logo_url, profile_picture)')
-          .eq('organization_id', orgId)
-          .in('status', ['pending', 'sent_to_n8n', 'processing'])
-          .gt('scheduled_date', nowIso)
-          .order('scheduled_date', { ascending: true })
-          .limit(5);
+          .select('id, scheduled_date, caption, post_type, status, client_id, images, video, cover_image, clients(id, name, logo_url, profile_picture)')
+          .eq('organization_id', orgId).in('status', ['pending', 'sent_to_n8n', 'processing'])
+          .gt('scheduled_date', nowIso).order('scheduled_date', { ascending: true }).limit(6);
         setUpcomingPosts((upcoming || []).map(mapRow));
 
         const { data: failed } = await supabase
           .from('scheduled_posts')
           .select('id, scheduled_date, caption, post_type, status, client_id, error_message, retry_count, clients(id, name, logo_url, profile_picture)')
-          .eq('organization_id', orgId)
-          .eq('status', 'failed')
-          .order('last_retry_at', { ascending: false })
-          .limit(5);
+          .eq('organization_id', orgId).eq('status', 'failed')
+          .order('last_retry_at', { ascending: false }).limit(5);
         setFailedPosts((failed || []).map(mapRow));
 
         const { data: lastPublishedData } = await supabase
           .from('scheduled_posts')
-          .select('id, posted_at, caption, post_type, status, client_id, clients(id, name, logo_url, profile_picture)')
-          .eq('organization_id', orgId)
-          .in('status', ['posted', 'published'])
-          .not('posted_at', 'is', null)
-          .order('posted_at', { ascending: false })
-          .limit(5);
+          .select('id, posted_at, caption, post_type, status, client_id, images, video, cover_image, clients(id, name, logo_url, profile_picture)')
+          .eq('organization_id', orgId).in('status', ['posted', 'published'])
+          .not('posted_at', 'is', null).order('posted_at', { ascending: false }).limit(6);
         setLastPublishedPosts((lastPublishedData || []).map((p: any) => ({ ...mapRow(p), scheduledDate: p.posted_at || p.scheduled_date })));
 
-        try {
-          const limits = await subscriptionLimitsService.getCurrentLimits();
-          setPlanLimits(limits);
-        } catch {
-          setPlanLimits(null);
-        }
+        try { const limits = await subscriptionLimitsService.getCurrentLimits(); setPlanLimits(limits); } catch { setPlanLimits(null); }
 
         const { data: forTopClients } = await supabase
           .from('scheduled_posts')
           .select('client_id, clients(id, name, logo_url, profile_picture)')
-          .eq('organization_id', orgId)
-          .in('status', ['pending', 'sent_to_n8n', 'processing']);
+          .eq('organization_id', orgId).in('status', ['pending', 'sent_to_n8n', 'processing']);
         const byClient: Record<string, { name: string; logoUrl?: string | null; count: number }> = {};
         (forTopClients || []).forEach((p: any) => {
           const cid = p.client_id;
@@ -316,64 +296,19 @@ const HomePage: React.FC = () => {
         setTopClients(
           Object.entries(byClient)
             .map(([clientId, v]) => ({ clientId, clientName: v.name, clientLogoUrl: v.logoUrl ?? null, count: v.count }))
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 5)
+            .sort((a, b) => b.count - a.count).slice(0, 5)
         );
-
       } catch (err) {
         console.error('Erro ao carregar dados da organização:', err);
       } finally {
         setLoading(false);
       }
     };
-
     loadData();
   }, [user]);
 
-  const mainShortcuts: ShortcutCard[] = [
-    {
-      title: 'Gerenciamento de Clientes',
-      description: 'Visualize e gerencie todos os seus clientes e contas Instagram',
-      path: '/clients',
-      icon: <PeopleIcon sx={{ fontSize: 40 }} />,
-    },
-    {
-      title: 'Calendário',
-      description: 'Visualize o calendário de posts e stories agendados',
-      path: '/calendar',
-      icon: <CalendarIcon sx={{ fontSize: 40 }} />,
-    },
-  ];
-
-  const createShortcuts: ShortcutCard[] = [
-    {
-      title: 'Criar Post',
-      description: 'Novo post ou carrossel para o feed',
-      path: '/create-post',
-      icon: <PostIcon sx={{ fontSize: 36 }} />,
-    },
-    {
-      title: 'Criar Reels',
-      description: 'Novo vídeo Reels',
-      path: '/create-reels',
-      icon: <ReelsIcon sx={{ fontSize: 36 }} />,
-    },
-    {
-      title: 'Criar Story',
-      description: 'Novo story para Instagram',
-      path: '/create-story',
-      icon: <StoryIcon sx={{ fontSize: 36 }} />,
-    },
-  ];
-
   const greeting = getGreeting();
   const displayName = getUserDisplayName(user);
-
-  const getPostTypeLabel = (postType: string) => {
-    const map: Record<string, string> = { post: 'Post', carousel: 'Carrossel', reels: 'Reels', stories: 'Story' };
-    return map[postType] || postType;
-  };
-
   const nextPost = upcomingPosts[0] ?? null;
 
   const handleRetryPost = async (postId: string) => {
@@ -385,397 +320,458 @@ const HomePage: React.FC = () => {
     }
   };
 
-  const cardSx = {
-    borderRadius: 2,
-    border: `1px solid ${COLORS.lightGray}`,
-    bgcolor: 'background.paper',
-    transition: 'all 0.2s ease',
-    '&:hover': {
-      borderColor: COLORS.primary,
-      boxShadow: '0 2px 8px rgba(15, 118, 110, 0.08)',
-    },
-  };
+  const quickActions = [
+    { label: 'Clientes', path: '/clients', icon: <PeopleIcon sx={{ fontSize: 15 }} /> },
+    { label: 'Calendário', path: '/calendar', icon: <CalendarIcon sx={{ fontSize: 15 }} /> },
+    { label: 'Criar Post', path: '/create-post', icon: <PostIcon sx={{ fontSize: 15 }} /> },
+    { label: 'Criar Reels', path: '/create-reels', icon: <ReelsIcon sx={{ fontSize: 15 }} /> },
+    { label: 'Criar Story', path: '/create-story', icon: <StoryIcon sx={{ fontSize: 15 }} /> },
+  ];
+
+  const todayStr = format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR });
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
-      {/* Saudação + Nome da organização */}
+    <Container
+      maxWidth={false}
+      disableGutters
+      sx={{ ...appShellContainerSx, py: { xs: 2.5, md: 4 } }}
+    >
+
+      {/* ── SECTION 1: Greeting ──────────────────────────────────── */}
       <Box
+        className="grain-overlay premium-header-bg"
         sx={{
-          mb: 4,
-          p: 4,
-          borderRadius: 3,
-          background: `linear-gradient(135deg, ${COLORS.primary} 0%, ${COLORS.secondary} 100%)`,
-          position: 'relative',
-          overflow: 'hidden',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'radial-gradient(circle at 20% 80%, rgba(237,235,233,0.08) 0%, transparent 50%)',
-            pointerEvents: 'none',
-          },
+          p: { xs: 2, md: 2.75 },
+          borderRadius: GLASS.radius.card,
+          border: `1px solid rgba(255, 255, 255, 0.18)`,
+          boxShadow: '0 16px 38px -24px rgba(10, 15, 45, 0.8)',
+          mb: 2.5,
         }}
       >
-        <Box sx={{ position: 'relative', zIndex: 1 }}>
+        {/* Logo + greeting */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 0.5 }}>
+          {agencyLogoUrl && (
+            <Avatar
+              src={resolveAgencyLogoSrc(agencyLogoUrl)}
+              variant="rounded"
+              sx={{
+                width: { xs: 40, md: 48 },
+                height: { xs: 40, md: 48 },
+                flexShrink: 0,
+                border: `1px solid rgba(255,255,255,0.22)`,
+                bgcolor: 'rgba(255,255,255,0.12)',
+                objectFit: 'contain',
+              }}
+            />
+          )}
           <Typography
-            variant="h4"
+            component="h1"
+            className="premium-header-title"
             sx={{
-              fontFamily: '"Argent CF", serif',
-              fontWeight: 'normal',
-              color: COLORS.offWhite,
+              fontFamily: '"Cabinet Grotesk", sans-serif',
+              fontWeight: 800,
+              fontSize: { xs: '1.55rem', md: '1.9rem' },
+              letterSpacing: '-0.03em',
+              lineHeight: 1.1,
             }}
           >
             {greeting}{displayName ? `, ${displayName}` : ''}
           </Typography>
-          {organizationName && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 1.5 }}>
-              <BusinessIcon sx={{ fontSize: 20, color: COLORS.lightGray }} />
-              <Typography
-                variant="body1"
-                sx={{
-                  fontFamily: '"Poppins", sans-serif',
-                  color: COLORS.lightGray,
-                  fontWeight: 500,
-                }}
-              >
-                {organizationName}
+        </Box>
+
+        <Typography
+          className="premium-header-subtitle"
+          variant="body2"
+          sx={{ mb: 2.5, textTransform: 'capitalize', letterSpacing: '0.01em' }}
+        >
+          {organizationName ? `${organizationName} · ` : ''}{todayStr}
+        </Typography>
+
+        {/* Quick actions */}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          {quickActions.map((item) => (
+            <Box
+              key={item.path}
+              onClick={() => navigate(item.path)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.6,
+                px: 1.4,
+                py: 0.6,
+                borderRadius: '999px',
+                border: `1px solid rgba(255,255,255,0.22)`,
+                bgcolor: 'rgba(255,255,255,0.12)',
+                cursor: 'pointer',
+                transition: 'all 0.18s',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.22)', borderColor: 'rgba(255,255,255,0.35)' },
+              }}
+            >
+              <Box sx={{ color: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center' }}>{item.icon}</Box>
+              <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: '#fff', letterSpacing: '-0.01em' }}>
+                {item.label}
+              </Typography>
+            </Box>
+          ))}
+          {isAdmin && (
+            <Box
+              onClick={() => navigate('/admin')}
+              sx={{
+                display: 'flex', alignItems: 'center', gap: 0.6, px: 1.4, py: 0.6,
+                borderRadius: '999px', border: `1px solid rgba(255,255,255,0.22)`,
+                bgcolor: 'rgba(255,255,255,0.12)', cursor: 'pointer', transition: 'all 0.18s',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.22)', borderColor: 'rgba(255,255,255,0.35)' },
+              }}
+            >
+              <AdminIcon sx={{ fontSize: 15, color: 'rgba(255,255,255,0.85)' }} />
+              <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: '#fff', letterSpacing: '-0.01em' }}>
+                Admin
               </Typography>
             </Box>
           )}
-          <Typography
-            variant="body2"
-            sx={{
-              fontFamily: '"Poppins", sans-serif',
-              color: 'rgba(237,235,233,0.85)',
-              mt: 1,
-            }}
-          >
-            Escolha por onde começar
-          </Typography>
-          <Box
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 1,
-              mt: 2.5,
-            }}
-          >
-            {[...mainShortcuts, ...createShortcuts].map((item) => (
-              <Box
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.75,
-                  px: 1.5,
-                  py: 0.75,
-                  borderRadius: 1.5,
-                  bgcolor: 'rgba(255,255,255,0.15)',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                  '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
-                }}
-              >
-                <Box sx={{ color: COLORS.offWhite, display: 'flex', '& .MuiSvgIcon-root': { fontSize: 20 } }}>
-                  {item.icon}
-                </Box>
-                <Typography variant="caption" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 500, color: COLORS.offWhite }}>
-                  {item.title}
-                </Typography>
-              </Box>
-            ))}
-            {isAdmin && (
-              <Box
-                onClick={() => navigate('/admin')}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.75,
-                  px: 1.5,
-                  py: 0.75,
-                  borderRadius: 1.5,
-                  bgcolor: 'rgba(255,255,255,0.15)',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                  '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
-                }}
-              >
-                <AdminIcon sx={{ fontSize: 20, color: COLORS.offWhite }} />
-                <Typography variant="caption" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 500, color: COLORS.offWhite }}>
-                  Painel Admin
-                </Typography>
-              </Box>
-            )}
-          </Box>
         </Box>
       </Box>
 
-      {/* Números da organização */}
+      {/* ── SECTION 2: Metric cards ──────────────────────────────── */}
       {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <CircularProgress sx={{ color: COLORS.primary }} size={32} />
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+          <CircularProgress size={32} sx={{ color: BRAND.orange }} />
         </Box>
-      ) : (
-        orgStats && (
-          <Grid container spacing={2} sx={{ mb: 4 }}>
-            <Grid item xs={12} sm={4}>
-              <Card elevation={0} sx={{ ...cardSx, bgcolor: COLORS.offWhite }}>
-                <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+      ) : orgStats && (
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          {/* Clientes ativos */}
+          <Grid item xs={12} sm={4}>
+            <Card elevation={0} sx={{ ...CARD_SX }}>
+              <CardContent sx={{ p: { xs: 2.5, md: 3 }, pb: '20px !important' }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
                   <Box
                     sx={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 1.5,
-                      bgcolor: 'rgba(15, 118, 110, 0.08)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: COLORS.primary,
+                      width: 40, height: 40, borderRadius: '10px',
+                      bgcolor: 'rgba(62,84,181,0.1)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
                   >
-                    <PeopleIcon sx={{ fontSize: 28 }} />
+                    <PeopleIcon sx={{ fontSize: 22, color: BRAND.blue }} />
                   </Box>
-                  <Box>
-                    <Typography
-                      variant="h4"
-                      sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 700, color: COLORS.primary }}
-                    >
-                      {activeClientsCount}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                      Clientes ativos ({homeClients.length} no total)
-                    </Typography>
-                  </Box>
+                  <Typography variant="caption" sx={{ color: BRAND.muted, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', fontSize: '0.68rem', mt: 0.5 }}>
+                    Clientes
+                  </Typography>
                 </Box>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Card elevation={0} sx={{ ...cardSx, bgcolor: COLORS.offWhite }}>
-                <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box
-                    sx={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 1.5,
-                      bgcolor: 'rgba(15, 118, 110, 0.08)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: COLORS.primary,
-                    }}
-                  >
-                    <ScheduleIcon sx={{ fontSize: 28 }} />
-                  </Box>
-                  <Box>
-                    <Typography
-                      variant="h4"
-                      sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 700, color: COLORS.primary }}
-                    >
-                      {orgStats.scheduledPosts}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                      Posts agendados
-                    </Typography>
-                  </Box>
-                </Box>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Card elevation={0} sx={{ ...cardSx, bgcolor: COLORS.offWhite }}>
-                <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box
-                    sx={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 1.5,
-                      bgcolor: 'rgba(15, 118, 110, 0.08)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: COLORS.primary,
-                    }}
-                  >
-                    <CheckCircleIcon sx={{ fontSize: 28 }} />
-                  </Box>
-                  <Box>
-                    <Typography
-                      variant="h4"
-                      sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 700, color: COLORS.primary }}
-                    >
-                      {orgStats.publishedPosts}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                      Posts publicados
-                    </Typography>
-                  </Box>
-                </Box>
-              </Card>
-            </Grid>
-          </Grid>
-        )
-      )}
-
-      {/* Próximo post em destaque */}
-      {!loading && nextPost && (
-        <>
-          <Card elevation={0} sx={{ ...cardSx, mb: 3, borderLeft: `4px solid ${COLORS.primary}`, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, overflow: 'hidden' }}>
-            {nextPost.imagePreviewUrl && (
-              <Box
-                onClick={() => setPreviewModalOpen(true)}
-                sx={{ cursor: 'pointer', position: 'relative', flexShrink: 0 }}
-              >
-                <CardMedia
-                  component="img"
-                  image={nextPost.imagePreviewUrl}
-                  alt="Preview do post"
-                  sx={{ width: { xs: '100%', sm: 280 }, minWidth: { sm: 280 }, height: 280, objectFit: 'cover' }}
-                />
-                <Box
+                <Typography
                   sx={{
-                    position: 'absolute',
-                    bottom: 8,
-                    right: 8,
-                    bgcolor: 'rgba(0,0,0,0.6)',
-                    color: 'white',
-                    borderRadius: 1,
-                    px: 1,
-                    py: 0.5,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
+                    fontFamily: '"Cabinet Grotesk", sans-serif',
+                    fontWeight: 800,
+                    fontSize: { xs: '2.8rem', md: '3.2rem' },
+                    letterSpacing: '-0.04em',
+                    lineHeight: 1,
+                    color: BRAND.navy,
+                    mb: 0.5,
                   }}
                 >
-                  <VisibilityIcon sx={{ fontSize: 18 }} />
-                  <Typography variant="caption" sx={{ fontFamily: '"Poppins", sans-serif' }}>Ver preview</Typography>
+                  {activeClientsCount}
+                </Typography>
+                <Typography variant="caption" sx={{ color: BRAND.muted, fontWeight: 500 }}>
+                  {homeClients.length > activeClientsCount
+                    ? `+${homeClients.length - activeClientsCount} inativos`
+                    : `${homeClients.length} no total`}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Posts agendados */}
+          <Grid item xs={12} sm={4}>
+            <Card elevation={0} sx={{ ...CARD_SX }}>
+              <CardContent sx={{ p: { xs: 2.5, md: 3 }, pb: '20px !important' }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
+                  <Box
+                    sx={{
+                      width: 40, height: 40, borderRadius: '10px',
+                      bgcolor: 'rgba(247,66,17,0.1)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <ScheduleIcon sx={{ fontSize: 22, color: BRAND.orange }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: BRAND.muted, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', fontSize: '0.68rem', mt: 0.5 }}>
+                    Agendados
+                  </Typography>
                 </Box>
-              </Box>
-            )}
-            {!nextPost.imagePreviewUrl && nextPost.videoUrl && (
+                <Typography
+                  sx={{
+                    fontFamily: '"Cabinet Grotesk", sans-serif',
+                    fontWeight: 800,
+                    fontSize: { xs: '2.8rem', md: '3.2rem' },
+                    letterSpacing: '-0.04em',
+                    lineHeight: 1,
+                    color: BRAND.navy,
+                    mb: 0.5,
+                  }}
+                >
+                  {orgStats.scheduledPosts}
+                </Typography>
+                <Typography variant="caption" sx={{ color: BRAND.muted, fontWeight: 500 }}>
+                  posts na fila
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Posts publicados */}
+          <Grid item xs={12} sm={4}>
+            <Card elevation={0} sx={{ ...CARD_SX }}>
+              <CardContent sx={{ p: { xs: 2.5, md: 3 }, pb: '20px !important' }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
+                  <Box
+                    sx={{
+                      width: 40, height: 40, borderRadius: '10px',
+                      bgcolor: 'rgba(16,185,129,0.1)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <CheckCircleIcon sx={{ fontSize: 22, color: BRAND.green }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: BRAND.muted, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', fontSize: '0.68rem', mt: 0.5 }}>
+                    Publicados
+                  </Typography>
+                </Box>
+                <Typography
+                  sx={{
+                    fontFamily: '"Cabinet Grotesk", sans-serif',
+                    fontWeight: 800,
+                    fontSize: { xs: '2.8rem', md: '3.2rem' },
+                    letterSpacing: '-0.04em',
+                    lineHeight: 1,
+                    color: BRAND.navy,
+                    mb: 0.5,
+                  }}
+                >
+                  {orgStats.publishedPosts}
+                </Typography>
+                <Typography variant="caption" sx={{ color: BRAND.muted, fontWeight: 500 }}>
+                  posts no total
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
+
+      {/* ── SECTION 3: Featured "Próximo Agendado" ───────────────── */}
+      {!loading && nextPost && (
+        <>
+          <Card
+            elevation={0}
+            sx={{
+              ...CARD_SX,
+              mb: 3,
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              overflow: 'hidden',
+            }}
+          >
+            {/* Media preview */}
+            {(nextPost.imagePreviewUrl || nextPost.videoUrl) && (
               <Box
                 onClick={() => setPreviewModalOpen(true)}
                 sx={{
                   cursor: 'pointer',
                   position: 'relative',
                   flexShrink: 0,
-                  width: { xs: '100%', sm: 280 },
-                  minWidth: { sm: 280 },
-                  height: 280,
-                  bgcolor: 'grey.900',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  width: { xs: '100%', sm: 240 },
+                  minWidth: { sm: 240 },
+                  height: { xs: 200, sm: 240 },
+                  bgcolor: '#0a0f2d',
+                  overflow: 'hidden',
                 }}
               >
-                <ReelsIcon sx={{ fontSize: 80, color: 'rgba(255,255,255,0.5)' }} />
+                {nextPost.imagePreviewUrl ? (
+                  <CardMedia
+                    component="img"
+                    image={nextPost.imagePreviewUrl}
+                    alt="Preview"
+                    sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : nextPost.videoUrl ? (
+                  <Box
+                    component="video"
+                    src={nextPost.videoUrl}
+                    poster={nextPost.coverImageUrl ?? undefined}
+                    preload="metadata"
+                    muted
+                    playsInline
+                    sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
+                    onLoadedMetadata={(e: React.SyntheticEvent<HTMLVideoElement>) => {
+                      e.currentTarget.currentTime = 0.1;
+                    }}
+                  />
+                ) : (
+                  <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ReelsIcon sx={{ fontSize: 64, color: 'rgba(255,255,255,0.3)' }} />
+                  </Box>
+                )}
+                {/* Post type badge */}
                 <Box
                   sx={{
-                    position: 'absolute',
-                    bottom: 8,
-                    right: 8,
-                    bgcolor: 'rgba(0,0,0,0.6)',
-                    color: 'white',
-                    borderRadius: 1,
-                    px: 1,
-                    py: 0.5,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
+                    position: 'absolute', top: 12, left: 12,
+                    bgcolor: getPostTypeBadgeColor(nextPost.postType),
+                    color: '#fff', px: 1.2, py: 0.3,
+                    borderRadius: '999px',
+                    fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
                   }}
                 >
-                  <VisibilityIcon sx={{ fontSize: 18 }} />
-                  <Typography variant="caption" sx={{ fontFamily: '"Poppins", sans-serif' }}>Ver preview</Typography>
+                  {getPostTypeLabel(nextPost.postType)}
+                </Box>
+                {/* Carousel indicator */}
+                {(nextPost.imageUrls?.length ?? 0) > 1 && (
+                  <Box
+                    sx={{
+                      position: 'absolute', bottom: 10, right: 10,
+                      bgcolor: 'rgba(0,0,0,0.6)', color: '#fff',
+                      px: 1, py: 0.3, borderRadius: '999px', fontSize: '0.7rem', fontWeight: 600,
+                    }}
+                  >
+                    1/{nextPost.imageUrls!.length}
+                  </Box>
+                )}
+                {/* Hover overlay */}
+                <Box
+                  sx={{
+                    position: 'absolute', inset: 0,
+                    bgcolor: 'rgba(0,0,0,0)', transition: 'background-color 0.2s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    '&:hover': { bgcolor: 'rgba(0,0,0,0.3)' },
+                  }}
+                >
+                  <VisibilityIcon sx={{ color: 'rgba(255,255,255,0)', fontSize: 32, transition: 'color 0.2s', '.MuiBox-root:hover &': { color: '#fff' } }} />
                 </Box>
               </Box>
             )}
-            <CardContent sx={{ p: 2.5, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif', textTransform: 'uppercase', letterSpacing: 1 }}>
-                Próximo agendado
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 0.5 }}>
-                <Avatar
-                  src={nextPost.clientLogoUrl ? ImageUrlService.getPublicUrl(nextPost.clientLogoUrl) : undefined}
-                  sx={{ width: 32, height: 32, bgcolor: COLORS.primary, fontSize: '0.875rem' }}
+
+            {/* Content */}
+            <CardContent sx={{ p: { xs: 2.5, md: 3 }, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <Box>
+                <Typography
+                  sx={{
+                    fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.12em',
+                    textTransform: 'uppercase', color: BRAND.orange, mb: 1,
+                  }}
                 >
-                  {nextPost.clientName?.charAt(0)?.toUpperCase() || '?'}
-                </Avatar>
-                <Typography variant="h6" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600, color: COLORS.primary }}>
-                  {nextPost.clientName} · {getPostTypeLabel(nextPost.postType)}
+                  Próximo agendado
                 </Typography>
+
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+                  <Avatar
+                    src={nextPost.clientLogoUrl ? ImageUrlService.getPublicUrl(nextPost.clientLogoUrl) : undefined}
+                    sx={{ width: 36, height: 36, bgcolor: BRAND.orange, fontSize: '0.875rem', flexShrink: 0 }}
+                  >
+                    {nextPost.clientName?.charAt(0)?.toUpperCase() || '?'}
+                  </Avatar>
+                  <Typography
+                    sx={{
+                      fontFamily: '"Cabinet Grotesk", sans-serif',
+                      fontWeight: 700,
+                      fontSize: '1.15rem',
+                      color: BRAND.navy,
+                      letterSpacing: '-0.02em',
+                    }}
+                  >
+                    {nextPost.clientName}
+                  </Typography>
+                </Box>
+
+                {nextPost.caption && (
+                  <Typography
+                    variant="body2"
+                    sx={{ color: BRAND.muted, lineHeight: 1.55, mb: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                  >
+                    {nextPost.caption}
+                  </Typography>
+                )}
+
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                  <AccessTimeIcon sx={{ fontSize: 15, color: BRAND.muted }} />
+                  <Typography variant="caption" sx={{ color: BRAND.muted, fontWeight: 500 }}>
+                    {format(new Date(nextPost.scheduledDate), "EEEE, d 'de' MMMM 'às' HH:mm", { locale: ptBR })}
+                  </Typography>
+                </Box>
               </Box>
-              <Typography variant="body2" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif', mt: 1 }} noWrap>
-                {nextPost.caption?.slice(0, 100)}{nextPost.caption?.length > 100 ? '…' : ''}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif', display: 'block', mt: 1.5 }}>
-                {format(new Date(nextPost.scheduledDate), "EEEE, d 'de' MMMM 'às' HH:mm", { locale: ptBR })}
-              </Typography>
-              <Box sx={{ mt: 2.5, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+
+              <Box sx={{ display: 'flex', gap: 1, mt: 2.5, flexWrap: 'wrap' }}>
                 {(nextPost.imagePreviewUrl || nextPost.videoUrl) && (
-                  <Button size="medium" variant="outlined" startIcon={<VisibilityIcon />} onClick={() => setPreviewModalOpen(true)} sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                    Ver preview
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<VisibilityIcon sx={{ fontSize: '1rem !important' }} />}
+                    onClick={() => setPreviewModalOpen(true)}
+                    sx={{ borderColor: BRAND.border, color: BRAND.navy, borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, '&:hover': { borderColor: BRAND.borderStrong, bgcolor: 'rgba(0,0,0,0.03)' } }}
+                  >
+                    Preview
                   </Button>
                 )}
-                <Button size="medium" variant="outlined" onClick={() => navigate('/calendar')} sx={{ fontFamily: '"Poppins", sans-serif' }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => navigate('/calendar')}
+                  sx={{ borderColor: BRAND.border, color: BRAND.navy, borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, '&:hover': { borderColor: BRAND.borderStrong, bgcolor: 'rgba(0,0,0,0.03)' } }}
+                >
                   Calendário
                 </Button>
-                <Button size="medium" variant="contained" onClick={() => navigate(`/edit-post/${nextPost.id}`)} startIcon={<EditIcon />} sx={{ fontFamily: '"Poppins", sans-serif', bgcolor: COLORS.primary, '&:hover': { bgcolor: COLORS.secondary } }}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  startIcon={<EditIcon sx={{ fontSize: '1rem !important' }} />}
+                  onClick={() => navigate(`/edit-post/${nextPost.id}`)}
+                  sx={{ bgcolor: BRAND.orange, borderRadius: '8px', fontSize: '0.78rem', fontWeight: 600, boxShadow: 'none', '&:hover': { bgcolor: BRAND.orangeDark, boxShadow: 'none' } }}
+                >
                   Editar
                 </Button>
               </Box>
             </CardContent>
           </Card>
 
-          {/* Modal de preview do post */}
+          {/* Preview modal */}
           <Dialog
             open={previewModalOpen}
             onClose={() => { setPreviewModalOpen(false); setPreviewCarouselIndex(0); }}
             maxWidth="sm"
             fullWidth
-            PaperProps={{ sx: { borderRadius: 2, overflow: 'hidden' } }}
+            PaperProps={{
+              sx: {
+                borderRadius: '14px', overflow: 'hidden',
+                bgcolor: BRAND.surface,
+                border: `1px solid ${BRAND.border}`,
+                boxShadow: '0 20px 60px rgba(10,15,45,0.18)',
+              },
+            }}
           >
-            <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: 1, borderColor: 'divider', py: 1.5 }}>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${BRAND.border}`, py: 1.5 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Avatar
-                  src={nextPost.clientLogoUrl ? ImageUrlService.getPublicUrl(nextPost.clientLogoUrl) : undefined}
-                  sx={{ width: 36, height: 36, bgcolor: COLORS.primary }}
-                >
+                <Avatar src={nextPost.clientLogoUrl ? ImageUrlService.getPublicUrl(nextPost.clientLogoUrl) : undefined} sx={{ width: 34, height: 34, bgcolor: BRAND.orange }}>
                   {nextPost.clientName?.charAt(0)?.toUpperCase() || '?'}
                 </Avatar>
                 <Box>
-                  <Typography variant="subtitle1" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>{nextPost.clientName}</Typography>
-                  <Typography variant="caption" color="text.secondary">{getPostTypeLabel(nextPost.postType)} · {format(new Date(nextPost.scheduledDate), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{nextPost.clientName}</Typography>
+                  <Typography variant="caption" color="text.secondary">{getPostTypeLabel(nextPost.postType)} · {format(new Date(nextPost.scheduledDate), "dd/MM 'às' HH:mm", { locale: ptBR })}</Typography>
                 </Box>
               </Box>
               <IconButton size="small" onClick={() => { setPreviewModalOpen(false); setPreviewCarouselIndex(0); }}>
-                <CloseIcon />
+                <CloseIcon fontSize="small" />
               </IconButton>
             </DialogTitle>
             <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', bgcolor: '#000' }}>
               {nextPost.postType === 'reels' && nextPost.videoUrl ? (
-                <video
-                  src={nextPost.videoUrl}
-                  controls
-                  style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain' }}
-                />
+                <video src={nextPost.videoUrl} controls style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain' }} />
               ) : (nextPost.imageUrls && nextPost.imageUrls.length > 0) ? (
                 <Box sx={{ position: 'relative', width: '100%', display: 'flex', alignItems: 'center' }}>
                   {nextPost.imageUrls.length > 1 && (
-                    <IconButton
-                      sx={{ position: 'absolute', left: 8, zIndex: 1, bgcolor: 'rgba(0,0,0,0.5)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' } }}
-                      onClick={() => setPreviewCarouselIndex((i) => Math.max(0, i - 1))}
-                    >
+                    <IconButton sx={{ position: 'absolute', left: 8, zIndex: 1, bgcolor: 'rgba(0,0,0,0.5)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' } }} onClick={() => setPreviewCarouselIndex((i) => Math.max(0, i - 1))}>
                       <ChevronLeftIcon />
                     </IconButton>
                   )}
                   <Box component="img" src={nextPost.imageUrls[previewCarouselIndex]} alt="Preview" sx={{ width: '100%', maxHeight: '70vh', objectFit: 'contain' }} />
                   {nextPost.imageUrls.length > 1 && (
-                    <IconButton
-                      sx={{ position: 'absolute', right: 8, zIndex: 1, bgcolor: 'rgba(0,0,0,0.5)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' } }}
-                      onClick={() => setPreviewCarouselIndex((i) => Math.min(nextPost!.imageUrls!.length - 1, i + 1))}
-                    >
+                    <IconButton sx={{ position: 'absolute', right: 8, zIndex: 1, bgcolor: 'rgba(0,0,0,0.5)', color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' } }} onClick={() => setPreviewCarouselIndex((i) => Math.min(nextPost!.imageUrls!.length - 1, i + 1))}>
                       <ChevronRightIcon />
                     </IconButton>
                   )}
@@ -786,8 +782,8 @@ const HomePage: React.FC = () => {
                 </Box>
               )}
               {nextPost.caption && (
-                <Box sx={{ p: 2, width: '100%', bgcolor: 'background.paper', borderTop: 1, borderColor: 'divider' }}>
-                  <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', whiteSpace: 'pre-wrap' }}>{nextPost.caption}</Typography>
+                <Box sx={{ p: 2, width: '100%', bgcolor: BRAND.surface, borderTop: `1px solid ${BRAND.border}` }}>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{nextPost.caption}</Typography>
                 </Box>
               )}
             </DialogContent>
@@ -795,171 +791,253 @@ const HomePage: React.FC = () => {
         </>
       )}
 
-      {/* Próximos agendados + Posts que precisam de atenção + Uso do plano + Top clientes */}
+      {/* ── SECTION 4: Two-column grid ───────────────────────────── */}
       {!loading && (upcomingPosts.length > 0 || failedPosts.length > 0 || planLimits || topClients.length > 0) && (
-        <Grid container spacing={2} sx={{ mb: 4 }}>
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          {/* Left column */}
           <Grid item xs={12} md={6}>
             {upcomingPosts.length > 0 && (
-              <Card elevation={0} sx={{ ...cardSx, mb: 2, height: '100%' }}>
-                <CardContent sx={{ p: 2.5 }}>
-                  <Typography variant="subtitle2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600, color: COLORS.primary, mb: 1.5 }}>
-                    Próximos agendados
-                  </Typography>
+              <Card elevation={0} sx={{ ...CARD_SX, mb: 2 }}>
+                <CardContent sx={{ p: { xs: 2, md: 2.5 }, pb: '16px !important' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <ScheduleIcon sx={{ fontSize: 18, color: BRAND.orange }} />
+                      <Typography sx={{ fontFamily: '"Cabinet Grotesk", sans-serif', fontWeight: 700, fontSize: '0.9rem', color: BRAND.navy }}>
+                        Próximos na fila
+                      </Typography>
+                    </Box>
+                    <Chip
+                      label={`${upcomingPosts.length}`}
+                      size="small"
+                      sx={{ bgcolor: 'rgba(247,66,17,0.08)', color: BRAND.orange, fontWeight: 700, height: 22, fontSize: '0.72rem' }}
+                    />
+                  </Box>
+
                   <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none' }}>
                     {upcomingPosts.slice(nextPost ? 1 : 0, nextPost ? 6 : 5).map((p, idx) => (
-                      <React.Fragment key={p.id}>
-                        {idx > 0 && <Divider sx={{ my: 1.5 }} />}
-                        <Box component="li" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: idx === 0 ? 0 : 0.5 }}>
-                          <Avatar
-                            src={p.clientLogoUrl ? ImageUrlService.getPublicUrl(p.clientLogoUrl) : undefined}
-                            sx={{ width: 36, height: 36, bgcolor: COLORS.primary, fontSize: '0.875rem', flexShrink: 0 }}
-                          >
-                            {p.clientName?.charAt(0)?.toUpperCase() || '?'}
-                          </Avatar>
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 500 }}>
-                              {p.clientName} · {getPostTypeLabel(p.postType)}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                              {format(new Date(p.scheduledDate), "dd/MM HH:mm", { locale: ptBR })}
+                      <Box
+                        component="li"
+                        key={p.id}
+                        sx={{
+                          display: 'flex', alignItems: 'center', gap: 1.5,
+                          py: 1.25,
+                          borderTop: idx > 0 ? `1px solid ${BRAND.border}` : 'none',
+                        }}
+                      >
+                        <Avatar
+                          src={p.clientLogoUrl ? ImageUrlService.getPublicUrl(p.clientLogoUrl) : undefined}
+                          sx={{ width: 34, height: 34, bgcolor: BRAND.orange, fontSize: '0.8rem', flexShrink: 0 }}
+                        >
+                          {p.clientName?.charAt(0)?.toUpperCase() || '?'}
+                        </Avatar>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: BRAND.navy, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {p.clientName}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.2 }}>
+                            <Box
+                              sx={{
+                                width: 6, height: 6, borderRadius: '50%',
+                                bgcolor: getPostTypeBadgeColor(p.postType),
+                                flexShrink: 0,
+                              }}
+                            />
+                            <Typography variant="caption" sx={{ color: BRAND.muted, fontWeight: 500 }}>
+                              {getPostTypeLabel(p.postType)} · {format(new Date(p.scheduledDate), 'dd/MM HH:mm', { locale: ptBR })}
                             </Typography>
                           </Box>
-                          <Button size="small" variant="outlined" onClick={() => navigate(`/edit-post/${p.id}`)} sx={{ fontFamily: '"Poppins", sans-serif', flexShrink: 0 }}>
-                            Ver
-                          </Button>
                         </Box>
-                      </React.Fragment>
+                        <IconButton
+                          size="small"
+                          onClick={() => navigate(`/edit-post/${p.id}`)}
+                          sx={{
+                            width: 30, height: 30, flexShrink: 0,
+                            border: `1px solid ${BRAND.border}`,
+                            borderRadius: '8px',
+                            color: BRAND.muted,
+                            '&:hover': { bgcolor: 'rgba(247,66,17,0.06)', borderColor: 'rgba(247,66,17,0.2)', color: BRAND.orange },
+                          }}
+                        >
+                          <ArrowForwardIcon sx={{ fontSize: 15 }} />
+                        </IconButton>
+                      </Box>
                     ))}
                   </Box>
-                  <Divider sx={{ my: 1.5 }} />
-                  <Button size="medium" variant="contained" onClick={() => navigate('/calendar')} sx={{ fontFamily: '"Poppins", sans-serif', width: '100%', bgcolor: COLORS.primary, '&:hover': { bgcolor: COLORS.secondary } }}>
+
+                  <Button
+                    fullWidth
+                    size="small"
+                    onClick={() => navigate('/calendar')}
+                    sx={{
+                      mt: 1.5,
+                      bgcolor: BRAND.navy,
+                      color: '#fff',
+                      borderRadius: '8px',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      py: 0.9,
+                      boxShadow: 'none',
+                      '&:hover': { bgcolor: '#151c42', boxShadow: 'none' },
+                    }}
+                  >
                     Ver calendário completo
                   </Button>
                 </CardContent>
               </Card>
             )}
+
             {failedPosts.length > 0 && (
-              <Card elevation={0} sx={{ ...cardSx, borderLeft: `4px solid ${theme.palette.error.main}` }}>
-                <CardContent sx={{ p: 2.5 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                    <WarningIcon sx={{ color: theme.palette.error.main, fontSize: 20 }} />
-                    <Typography variant="subtitle2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600, color: theme.palette.error.dark }}>
-                      Posts que precisam de atenção
+              <Card elevation={0} sx={{ ...CARD_SX, border: `1px solid rgba(239,68,68,0.2)` }}>
+                <CardContent sx={{ p: { xs: 2, md: 2.5 }, pb: '16px !important' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Box sx={{ width: 32, height: 32, borderRadius: '8px', bgcolor: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <WarningIcon sx={{ fontSize: 17, color: theme.palette.error.main }} />
+                    </Box>
+                    <Typography sx={{ fontFamily: '"Cabinet Grotesk", sans-serif', fontWeight: 700, fontSize: '0.9rem', color: theme.palette.error.dark }}>
+                      Precisam de atenção
                     </Typography>
+                    <Chip label={failedPosts.length} size="small" sx={{ bgcolor: 'rgba(239,68,68,0.1)', color: theme.palette.error.main, fontWeight: 700, height: 22, fontSize: '0.72rem' }} />
                   </Box>
+
                   {failedPosts.slice(0, 5).map((p, idx) => (
-                    <React.Fragment key={p.id}>
-                      {idx > 0 && <Divider sx={{ my: 1.5 }} />}
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, py: idx === 0 ? 0 : 0.5 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 0 }}>
-                          <Avatar
-                            src={p.clientLogoUrl ? ImageUrlService.getPublicUrl(p.clientLogoUrl) : undefined}
-                            sx={{ width: 36, height: 36, bgcolor: COLORS.primary, fontSize: '0.875rem', flexShrink: 0 }}
-                          >
-                            {p.clientName?.charAt(0)?.toUpperCase() || '?'}
-                          </Avatar>
-                          <Box>
-                            <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 500 }}>
-                              {p.clientName} · {getPostTypeLabel(p.postType)}
-                            </Typography>
-                            {p.errorMessage && (
-                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontFamily: '"Poppins", sans-serif' }}>
-                                {p.errorMessage.slice(0, 60)}{p.errorMessage.length > 60 ? '…' : ''}
-                              </Typography>
-                            )}
-                            {p.status === 'failed' && p.postType === 'reels' && (
-                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontFamily: '"Poppins", sans-serif', mt: 0.5 }}>
-                                Converter o vídeo para MP4 (H.264 + AAC) e tentar novamente pode resolver.
-                              </Typography>
-                            )}
-                          </Box>
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
-                          <Button size="small" variant="outlined" onClick={() => navigate(`/edit-post/${p.id}`)} sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                            Ver
-                          </Button>
-                          <Button size="small" variant="contained" startIcon={<RefreshIcon />} onClick={() => handleRetryPost(p.id)} sx={{ fontFamily: '"Poppins", sans-serif', bgcolor: theme.palette.error.main, '&:hover': { bgcolor: theme.palette.error.dark } }}>
-                            Reprocessar
-                          </Button>
-                        </Box>
+                    <Box
+                      key={p.id}
+                      sx={{
+                        display: 'flex', alignItems: 'center', gap: 1.5,
+                        py: 1.25,
+                        borderTop: idx > 0 ? `1px solid rgba(239,68,68,0.1)` : 'none',
+                      }}
+                    >
+                      <Avatar src={p.clientLogoUrl ? ImageUrlService.getPublicUrl(p.clientLogoUrl) : undefined} sx={{ width: 34, height: 34, bgcolor: BRAND.orange, fontSize: '0.8rem', flexShrink: 0 }}>
+                        {p.clientName?.charAt(0)?.toUpperCase() || '?'}
+                      </Avatar>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: BRAND.navy, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {p.clientName} · {getPostTypeLabel(p.postType)}
+                        </Typography>
+                        {p.errorMessage && (
+                          <Typography variant="caption" sx={{ color: BRAND.muted, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.errorMessage.slice(0, 55)}{p.errorMessage.length > 55 ? '…' : ''}
+                          </Typography>
+                        )}
                       </Box>
-                    </React.Fragment>
+                      <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
+                        <IconButton size="small" onClick={() => navigate(`/edit-post/${p.id}`)} sx={{ width: 30, height: 30, border: `1px solid ${BRAND.border}`, borderRadius: '8px', color: BRAND.muted }}>
+                          <EditIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                        <IconButton size="small" onClick={() => handleRetryPost(p.id)} sx={{ width: 30, height: 30, border: `1px solid rgba(239,68,68,0.3)`, borderRadius: '8px', color: theme.palette.error.main, bgcolor: 'rgba(239,68,68,0.06)', '&:hover': { bgcolor: 'rgba(239,68,68,0.12)' } }}>
+                          <RefreshIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      </Box>
+                    </Box>
                   ))}
                 </CardContent>
               </Card>
             )}
           </Grid>
+
+          {/* Right column */}
           <Grid item xs={12} md={6}>
             {planLimits && planLimits.maxPostsPerMonth < 999999 && (
-              <Card elevation={0} sx={{ ...cardSx, mb: 2 }}>
-                <CardContent sx={{ p: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                    <PlanIcon sx={{ color: COLORS.primary, fontSize: 20 }} />
-                    <Typography variant="subtitle2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600, color: COLORS.primary }}>
+              <Card elevation={0} sx={{ ...CARD_SX, mb: 2 }}>
+                <CardContent sx={{ p: { xs: 2, md: 2.5 }, pb: '16px !important' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Box sx={{ width: 32, height: 32, borderRadius: '8px', bgcolor: 'rgba(62,84,181,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <PlanIcon sx={{ fontSize: 17, color: BRAND.blue }} />
+                    </Box>
+                    <Typography sx={{ fontFamily: '"Cabinet Grotesk", sans-serif', fontWeight: 700, fontSize: '0.9rem', color: BRAND.navy }}>
                       Uso do plano
                     </Typography>
                   </Box>
-                  <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                    Posts este mês: {planLimits.currentPostsThisMonth} / {planLimits.maxPostsPerMonth}
-                  </Typography>
+
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+                    <Typography variant="body2" sx={{ color: BRAND.muted, fontWeight: 500 }}>Posts este mês</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: BRAND.navy }}>
+                      {planLimits.currentPostsThisMonth} <Typography component="span" variant="caption" sx={{ color: BRAND.muted, fontWeight: 500 }}>/ {planLimits.maxPostsPerMonth}</Typography>
+                    </Typography>
+                  </Box>
                   <LinearProgress
                     variant="determinate"
                     value={Math.min(100, (planLimits.currentPostsThisMonth / planLimits.maxPostsPerMonth) * 100)}
-                    sx={{ mt: 1, height: 8, borderRadius: 1, bgcolor: COLORS.lightGray, '& .MuiLinearProgress-bar': { bgcolor: COLORS.primary } }}
+                    sx={{
+                      height: 6, borderRadius: '999px', bgcolor: 'rgba(82,86,99,0.1)',
+                      '& .MuiLinearProgress-bar': { bgcolor: BRAND.orange, borderRadius: '999px' },
+                    }}
                   />
-                  <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif', display: 'block', mt: 0.5 }}>
+                  <Typography variant="caption" sx={{ color: BRAND.muted, mt: 0.75, display: 'block' }}>
                     {Math.max(0, planLimits.maxPostsPerMonth - planLimits.currentPostsThisMonth)} posts restantes no plano
                   </Typography>
                 </CardContent>
               </Card>
             )}
+
             {topClients.length > 0 && (
-              <Card elevation={0} sx={{ ...cardSx }}>
-                <CardContent sx={{ p: 2.5 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                    <TrendingUpIcon sx={{ color: COLORS.primary, fontSize: 20 }} />
-                    <Typography variant="subtitle2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600, color: COLORS.primary }}>
-                      Top clientes (posts agendados)
-                    </Typography>
+              <Card elevation={0} sx={{ ...CARD_SX }}>
+                <CardContent sx={{ p: { xs: 2, md: 2.5 }, pb: '16px !important' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <TrendingUpIcon sx={{ fontSize: 18, color: BRAND.green }} />
+                      <Typography sx={{ fontFamily: '"Cabinet Grotesk", sans-serif', fontWeight: 700, fontSize: '0.9rem', color: BRAND.navy }}>
+                        Top clientes
+                      </Typography>
+                    </Box>
+                    <Typography variant="caption" sx={{ color: BRAND.muted, fontWeight: 500 }}>posts agendados</Typography>
                   </Box>
-                  <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none' }}>
-                    {topClients.map((c, idx) => (
-                      <React.Fragment key={c.clientId}>
-                        {idx > 0 && <Divider sx={{ my: 1.5 }} />}
-                        <Box
-                          component="li"
-                          onClick={() => navigate(`/client/${c.clientId}`)}
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            py: idx === 0 ? 0 : 1,
-                            cursor: 'pointer',
-                            borderRadius: 1.5,
-                            px: 1.5,
-                            transition: 'background-color 0.2s',
-                            '&:hover': { bgcolor: theme.palette.action.hover },
-                          }}
-                        >
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <Avatar
-                              src={c.clientLogoUrl ? ImageUrlService.getPublicUrl(c.clientLogoUrl) : undefined}
-                              sx={{ width: 40, height: 40, bgcolor: COLORS.primary, fontSize: '0.9375rem', flexShrink: 0 }}
-                            >
-                              {c.clientName?.charAt(0)?.toUpperCase() || '?'}
-                            </Avatar>
-                            <Box>
-                              <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600 }}>{c.clientName}</Typography>
-                              <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>{c.count} posts agendados</Typography>
-                            </Box>
+
+                  {topClients.map((c, idx) => {
+                    const max = topClients[0]?.count || 1;
+                    return (
+                      <Box
+                        key={c.clientId}
+                        onClick={() => navigate(`/client/${c.clientId}`)}
+                        sx={{
+                          display: 'flex', alignItems: 'center', gap: 1.5,
+                          py: 1.25, cursor: 'pointer',
+                          borderTop: idx > 0 ? `1px solid ${BRAND.border}` : 'none',
+                          borderRadius: '8px',
+                          px: 0.5,
+                          mx: -0.5,
+                          transition: 'background-color 0.15s',
+                          '&:hover': { bgcolor: 'rgba(0,0,0,0.02)' },
+                        }}
+                      >
+                        <Typography sx={{ fontWeight: 700, color: BRAND.muted, fontSize: '0.7rem', width: 16, flexShrink: 0, textAlign: 'center' }}>
+                          {idx + 1}
+                        </Typography>
+                        <Avatar src={c.clientLogoUrl ? ImageUrlService.getPublicUrl(c.clientLogoUrl) : undefined} sx={{ width: 34, height: 34, bgcolor: BRAND.orange, fontSize: '0.8rem', flexShrink: 0 }}>
+                          {c.clientName?.charAt(0)?.toUpperCase() || '?'}
+                        </Avatar>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: BRAND.navy, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {c.clientName}
+                          </Typography>
+                          {/* Mini bar */}
+                          <Box sx={{ mt: 0.5, height: 3, borderRadius: '999px', bgcolor: 'rgba(82,86,99,0.1)', overflow: 'hidden', width: '100%' }}>
+                            <Box sx={{ height: '100%', borderRadius: '999px', bgcolor: BRAND.orange, width: `${(c.count / max) * 100}%`, transition: 'width 0.4s ease' }} />
                           </Box>
-                          <Typography variant="caption" sx={{ fontFamily: '"Poppins", sans-serif', color: COLORS.primary, fontWeight: 600 }}>Ver perfil →</Typography>
                         </Box>
-                      </React.Fragment>
-                    ))}
-                  </Box>
-                  <Divider sx={{ my: 1.5 }} />
-                  <Button size="medium" variant="contained" onClick={() => navigate('/clients')} sx={{ fontFamily: '"Poppins", sans-serif', width: '100%', bgcolor: COLORS.primary, '&:hover': { bgcolor: COLORS.secondary } }}>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: BRAND.navy, flexShrink: 0 }}>
+                          {c.count}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
+
+                  <Button
+                    fullWidth size="small"
+                    onClick={() => navigate('/clients')}
+                    sx={{
+                      mt: 1.5,
+                      bgcolor: BRAND.navy,
+                      color: '#fff',
+                      borderRadius: '8px',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      py: 0.9,
+                      boxShadow: 'none',
+                      '&:hover': { bgcolor: '#151c42', boxShadow: 'none' },
+                    }}
+                  >
                     Ver todos os clientes
                   </Button>
                 </CardContent>
@@ -969,126 +1047,234 @@ const HomePage: React.FC = () => {
         </Grid>
       )}
 
-      {/* Últimos publicados */}
+      {/* ── SECTION 5: Last published ────────────────────────────── */}
       {!loading && lastPublishedPosts.length > 0 && (
-        <Card elevation={0} sx={{ ...cardSx, mb: 4 }}>
-          <CardContent sx={{ p: 2.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-              <HistoryIcon sx={{ color: COLORS.primary, fontSize: 20 }} />
-              <Typography variant="subtitle2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600, color: COLORS.primary }}>
-                Últimos publicados
-              </Typography>
+        <Card elevation={0} sx={{ ...CARD_SX, mb: 3 }}>
+          <CardContent sx={{ p: { xs: 2, md: 2.5 }, pb: '16px !important' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CheckCircleOutlineIcon sx={{ fontSize: 18, color: BRAND.green }} />
+                <Typography sx={{ fontFamily: '"Cabinet Grotesk", sans-serif', fontWeight: 700, fontSize: '0.9rem', color: BRAND.navy }}>
+                  Últimos publicados
+                </Typography>
+              </Box>
+              <Button
+                size="small"
+                endIcon={<ArrowForwardIcon sx={{ fontSize: '0.9rem !important' }} />}
+                onClick={() => navigate('/calendar')}
+                sx={{ color: BRAND.muted, fontSize: '0.75rem', fontWeight: 600, p: 0, minWidth: 0, '&:hover': { color: BRAND.navy, bgcolor: 'transparent' } }}
+              >
+                Ver todos
+              </Button>
             </Box>
-            <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none' }}>
-              {lastPublishedPosts.map((p, idx) => (
-                <React.Fragment key={p.id}>
-                  {idx > 0 && <Divider sx={{ my: 1.5 }} />}
-                  <Box component="li" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: idx === 0 ? 0 : 0.5 }}>
-                    <Avatar
-                      src={p.clientLogoUrl ? ImageUrlService.getPublicUrl(p.clientLogoUrl) : undefined}
-                      sx={{ width: 36, height: 36, bgcolor: COLORS.primary, fontSize: '0.875rem', flexShrink: 0 }}
+
+            {/* Horizontal scrollable thumbnails if posts have images, else vertical list */}
+            {lastPublishedPosts.some((p) => p.imagePreviewUrl) ? (
+              <Box
+                sx={{
+                  display: 'flex',
+                  gap: 1.5,
+                  overflowX: 'auto',
+                  pb: 1,
+                  mx: { xs: -2, md: -2.5 },
+                  px: { xs: 2, md: 2.5 },
+                  scrollbarWidth: 'none',
+                  '&::-webkit-scrollbar': { display: 'none' },
+                }}
+              >
+                {lastPublishedPosts.map((p) => {
+                  const isVertical = p.postType === 'reels' || p.postType === 'stories';
+                  const thumbW = isVertical ? { xs: 78, md: 92 } : { xs: 110, md: 130 };
+                  const thumbH = isVertical ? { xs: 139, md: 164 } : { xs: 110, md: 130 };
+                  return (
+                    <Box
+                      key={p.id}
+                      onClick={() => navigate(`/edit-post/${p.id}`)}
+                      sx={{
+                        position: 'relative',
+                        flexShrink: 0,
+                        width: thumbW,
+                        height: thumbH,
+                        borderRadius: '10px',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        bgcolor: BRAND.navy,
+                        border: `1px solid ${BRAND.border}`,
+                        transition: 'transform 0.18s, box-shadow 0.18s',
+                        '&:hover': { transform: 'scale(1.03)', boxShadow: '0 8px 24px rgba(10,15,45,0.14)' },
+                      }}
                     >
+                      {p.imagePreviewUrl ? (
+                        <Box
+                          component="img"
+                          src={p.imagePreviewUrl}
+                          alt={p.clientName}
+                          sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        />
+                      ) : p.videoUrl ? (
+                        /* Reels without cover: render video frozen at first frame */
+                        <Box
+                          component="video"
+                          src={p.videoUrl}
+                          preload="metadata"
+                          muted
+                          playsInline
+                          sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
+                          onLoadedMetadata={(e: React.SyntheticEvent<HTMLVideoElement>) => {
+                            e.currentTarget.currentTime = 0.1;
+                          }}
+                        />
+                      ) : (
+                        <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {p.postType === 'reels'
+                            ? <ReelsIcon sx={{ fontSize: 32, color: 'rgba(255,255,255,0.3)' }} />
+                            : <StoryIcon sx={{ fontSize: 32, color: 'rgba(255,255,255,0.3)' }} />
+                          }
+                        </Box>
+                      )}
+                      {/* Gradient overlay */}
+                      <Box
+                        sx={{
+                          position: 'absolute', inset: 0,
+                          background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0) 55%)',
+                          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', p: 1,
+                        }}
+                      >
+                        <Typography sx={{ fontSize: '0.58rem', fontWeight: 700, color: '#fff', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {p.clientName}
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.53rem', color: 'rgba(255,255,255,0.7)' }}>
+                          {p.postedAt ? format(new Date(p.postedAt), 'dd/MM', { locale: ptBR }) : format(new Date(p.scheduledDate), 'dd/MM', { locale: ptBR })}
+                        </Typography>
+                      </Box>
+                      {/* Post type badge */}
+                      <Box
+                        sx={{
+                          position: 'absolute', top: 6, left: 6,
+                          bgcolor: getPostTypeBadgeColor(p.postType),
+                          color: '#fff', px: 0.7, py: 0.15,
+                          borderRadius: '999px',
+                          fontSize: '0.52rem', fontWeight: 700, letterSpacing: '0.03em', textTransform: 'uppercase',
+                        }}
+                      >
+                        {getPostTypeLabel(p.postType)}
+                      </Box>
+                      {/* Status dot */}
+                      <Box sx={{ position: 'absolute', top: 6, right: 6, width: 7, height: 7, borderRadius: '50%', bgcolor: BRAND.green, border: '1.5px solid #fff' }} />
+                    </Box>
+                  );
+                })}
+              </Box>
+            ) : (
+              <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none' }}>
+                {lastPublishedPosts.map((p, idx) => (
+                  <Box
+                    component="li"
+                    key={p.id}
+                    sx={{
+                      display: 'flex', alignItems: 'center', gap: 1.5,
+                      py: 1.25,
+                      borderTop: idx > 0 ? `1px solid ${BRAND.border}` : 'none',
+                    }}
+                  >
+                    <Avatar src={p.clientLogoUrl ? ImageUrlService.getPublicUrl(p.clientLogoUrl) : undefined} sx={{ width: 34, height: 34, bgcolor: BRAND.green, fontSize: '0.8rem', flexShrink: 0 }}>
                       {p.clientName?.charAt(0)?.toUpperCase() || '?'}
                     </Avatar>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 500 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: BRAND.navy }}>
                         {p.clientName} · {getPostTypeLabel(p.postType)}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontFamily: '"Poppins", sans-serif' }}>
-                        {p.postedAt ? format(new Date(p.postedAt), "dd/MM HH:mm", { locale: ptBR }) : format(new Date(p.scheduledDate), "dd/MM", { locale: ptBR })}
+                      <Typography variant="caption" sx={{ color: BRAND.muted }}>
+                        {p.postedAt ? format(new Date(p.postedAt), "dd/MM 'às' HH:mm", { locale: ptBR }) : format(new Date(p.scheduledDate), 'dd/MM', { locale: ptBR })}
                       </Typography>
                     </Box>
-                    <Button size="small" variant="outlined" onClick={() => navigate(`/edit-post/${p.id}`)} sx={{ fontFamily: '"Poppins", sans-serif', flexShrink: 0 }}>
-                      Ver
-                    </Button>
+                    <IconButton size="small" onClick={() => navigate(`/edit-post/${p.id}`)} sx={{ width: 30, height: 30, border: `1px solid ${BRAND.border}`, borderRadius: '8px', color: BRAND.muted }}>
+                      <ArrowForwardIcon sx={{ fontSize: 15 }} />
+                    </IconButton>
                   </Box>
-                </React.Fragment>
-              ))}
-            </Box>
-            <Divider sx={{ my: 1.5 }} />
-            <Button size="medium" variant="contained" onClick={() => navigate('/calendar')} sx={{ fontFamily: '"Poppins", sans-serif', width: '100%', bgcolor: COLORS.primary, '&:hover': { bgcolor: COLORS.secondary } }}>
-              Ver calendário completo
-            </Button>
+                ))}
+              </Box>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Posts publicados por mês — com contexto */}
+      {/* ── SECTION 6: Monthly chart ─────────────────────────────── */}
       {!loading && postsByMonth.length > 0 && (
-        <Box
-          sx={{
-            p: { xs: 2, sm: 3 },
-            borderRadius: 2,
-            border: `1px solid ${COLORS.lightGray}`,
-            backgroundColor: theme.palette.background.paper,
-            boxShadow: `0 1px 3px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.04)'}`,
-          }}
-        >
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <BarChartIcon sx={{ fontSize: 28, color: COLORS.primary }} />
-              <Typography
-                variant="h5"
-                component="h2"
-                sx={{
-                  color: COLORS.primary,
-                  fontFamily: '"Argent CF", serif',
-                  fontWeight: 400,
-                  textTransform: 'lowercase',
-                  letterSpacing: '0.02em',
-                  fontSize: { xs: '1.35rem', sm: '1.5rem' },
-                }}
-              >
-                Publicações por mês
-              </Typography>
-            </Box>
-            <Typography
-              variant="caption"
-              sx={{
-                fontFamily: '"Poppins", sans-serif',
-                color: theme.palette.text.secondary,
-              }}
-            >
-              Últimos 6 meses · {postsByMonth.reduce((acc, d) => acc + d.posts, 0)} publicados no período
-            </Typography>
-          </Box>
-          <Box sx={{ height: 220, width: '100%' }}>
-            <ResponsiveContainer>
-              <BarChart data={postsByMonth} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <XAxis
-                  dataKey="name"
-                  tick={{ fill: COLORS.secondary, fontSize: 12, fontFamily: '"Poppins", sans-serif' }}
-                  axisLine={{ stroke: COLORS.lightGray }}
-                />
-                <YAxis
-                  tick={{ fill: COLORS.secondary, fontSize: 12, fontFamily: '"Poppins", sans-serif' }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: COLORS.offWhite,
-                    border: `1px solid ${COLORS.lightGray}`,
-                    borderRadius: 8,
-                    fontFamily: '"Poppins", sans-serif',
+        <Card elevation={0} sx={{ ...CARD_SX }}>
+          <CardContent sx={{ p: { xs: 2, md: 3 }, pb: '20px !important' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <BarChartIcon sx={{ fontSize: 20, color: BRAND.orange }} />
+                <Typography
+                  sx={{
+                    fontFamily: '"Cabinet Grotesk", sans-serif',
+                    fontWeight: 800,
+                    fontSize: { xs: '1.05rem', md: '1.15rem' },
+                    color: BRAND.navy,
+                    letterSpacing: '-0.02em',
                   }}
-                  formatter={(value: number) => [`${value} posts`, 'Publicados']}
-                  labelFormatter={(label, payload) =>
-                    payload?.[0]?.payload?.fullMonth
-                      ? format(new Date(payload[0].payload.fullMonth + '-01'), 'MMMM yyyy', { locale: ptBR })
-                      : label
-                  }
-                />
-                <Bar dataKey="posts" radius={[4, 4, 0, 0]}>
-                  {postsByMonth.map((_, index) => (
-                    <Cell key={index} fill={COLORS.primary} fillOpacity={0.7 + (index % 3) * 0.1} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </Box>
-        </Box>
+                >
+                  Publicações por mês
+                </Typography>
+              </Box>
+              <Chip
+                label={`${postsByMonth.reduce((acc, d) => acc + d.posts, 0)} nos últimos 6 meses`}
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(247,66,17,0.08)',
+                  color: BRAND.orange,
+                  fontWeight: 600,
+                  fontSize: '0.72rem',
+                  height: 24,
+                }}
+              />
+            </Box>
+
+            <Box sx={{ height: 200, width: '100%' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={postsByMonth} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fill: BRAND.muted, fontSize: 11, fontWeight: 500 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: BRAND.muted, fontSize: 11 }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: BRAND.surface,
+                      border: `1px solid ${BRAND.border}`,
+                      borderRadius: '10px',
+                      boxShadow: '0 8px 24px rgba(10,15,45,0.1)',
+                      fontSize: '0.8rem',
+                    }}
+                    formatter={(value: number) => [`${value} posts`, 'Publicados']}
+                    labelFormatter={(label, payload) =>
+                      payload?.[0]?.payload?.fullMonth
+                        ? format(new Date(payload[0].payload.fullMonth + '-01'), 'MMMM yyyy', { locale: ptBR })
+                        : label
+                    }
+                    cursor={{ fill: 'rgba(247,66,17,0.05)' }}
+                  />
+                  <Bar dataKey="posts" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                    {postsByMonth.map((entry, index) => (
+                      <Cell
+                        key={index}
+                        fill={entry.posts === Math.max(...postsByMonth.map((d) => d.posts)) ? BRAND.orange : `rgba(247,66,17,0.35)`}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </Box>
+          </CardContent>
+        </Card>
       )}
     </Container>
   );

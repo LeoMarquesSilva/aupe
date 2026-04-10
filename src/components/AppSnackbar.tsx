@@ -6,6 +6,7 @@ import {
   Info as InfoIcon,
   Warning as WarningIcon,
 } from '@mui/icons-material';
+import { GLASS } from '../theme/glassTokens';
 
 export type AppSnackbarSeverity = 'success' | 'error' | 'info' | 'warning';
 
@@ -34,14 +35,14 @@ const AppSnackbar: React.FC<AppSnackbarProps> = ({
   const theme = useTheme();
 
   const severityBorder = {
-    success: alpha(theme.palette.success.main, 0.4),
+    success: 'rgba(16,185,129,0.4)',
     error: alpha(theme.palette.error.main, 0.35),
     info: alpha(theme.palette.primary.main, 0.3),
     warning: alpha(theme.palette.warning.main, 0.4),
   };
 
   const severityColor = {
-    success: theme.palette.success.dark,
+    success: GLASS.accent.orangeDark,
     error: theme.palette.error.dark,
     info: theme.palette.primary.dark,
     warning: theme.palette.warning.dark,
@@ -64,7 +65,6 @@ const AppSnackbar: React.FC<AppSnackbarProps> = ({
         sx={{
           width: '100%',
           maxWidth: 420,
-          fontFamily: '"Poppins", sans-serif',
           fontSize: '0.9375rem',
           fontWeight: 500,
           borderRadius: 2.5,

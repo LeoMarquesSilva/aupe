@@ -1,38 +1,24 @@
 import React from 'react';
 import {
-  Grid,
-  Paper,
-  Typography,
-  Card,
-  CardMedia,
-  CardContent,
   Box,
-  Chip,
-  Button,
+  Typography,
   useTheme,
   useMediaQuery,
-  Divider,
-  alpha
 } from '@mui/material';
 import {
-  ThumbUp as LikeIcon,
+  FavoriteBorder as LikeIcon,
   ChatBubbleOutline as CommentIcon,
-  Visibility as VisibilityIcon,
+  BookmarkBorder as SaveIcon,
+  IosShare as ShareIcon,
+  Visibility as ReachIcon,
+  RemoveRedEye as ImpressionsIcon,
+  OpenInNew as ExternalIcon,
+  TrendingUp as TrendingUpIcon,
   Image as ImageIcon,
   VideoLibrary as VideoIcon,
   ViewCarousel as CarouselIcon,
-  TrendingUp as TrendingUpIcon,
-  People as ReachIcon,
-  Launch as LaunchIcon
 } from '@mui/icons-material';
 import { InstagramPost } from '../../services/instagramMetricsService';
-
-const MEDIA_COLORS: Record<string, string> = {
-  REELS:          '#7c3aed',
-  VIDEO:          '#d97706',
-  IMAGE:          '#0891b2',
-  CAROUSEL_ALBUM: '#6366f1',
-};
 
 interface FeaturedPostProps {
   post: InstagramPost;
@@ -40,37 +26,28 @@ interface FeaturedPostProps {
   formatTimeAgo: (timestamp: string) => string;
 }
 
+const getMediaTypeLabel = (type: string, productType?: string) => {
+  if (productType === 'REELS') return 'Reels';
+  switch (type) {
+    case 'IMAGE': return 'Foto';
+    case 'VIDEO': return 'Vídeo';
+    case 'CAROUSEL_ALBUM': return 'Carrossel';
+    default: return type;
+  }
+};
+
+const getMediaTypeIcon = (type: string, productType?: string) => {
+  if (productType === 'REELS') return <VideoIcon sx={{ fontSize: 13 }} />;
+  switch (type) {
+    case 'VIDEO': return <VideoIcon sx={{ fontSize: 13 }} />;
+    case 'CAROUSEL_ALBUM': return <CarouselIcon sx={{ fontSize: 13 }} />;
+    default: return <ImageIcon sx={{ fontSize: 13 }} />;
+  }
+};
+
 const FeaturedPost: React.FC<FeaturedPostProps> = ({ post, onViewDetails, formatTimeAgo }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-
-  const resolveColor = (type: string, productType?: string) => {
-    if (productType === 'REELS') return MEDIA_COLORS.REELS;
-    return MEDIA_COLORS[type] || MEDIA_COLORS.IMAGE;
-  };
-
-  const getMediaTypeIcon = (type: string, productType?: string) => {
-    const color = resolveColor(type, productType);
-    if (productType === 'REELS') return <VideoIcon sx={{ color }} />;
-    switch (type) {
-      case 'IMAGE': return <ImageIcon sx={{ color }} />;
-      case 'VIDEO': return <VideoIcon sx={{ color }} />;
-      case 'CAROUSEL_ALBUM': return <CarouselIcon sx={{ color }} />;
-      default: return <ImageIcon sx={{ color }} />;
-    }
-  };
-
-  const getMediaTypeLabel = (type: string, productType?: string) => {
-    if (productType === 'REELS') return 'Reels';
-    switch (type) {
-      case 'IMAGE': return 'Foto';
-      case 'VIDEO': return 'Vídeo';
-      case 'CAROUSEL_ALBUM': return 'Carrossel';
-      default: return type;
-    }
-  };
-
-  const mediaColor = resolveColor(post.media_type, post.media_product_type);
 
   const likes = post.like_count || 0;
   const comments = post.comments_count || 0;
@@ -81,220 +58,279 @@ const FeaturedPost: React.FC<FeaturedPostProps> = ({ post, onViewDetails, format
   const totalEngagement = likes + comments + saved + shares;
   const engagementRate = reach > 0 ? (totalEngagement / reach) * 100 : 0;
 
+  const formatNumber = (n: number) => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    return n.toLocaleString('pt-BR');
+  };
+
+  const engagementColor = engagementRate >= 5 ? '#059669' : engagementRate >= 2 ? '#d97706' : '#6b7280';
+
   const statItems = [
-    { icon: <LikeIcon sx={{ color: '#d97706', fontSize: 18 }} />, value: likes, label: 'Curtidas', bg: '#fffbeb' },
-    { icon: <CommentIcon sx={{ color: '#7c3aed', fontSize: 18 }} />, value: comments, label: 'Comentários', bg: '#f5f3ff' },
-    ...(reach > 0 ? [{ icon: <ReachIcon sx={{ color: '#0891b2', fontSize: 18 }} />, value: reach, label: 'Alcance', bg: '#ecfeff' }] : []),
-    ...(impressions > 0 ? [{ icon: <VisibilityIcon sx={{ color: '#6366f1', fontSize: 18 }} />, value: impressions, label: 'Impressões', bg: '#eef2ff' }] : []),
+    { icon: <LikeIcon />, value: likes, label: 'Curtidas' },
+    { icon: <CommentIcon />, value: comments, label: 'Comentários' },
+    ...(saved > 0 ? [{ icon: <SaveIcon />, value: saved, label: 'Salvos' }] : []),
+    ...(shares > 0 ? [{ icon: <ShareIcon />, value: shares, label: 'Shares' }] : []),
+    ...(reach > 0 ? [{ icon: <ReachIcon />, value: reach, label: 'Alcance' }] : []),
+    ...(impressions > 0 ? [{ icon: <ImpressionsIcon />, value: impressions, label: 'Impressões' }] : []),
   ];
 
   return (
-    <Grid item xs={12}>
-      <Paper 
-        elevation={0} 
-        sx={{ 
-          borderRadius: 3,
-          overflow: 'hidden',
-          bgcolor: 'background.paper',
-          border: '1px solid',
-          borderColor: 'divider',
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          '&:hover': {
-            borderColor: alpha(mediaColor, 0.4),
-            boxShadow: `0 8px 25px -5px ${alpha(mediaColor, 0.12)}`
-          }
-        }}
-      >
-        <Box sx={{ 
-          px: 2.5, 
-          py: 2,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 1.5
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box sx={{ 
-              width: 32, 
-              height: 32, 
-              borderRadius: 2, 
-              bgcolor: '#ecfdf5',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <TrendingUpIcon sx={{ color: '#059669', fontSize: 18 }} />
-            </Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
-              Post Mais Engajado
-            </Typography>
-            <Chip 
-              icon={getMediaTypeIcon(post.media_type, post.media_product_type)}
-              label={getMediaTypeLabel(post.media_type, post.media_product_type)}
-              size="small"
-              sx={{ 
-                fontWeight: 600,
-                fontSize: '0.72rem',
-                height: 26,
-                bgcolor: alpha(mediaColor, 0.08),
-                color: mediaColor,
-                border: `1px solid ${alpha(mediaColor, 0.2)}`,
-                '& .MuiChip-icon': { ml: 0.5 }
-              }}
-            />
-          </Box>
-          
-          <Typography variant="body2" color="text.disabled" sx={{ fontSize: '0.8rem' }}>
-            {formatTimeAgo(post.timestamp)}
+    <Box sx={{
+      bgcolor: '#fff',
+      border: '1px solid #e5e7eb',
+      borderRadius: '16px',
+      overflow: 'hidden',
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
+      {/* Header */}
+      <Box sx={{
+        px: 2.5,
+        py: 1.75,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderBottom: '1px solid #f3f4f6',
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{
+            width: 6,
+            height: 6,
+            borderRadius: '50%',
+            bgcolor: '#f74211',
+            flexShrink: 0,
+          }} />
+          <Typography sx={{
+            fontWeight: 600,
+            fontSize: '0.82rem',
+            color: '#111827',
+            letterSpacing: '-0.01em',
+          }}>
+            Post mais engajado
           </Typography>
         </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: '#9ca3af' }}>
+          {getMediaTypeIcon(post.media_type, post.media_product_type)}
+          <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: '#9ca3af' }}>
+            {getMediaTypeLabel(post.media_type, post.media_product_type)}
+          </Typography>
+        </Box>
+      </Box>
 
-        <Card sx={{ 
-          display: 'flex', 
-          flexDirection: isMobile ? 'column' : 'row',
-          boxShadow: 'none',
-          backgroundColor: 'transparent',
-          borderRadius: 0
-        }}>
-          <Box sx={{ position: 'relative', flexShrink: 0 }}>
-            <CardMedia
+      {/* Body */}
+      <Box sx={{
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
+        flex: 1,
+        minHeight: 0,
+      }}>
+        {/* Image */}
+        <Box
+          onClick={() => onViewDetails(post)}
+          sx={{
+            position: 'relative',
+            width: isMobile ? '100%' : 200,
+            minHeight: isMobile ? 200 : 'auto',
+            flexShrink: 0,
+            cursor: 'pointer',
+            bgcolor: '#f9fafb',
+            overflow: 'hidden',
+          }}
+        >
+          {(post.thumbnail_url || post.media_url) ? (
+            <Box
               component="img"
-              sx={{ 
-                width: isMobile ? '100%' : 260,
-                height: isMobile ? 260 : 260,
+              src={post.thumbnail_url || post.media_url}
+              alt=""
+              sx={{
+                width: '100%',
+                height: '100%',
                 objectFit: 'cover',
-                bgcolor: 'grey.100'
-              }}
-              image={post.thumbnail_url || post.media_url}
-              alt={post.caption || 'Post do Instagram'}
-            />
-            
-            {engagementRate > 0 && (
-              <Box sx={{
+                display: 'block',
                 position: 'absolute',
-                top: 10,
-                right: 10,
-                background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                borderRadius: 2,
-                px: 1.25,
-                py: 0.5,
-                boxShadow: '0 2px 8px rgba(5, 150, 105, 0.4)'
-              }}>
-                <Typography variant="caption" sx={{ 
-                  color: 'white', 
-                  fontWeight: 700,
-                  fontSize: '0.72rem',
-                  letterSpacing: '0.02em'
-                }}>
-                  {engagementRate.toFixed(1)}% eng.
-                </Typography>
-              </Box>
-            )}
-          </Box>
+                top: 0,
+                left: 0,
+              }}
+            />
+          ) : (
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              color: '#d1d5db',
+            }}>
+              <ImageIcon sx={{ fontSize: 40 }} />
+            </Box>
+          )}
 
-          <CardContent sx={{ 
-            flex: '1 0 auto', 
-            p: 2.5,
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between'
-          }}>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ 
-                lineHeight: 1.65,
-                color: 'text.secondary',
-                fontSize: '0.875rem'
+          {/* Engagement Rate Badge */}
+          {engagementRate > 0 && (
+            <Box sx={{
+              position: 'absolute',
+              bottom: 10,
+              left: 10,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.4,
+              px: 1,
+              py: 0.4,
+              borderRadius: '8px',
+              bgcolor: 'rgba(0,0,0,0.7)',
+              backdropFilter: 'blur(8px)',
+            }}>
+              <TrendingUpIcon sx={{ fontSize: 12, color: engagementColor }} />
+              <Typography sx={{
+                color: '#fff',
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                letterSpacing: '0.01em',
+                fontVariantNumeric: 'tabular-nums',
               }}>
-                {post.caption && post.caption.length > 140 
-                  ? `${post.caption.substring(0, 140)}...` 
-                  : post.caption || 'Sem legenda'}
+                {engagementRate.toFixed(1)}%
               </Typography>
             </Box>
+          )}
+        </Box>
 
-            <Box sx={{ mb: 2.5 }}>
-              <Grid container spacing={1.5}>
-                {statItems.map((item, idx) => (
-                  <Grid item xs={6} sm={3} key={idx}>
-                    <Box sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 1,
-                      p: 1.25,
-                      borderRadius: 2,
-                      bgcolor: item.bg,
-                      transition: 'transform 0.2s ease',
-                      '&:hover': { transform: 'translateY(-1px)' }
-                    }}>
-                      {item.icon}
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2, fontSize: '0.9rem' }}>
-                          {item.value.toLocaleString('pt-BR')}
-                        </Typography>
-                        <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.68rem' }}>
-                          {item.label}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
+        {/* Content */}
+        <Box sx={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          minWidth: 0,
+        }}>
+          {/* Caption + time */}
+          <Box sx={{ px: 2, pt: 2, pb: 1.5 }}>
+            <Typography sx={{
+              fontSize: '0.78rem',
+              color: '#6b7280',
+              lineHeight: 1.55,
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              mb: 0.75,
+            }}>
+              {post.caption || 'Sem legenda'}
+            </Typography>
+            <Typography sx={{ fontSize: '0.68rem', color: '#d1d5db', fontWeight: 500 }}>
+              {formatTimeAgo(post.timestamp)}
+            </Typography>
+          </Box>
 
-            <Divider sx={{ mb: 2 }} />
-
-            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-              <Button 
-                variant="contained"
-                size="small"
-                disableElevation
-                onClick={() => onViewDetails(post)}
-                sx={{ 
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.8rem',
-                  px: 2.5,
-                  py: 0.75,
-                  bgcolor: theme.palette.text.primary,
-                  color: 'background.paper',
-                  '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.85) }
+          {/* Metrics Grid */}
+          <Box sx={{
+            px: 2,
+            pb: 2,
+            flex: 1,
+            display: 'grid',
+            gridTemplateColumns: `repeat(${Math.min(statItems.length, 3)}, 1fr)`,
+            gap: '1px',
+            bgcolor: '#f3f4f6',
+            borderRadius: '10px',
+            mx: 2,
+            overflow: 'hidden',
+          }}>
+            {statItems.slice(0, 6).map((item, idx) => (
+              <Box
+                key={idx}
+                sx={{
+                  bgcolor: '#fff',
+                  py: 1.25,
+                  px: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 0.25,
                 }}
               >
-                Ver Detalhes
-              </Button>
-              
-              <Button 
-                variant="outlined"
-                size="small"
-                href={post.permalink}
-                target="_blank"
-                rel="noopener noreferrer"
-                startIcon={<LaunchIcon sx={{ fontSize: '14px !important' }} />}
-                sx={{ 
-                  borderRadius: 2,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.8rem',
-                  px: 2.5,
-                  py: 0.75,
-                  borderColor: 'divider',
-                  color: 'text.secondary',
-                  '&:hover': { 
-                    borderColor: 'text.primary',
-                    bgcolor: alpha(theme.palette.text.primary, 0.04)
-                  }
-                }}
-              >
-                Abrir no Instagram
-              </Button>
+                <Box sx={{ color: '#d1d5db', '& .MuiSvgIcon-root': { fontSize: 14 } }}>
+                  {item.icon}
+                </Box>
+                <Typography sx={{
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                  color: '#111827',
+                  lineHeight: 1,
+                  fontVariantNumeric: 'tabular-nums',
+                }}>
+                  {formatNumber(item.value)}
+                </Typography>
+                <Typography sx={{
+                  fontSize: '0.6rem',
+                  color: '#9ca3af',
+                  fontWeight: 500,
+                  lineHeight: 1,
+                }}>
+                  {item.label}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+
+          {/* Actions */}
+          <Box sx={{
+            px: 2,
+            py: 1.5,
+            mt: 'auto',
+            borderTop: '1px solid #f3f4f6',
+            display: 'flex',
+            gap: 1,
+          }}>
+            <Box
+              component="button"
+              onClick={() => onViewDetails(post)}
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 0.5,
+                py: 0.85,
+                border: 'none',
+                borderRadius: '8px',
+                bgcolor: '#111827',
+                color: '#fff',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
+                '&:hover': { bgcolor: '#1f2937' },
+              }}
+            >
+              Ver detalhes
             </Box>
-          </CardContent>
-        </Card>
-      </Paper>
-    </Grid>
+            <Box
+              component="a"
+              href={post.permalink}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 36,
+                height: 36,
+                borderRadius: '8px',
+                border: '1px solid #e5e7eb',
+                bgcolor: '#fff',
+                color: '#6b7280',
+                textDecoration: 'none',
+                flexShrink: 0,
+                transition: 'border-color 0.15s ease',
+                '&:hover': { borderColor: '#d1d5db' },
+              }}
+            >
+              <ExternalIcon sx={{ fontSize: 15 }} />
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    </Box>
   );
 };
 

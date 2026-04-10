@@ -28,6 +28,7 @@ import {
   Visibility,
   ThumbUp
 } from '@mui/icons-material';
+import { GLASS } from '../../theme/glassTokens';
 
 interface TopPost {
   id: string;
@@ -105,7 +106,13 @@ const TopPerformingPosts: React.FC<TopPerformingPostsProps> = ({
   };
 
   return (
-    <Card elevation={2}>
+    <Card elevation={0} sx={{
+      borderRadius: GLASS.radius.card,
+      border: `1px solid ${GLASS.border.outer}`,
+      bgcolor: GLASS.surface.bg,
+      backdropFilter: `blur(${GLASS.surface.blur})`,
+      boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+    }}>
       <CardContent>
         <Typography variant="h6" gutterBottom fontWeight="bold">
           {title}
@@ -114,7 +121,12 @@ const TopPerformingPosts: React.FC<TopPerformingPostsProps> = ({
           Ordenado por engajamento, alcance ou impressões
         </Typography>
 
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer component={Paper} variant="outlined" sx={{
+          borderRadius: GLASS.radius.inner,
+          border: `1px solid ${GLASS.border.outer}`,
+          bgcolor: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+        }}>
           <Table size="small">
             <TableHead>
               <TableRow sx={{ backgroundColor: 'grey.50' }}>
@@ -263,7 +275,7 @@ const TopPerformingPosts: React.FC<TopPerformingPostsProps> = ({
         </TableContainer>
 
         {/* Resumo estatístico */}
-        <Box sx={{ mt: 2, p: 2, backgroundColor: 'grey.50', borderRadius: 1 }}>
+        <Box sx={{ mt: 2, p: 2, backgroundColor: GLASS.surface.bgFooter, borderRadius: GLASS.radius.inner, border: `1px solid ${GLASS.border.subtle}` }}>
           <Typography variant="subtitle2" gutterBottom>
             📊 Resumo dos Top Posts:
           </Typography>

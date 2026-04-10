@@ -17,6 +17,7 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { subscriptionService } from '../services/subscriptionService';
 import { roleService } from '../services/roleService';
+import { GLASS } from '../theme/glassTokens';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -84,11 +85,21 @@ const CheckoutSuccess: React.FC = () => {
     verifySubscription();
   }, [sessionId]);
 
+  const glassPaper = {
+    p: 4,
+    textAlign: 'center' as const,
+    background: GLASS.surface.bg,
+    backdropFilter: `blur(${GLASS.surface.blur})`,
+    border: `1px solid ${GLASS.border.outer}`,
+    borderRadius: GLASS.radius.card,
+    boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+  };
+
   if (loading) {
     return (
       <Container maxWidth="sm" sx={{ mt: 8 }}>
         <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-          <CircularProgress />
+          <CircularProgress sx={{ color: GLASS.accent.orange }} />
         </Box>
       </Container>
     );
@@ -97,11 +108,21 @@ const CheckoutSuccess: React.FC = () => {
   if (error) {
     return (
       <Container maxWidth="sm" sx={{ mt: 8 }}>
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Alert severity="error" sx={{ mb: 2 }}>
+        <Paper elevation={0} sx={glassPaper}>
+          <Alert severity="error" sx={{ mb: 2, borderRadius: GLASS.radius.inner }}>
             {error}
           </Alert>
-          <Button variant="contained" onClick={() => navigate('/')}>
+          <Button
+            variant="contained"
+            onClick={() => navigate('/')}
+            sx={{
+              bgcolor: GLASS.accent.orange,
+              borderRadius: GLASS.radius.button,
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': { bgcolor: GLASS.accent.orangeDark },
+            }}
+          >
             Voltar ao Início
           </Button>
         </Paper>
@@ -111,72 +132,89 @@ const CheckoutSuccess: React.FC = () => {
 
   return (
     <Container maxWidth="sm" sx={{ mt: 8 }}>
-      <Paper sx={{ p: 4, textAlign: 'center' }}>
-        <CheckCircleIcon sx={{ fontSize: 80, color: 'success.main', mb: 2 }} />
+      <Paper elevation={0} sx={glassPaper}>
+        <CheckCircleIcon sx={{ fontSize: 80, color: GLASS.accent.orange, mb: 2 }} />
         
-        <Typography variant="h4" gutterBottom fontWeight="bold">
+        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: GLASS.text.heading }}>
           Pagamento Confirmado!
         </Typography>
 
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+        <Typography variant="body1" sx={{ mb: 3, color: GLASS.text.muted }}>
           Sua assinatura foi ativada com sucesso.
         </Typography>
 
         {subscription && plan && (
           <>
-            <Divider sx={{ my: 3 }} />
+            <Divider sx={{ my: 3, borderColor: GLASS.border.subtle }} />
             <Box sx={{ textAlign: 'left', mb: 3 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary">
+                <Typography variant="subtitle2" sx={{ color: GLASS.text.muted }}>
                   Plano
                 </Typography>
                 <Chip 
                   label={plan.name.charAt(0).toUpperCase() + plan.name.slice(1)} 
-                  color="primary" 
                   size="small"
+                  sx={{
+                    bgcolor: 'rgba(247, 66, 17, 0.1)',
+                    color: GLASS.accent.orangeDark,
+                    fontWeight: 600,
+                  }}
                 />
               </Box>
               
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary">
+                <Typography variant="subtitle2" sx={{ color: GLASS.text.muted }}>
                   Status
                 </Typography>
                 <Chip 
                   label={subscription.status === 'active' ? 'Ativa' : subscription.status} 
-                  color={subscription.status === 'active' ? 'success' : 'default'} 
                   size="small"
+                  sx={{
+                    bgcolor: subscription.status === 'active' ? 'rgba(247, 66, 17, 0.1)' : undefined,
+                    color: subscription.status === 'active' ? GLASS.accent.orangeDark : undefined,
+                    fontWeight: 600,
+                  }}
                 />
               </Box>
 
               {subscription.current_period_end && (
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="subtitle2" color="text.secondary">
+                  <Typography variant="subtitle2" sx={{ color: GLASS.text.muted }}>
                     Próxima cobrança
                   </Typography>
-                  <Typography variant="body2">
+                  <Typography variant="body2" sx={{ color: GLASS.text.body }}>
                     {format(new Date(subscription.current_period_end), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                   </Typography>
                 </Box>
               )}
 
-              <Box sx={{ mt: 2, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              <Box
+                sx={{
+                  mt: 2,
+                  p: 2,
+                  background: GLASS.surface.bgMetric,
+                  backdropFilter: `blur(${GLASS.surface.blur})`,
+                  border: `1px solid ${GLASS.border.subtle}`,
+                  borderRadius: GLASS.radius.inner,
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ color: GLASS.text.muted }} gutterBottom>
                   Limites do Plano
                 </Typography>
-                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                <Typography variant="body2" sx={{ mb: 0.5, color: GLASS.text.body }}>
                   • Até {plan.max_clients} contas Instagram
                 </Typography>
-                <Typography variant="body2">
+                <Typography variant="body2" sx={{ color: GLASS.text.body }}>
                   • {plan.max_posts_per_month.toLocaleString('pt-BR')} posts por mês
                 </Typography>
               </Box>
             </Box>
-            <Divider sx={{ my: 3 }} />
+            <Divider sx={{ my: 3, borderColor: GLASS.border.subtle }} />
           </>
         )}
 
         {!subscription && !error && (
-          <Alert severity="info" sx={{ mb: 3, textAlign: 'left' }}>
+          <Alert severity="info" sx={{ mb: 3, textAlign: 'left', borderRadius: GLASS.radius.inner }}>
             A assinatura está sendo processada. Você receberá um email de confirmação em breve.
           </Alert>
         )}
@@ -187,7 +225,18 @@ const CheckoutSuccess: React.FC = () => {
             size="large"
             component={Link}
             to="/"
-            sx={{ minWidth: 150 }}
+            sx={{
+              minWidth: 150,
+              bgcolor: GLASS.accent.orange,
+              borderRadius: GLASS.radius.button,
+              textTransform: 'none',
+              fontWeight: 600,
+              boxShadow: '0 4px 14px rgba(247, 66, 17, 0.3)',
+              '&:hover': {
+                bgcolor: GLASS.accent.orangeDark,
+                boxShadow: '0 6px 20px rgba(247, 66, 17, 0.4)',
+              },
+            }}
           >
             Ir para Dashboard
           </Button>
@@ -196,7 +245,18 @@ const CheckoutSuccess: React.FC = () => {
             size="large"
             component={Link}
             to="/settings"
-            sx={{ minWidth: 150 }}
+            sx={{
+              minWidth: 150,
+              borderColor: GLASS.accent.orange,
+              color: GLASS.accent.orangeDark,
+              borderRadius: GLASS.radius.button,
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': {
+                borderColor: GLASS.accent.orangeDark,
+                bgcolor: 'rgba(247, 66, 17, 0.06)',
+              },
+            }}
           >
             Configurações
           </Button>

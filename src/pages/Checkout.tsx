@@ -15,12 +15,13 @@ import { subscriptionService } from '../services/subscriptionService';
 import { stripeService } from '../services/stripeService';
 import { supabase } from '../services/supabaseClient';
 import { roleService } from '../services/roleService';
+import { GLASS } from '../theme/glassTokens';
 
 const Checkout: React.FC = () => {
   const [searchParams] = useSearchParams();
   const planId = searchParams.get('plan');
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -95,11 +96,22 @@ const Checkout: React.FC = () => {
   if (error) {
     return (
       <Container maxWidth="sm" sx={{ mt: 8 }}>
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Alert severity="error" sx={{ mb: 2 }}>
+        <Paper
+          elevation={0}
+          sx={{
+            p: 4,
+            textAlign: 'center',
+            background: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            borderRadius: GLASS.radius.card,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }}
+        >
+          <Alert severity="error" sx={{ mb: 2, borderRadius: GLASS.radius.inner }}>
             {error}
           </Alert>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
             Redirecionando em alguns segundos...
           </Typography>
         </Paper>
@@ -116,13 +128,26 @@ const Checkout: React.FC = () => {
       minHeight="100vh"
       sx={{ bgcolor: 'background.default' }}
     >
-      <CircularProgress size={60} sx={{ mb: 3 }} />
-      <Typography variant="h6" color="text.primary">
-        Preparando checkout...
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-        Você será redirecionado para o Stripe em instantes
-      </Typography>
+      <Paper
+        elevation={0}
+        sx={{
+          p: 6,
+          textAlign: 'center',
+          background: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          borderRadius: GLASS.radius.card,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }}
+      >
+        <CircularProgress size={60} sx={{ mb: 3, color: GLASS.accent.orange }} />
+        <Typography variant="h6" sx={{ color: GLASS.text.heading }}>
+          Preparando checkout...
+        </Typography>
+        <Typography variant="body2" sx={{ mt: 1, color: GLASS.text.muted }}>
+          Você será redirecionado para o Stripe em instantes
+        </Typography>
+      </Paper>
     </Box>
   );
 };

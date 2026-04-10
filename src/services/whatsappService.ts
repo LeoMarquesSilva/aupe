@@ -220,7 +220,7 @@ export const whatsappService = {
       headers: evolutionHeaders(),
       body: JSON.stringify({
         number,
-        text: '✅ *Teste de notificação AUPE*\n\nSua integração com WhatsApp está funcionando! Você receberá notificações de aprovação neste número/grupo.',
+        text: '✅ *Teste de notificação INSYT*\n\nSua integração com WhatsApp está funcionando! Você receberá notificações de aprovação neste número/grupo.',
       }),
     });
     if (!res.ok) {

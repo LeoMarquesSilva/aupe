@@ -1,5 +1,6 @@
 module.exports = {
   plugins: [
+    require('@tailwindcss/postcss'),
     require('autoprefixer'),
     // Removendo postcss-preset-env temporariamente para resolver o erro
     // require('postcss-preset-env')({

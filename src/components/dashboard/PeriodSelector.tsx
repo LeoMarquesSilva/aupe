@@ -21,6 +21,7 @@ import {
 } from '@mui/icons-material';
 import { format, startOfMonth, subMonths, isAfter, isSameMonth, setMonth, setYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { GLASS } from '../../theme/glassTokens';
 
 export type PeriodMode = 'quick' | 'month';
 export type QuickPeriod = '7d' | '30d' | '90d';
@@ -87,10 +88,11 @@ const MonthPickerPopover: React.FC<{
         paper: {
           sx: {
             mt: 1,
-            borderRadius: 3,
-            boxShadow: `0 12px 40px ${alpha('#000', 0.12)}`,
-            border: '1px solid',
-            borderColor: 'divider',
+            borderRadius: GLASS.radius.card,
+            background: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+            border: `1px solid ${GLASS.border.outer}`,
             overflow: 'hidden',
             minWidth: 280
           }
@@ -151,12 +153,12 @@ const MonthPickerPopover: React.FC<{
                   fontWeight: selected ? 700 : 500,
                   textTransform: 'none',
                   color: selected ? 'background.paper' : disabled ? 'text.disabled' : 'text.primary',
-                  bgcolor: selected ? 'text.primary' : 'transparent',
+                  bgcolor: selected ? GLASS.accent.orange : 'transparent',
                   border: current && !selected ? '1px solid' : '1px solid transparent',
                   borderColor: current && !selected ? 'divider' : 'transparent',
                   '&:hover': {
                     bgcolor: selected
-                      ? alpha(theme.palette.text.primary, 0.85)
+                      ? GLASS.accent.orangeDark
                       : alpha(theme.palette.text.primary, 0.06)
                   },
                   '&.Mui-disabled': { color: alpha(theme.palette.text.primary, 0.18) }
@@ -330,9 +332,9 @@ const PeriodSelector: React.FC<PeriodSelectorProps> = ({ config, onChange, compa
               borderRadius: '10px !important',
               color: 'text.secondary',
               '&.Mui-selected': {
-                bgcolor: 'text.primary',
-                color: 'background.paper',
-                '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.85) }
+                bgcolor: GLASS.accent.orange,
+                color: '#fff',
+                '&:hover': { bgcolor: GLASS.accent.orangeDark }
               },
               '&:not(.Mui-selected)': {
                 '&:hover': { bgcolor: alpha(theme.palette.text.primary, 0.05) }

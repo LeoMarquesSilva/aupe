@@ -1,37 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Box, 
   Container, 
   Typography, 
-  Paper, 
   Button, 
   Grid,
-  Card, 
-  CardContent, 
-  CardMedia, 
-  CardActionArea,
-  CardActions,
-  IconButton, 
   TextField,
   InputAdornment,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   CircularProgress,
   Divider,
-  Chip,
   useTheme,
-  useMediaQuery,
-  Tooltip
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Add as AddIcon,
   SearchOutlined as SearchIcon,
   Instagram as InstagramIcon,
-  CalendarMonth as CalendarIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   PostAdd as PostAddIcon,
@@ -39,37 +30,38 @@ import {
   Collections as CarouselIcon,
   Image as StoryIcon,
   PersonAdd as PersonAddIcon,
-  Schedule as ScheduleIcon,
   CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
   Block as BlockIcon,
 } from '@mui/icons-material';
 import { clientService, postService } from '../services/supabaseClient';
 import { Client } from '../types';
 import EditClientDialog from '../components/EditClientDialog';
 import ConnectInstagram from '../components/ConnectInstagram';
-import SmartImage from '../components/SmartImage';
+import ClienteCardPremium from '../components/ClienteCardPremium';
 import { imageUrlService } from '../services/imageUrlService';
 import { getAuthorizationUrl, InstagramAuthData } from '../services/instagramAuthService';
 import { subscriptionLimitsService } from '../services/subscriptionLimitsService';
+import { motion } from 'framer-motion';
+import { GLASS } from '../theme/glassTokens';
+import { appShellContainerSx } from '../theme/appShellLayout';
 
 const ClientDashboard: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
   
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [clientFilter, setClientFilter] = useState<'all' | 'connected' | 'disconnected' | 'active' | 'inactive'>('all');
   const [creatingClient, setCreatingClient] = useState<boolean>(false);
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
   const [connectInstagramOpen, setConnectInstagramOpen] = useState<boolean>(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [clientActionMenuOpen, setClientActionMenuOpen] = useState<boolean>(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
-  const [togglingActiveClientId, setTogglingActiveClientId] = useState<string | null>(null);
+  const [contentMenuAnchor, setContentMenuAnchor] = useState<null | HTMLElement>(null);
+  const [actionsMenuAnchor, setActionsMenuAnchor] = useState<null | HTMLElement>(null);
+  const [menuClient, setMenuClient] = useState<Client | null>(null);
   const [clientStats, setClientStats] = useState<Record<string, { 
     scheduled: number, 
     posted: number, 
@@ -133,12 +125,40 @@ const ClientDashboard: React.FC = () => {
   useEffect(() => {
     fetchClients();
   }, []);
+
+  const isInstagramConnected = useCallback((client: Client): boolean => {
+    return !!(client.instagramAccountId && client.accessToken && client.username);
+  }, []);
   
-  // Filtrar clientes com base na pesquisa
-  const filteredClients = clients.filter(client => 
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    client.instagram.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredClients = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return clients.filter((client) => {
+      const clientName = (client.name || '').toLowerCase();
+      const instagram = (client.instagram || '').toLowerCase();
+      const matchesSearch = !term || clientName.includes(term) || instagram.includes(term);
+      const connected = isInstagramConnected(client);
+      const isActive = client.isActive !== false;
+      const matchesFilter =
+        clientFilter === 'all' ||
+        (clientFilter === 'connected' && connected) ||
+        (clientFilter === 'disconnected' && !connected) ||
+        (clientFilter === 'active' && isActive) ||
+        (clientFilter === 'inactive' && !isActive);
+      return matchesSearch && matchesFilter;
+    });
+  }, [clients, searchTerm, clientFilter, isInstagramConnected]);
+
+  const summary = useMemo(() => {
+    const connected = clients.filter((client) => isInstagramConnected(client)).length;
+    const active = clients.filter((client) => client.isActive !== false).length;
+    return {
+      total: clients.length,
+      connected,
+      disconnected: Math.max(0, clients.length - connected),
+      active,
+      inactive: Math.max(0, clients.length - active),
+    };
+  }, [clients, isInstagramConnected]);
   
   const handleNewClientViaOAuth = async () => {
     if (creatingClient) return;
@@ -297,15 +317,12 @@ const ClientDashboard: React.FC = () => {
   const handleToggleClientActive = async (client: Client) => {
     const currentlyActive = client.isActive !== false;
     const next = !currentlyActive;
-    setTogglingActiveClientId(client.id);
     setError(null);
     try {
       const updated = await clientService.updateClient({ id: client.id, isActive: next });
       setClients((prev) => prev.map((c) => (c.id === client.id ? { ...c, ...updated } : c)));
     } catch {
       setError('Não foi possível atualizar o status do cliente. Tente novamente.');
-    } finally {
-      setTogglingActiveClientId(null);
     }
   };
 
@@ -352,14 +369,23 @@ const ClientDashboard: React.FC = () => {
     navigate(`/create-story?clientId=${client.id}`);
   };
 
-  // Função para verificar se o Instagram está conectado
-  const isInstagramConnected = useCallback((client: Client): boolean => {
-    return !!(
-      client.instagramAccountId && 
-      client.accessToken && 
-      client.username
-    );
-  }, []);
+  const openContentMenu = (event: React.MouseEvent<HTMLElement>, client: Client) => {
+    event.stopPropagation();
+    setMenuClient(client);
+    setContentMenuAnchor(event.currentTarget);
+  };
+
+  const openActionsMenu = (event: React.MouseEvent<HTMLElement>, client: Client) => {
+    event.stopPropagation();
+    setMenuClient(client);
+    setActionsMenuAnchor(event.currentTarget);
+  };
+
+  const closeMenus = () => {
+    setContentMenuAnchor(null);
+    setActionsMenuAnchor(null);
+    setMenuClient(null);
+  };
 
   // Função para obter a imagem do avatar
   const getAvatarImage = (client: Client) => {
@@ -375,561 +401,452 @@ const ClientDashboard: React.FC = () => {
   };
   
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Cabeçalho da página */}
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        flexDirection: isTablet ? 'column' : 'row',
-        gap: 2,
-        mb: 4 
-      }}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
-          <InstagramIcon sx={{ mr: 2, color: theme.palette.primary.main }} />
-          Gerenciamento de Clientes
-        </Typography>
-        
-        <Box sx={{ 
-          display: 'flex', 
-          gap: 2, 
-          width: isTablet ? '100%' : 'auto',
-          flexDirection: isMobile ? 'column' : 'row'
-        }}>
-          <TextField
-            placeholder="Buscar clientes..."
-            variant="outlined"
-            size="small"
-            fullWidth={isMobile}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
+    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: { xs: 2, md: 3.5 } }}>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}>
+        <Box
+          className="grain-overlay premium-header-bg"
+          sx={{
+            p: { xs: 2, md: 2.75 },
+            borderRadius: GLASS.radius.card,
+            border: `1px solid rgba(255, 255, 255, 0.18)`,
+            boxShadow: '0 16px 38px -24px rgba(10, 15, 45, 0.8)',
+            mb: 2.5,
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: { xs: 'flex-start', md: 'center' },
+              justifyContent: 'space-between',
+              flexDirection: { xs: 'column', md: 'row' },
+              gap: 1.5,
             }}
-            sx={{ minWidth: 200 }}
-          />
-          
-          <Button 
-            variant="contained" 
-            color="primary"
-            startIcon={creatingClient ? <CircularProgress size={20} color="inherit" /> : <PersonAddIcon />}
-            onClick={handleNewClientViaOAuth}
-            disabled={creatingClient}
           >
-            {creatingClient ? 'Criando...' : 'Novo Cliente'}
-          </Button>
-        </Box>
-      </Box>
-      
-      {/* Estado de carregamento */}
-      {loading && !clients.length && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 8 }}>
-          <CircularProgress />
-        </Box>
-      )}
-      
-      {/* Estado de erro */}
-      {error && (
-        <Paper sx={{ p: 3, mb: 4, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 2 }}>
-          <Typography variant="body1">{error}</Typography>
-          <Button 
-            variant="contained" 
-            color="error"
-            startIcon={<AddIcon />}
-            onClick={fetchClients}
-            sx={{ mt: 2 }}
-          >
-            Tentar Novamente
-          </Button>
-        </Paper>
-      )}
-      
-      {/* Lista de clientes vazia */}
-      {!loading && !error && filteredClients.length === 0 && (
-        <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 2 }}>
-          <PersonAddIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-          
-          <Typography variant="h5" color="text.secondary" sx={{ mb: 1 }}>
-            Nenhum cliente encontrado
-          </Typography>
-          
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            {searchTerm 
-              ? 'Nenhum cliente corresponde à sua pesquisa.' 
-              : 'Comece adicionando seu primeiro cliente.'}
-          </Typography>
-          
-          <Button 
-            variant="contained" 
-            startIcon={creatingClient ? <CircularProgress size={20} color="inherit" /> : <PersonAddIcon />}
-            onClick={handleNewClientViaOAuth}
-            disabled={creatingClient}
-            size="large"
-          >
-            {creatingClient ? 'Criando...' : 'Adicionar Cliente'}
-          </Button>
-        </Paper>
-      )}
-      
-      {/* Grid de clientes */}
-      {!loading && !error && filteredClients.length > 0 && (
-        <Grid container spacing={3}>
-          {filteredClients.map(client => {
-            const clientIsActive = client.isActive !== false;
-            return (
-            <Grid item xs={12} sm={6} md={4} key={client.id}>
-              <Card 
-                elevation={1}
-                sx={{ 
-                  height: '100%', 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  borderRadius: 2,
-                  border: '1px solid',
-                  borderColor: clientIsActive ? 'divider' : alpha(theme.palette.warning.main, 0.55),
-                  transition: 'all 0.2s ease-in-out',
-                  overflow: 'hidden',
-                  bgcolor: 'background.paper',
-                  opacity: clientIsActive ? 1 : 0.97,
-                  '&:hover': {
-                    elevation: 4,
-                    boxShadow: theme.shadows[4],
-                    borderColor: clientIsActive ? 'primary.light' : alpha(theme.palette.warning.main, 0.7),
-                    transform: 'translateY(-2px)'
-                  }
+            <Box>
+              <Typography
+                variant="h4"
+                className="premium-header-title"
+                sx={{
+                  letterSpacing: '-0.02em',
+                  fontSize: { xs: '1.35rem', md: '1.6rem' },
+                  mb: 0.5,
                 }}
               >
-                <CardActionArea 
-                onClick={() => handleViewCalendar(client)}
-                sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
+                Dashboard de clientes
+              </Typography>
+              <Typography variant="body2" className="premium-header-subtitle">
+                Gerencie contas conectadas, status de operação e criação de conteúdo em um fluxo único.
+              </Typography>
+            </Box>
+            <Box
+              component="button"
+              onClick={handleNewClientViaOAuth}
+              disabled={creatingClient}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                px: 2.2,
+                py: 1.1,
+                border: 'none',
+                borderRadius: GLASS.radius.button,
+                bgcolor: GLASS.accent.orange,
+                color: '#fff',
+                cursor: creatingClient ? 'not-allowed' : 'pointer',
+                fontSize: '0.82rem',
+                fontWeight: 650,
+                fontFamily: 'inherit',
+                minWidth: 150,
+                justifyContent: 'center',
+                boxShadow: `0 2px 10px -2px ${GLASS.status.connected.glow}`,
+                opacity: creatingClient ? 0.7 : 1,
+                transition: `all ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
+                '&:hover': {
+                  bgcolor: GLASS.accent.orangeDark,
+                  boxShadow: `0 6px 20px -4px ${GLASS.status.connected.glow}`,
+                },
+                '&:focus-visible': {
+                  outline: 'none',
+                  boxShadow: `0 0 0 3px rgba(247, 66, 17, 0.3)`,
+                },
+              }}
+            >
+              {creatingClient ? (
+                <CircularProgress size={18} sx={{ color: '#fff' }} />
+              ) : (
+                <PersonAddIcon sx={{ fontSize: 18 }} />
+              )}
+              {creatingClient ? 'Criando...' : 'Novo cliente'}
+            </Box>
+          </Box>
+
+          <Box
+            sx={{
+              mt: 2,
+              display: 'flex',
+              flexDirection: { xs: 'column', lg: 'row' },
+              alignItems: { xs: 'stretch', lg: 'center' },
+              gap: 1.25,
+            }}
+          >
+            <TextField
+              placeholder="Buscar por nome ou @instagram..."
+              variant="outlined"
+              size="small"
+              fullWidth
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" sx={{ color: 'rgba(255,255,255,0.92)' }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                flex: 1,
+                '& .MuiOutlinedInput-root': {
+                  bgcolor: 'rgba(255, 255, 255, 0.16)',
+                  backdropFilter: 'blur(8px)',
+                  WebkitBackdropFilter: 'blur(8px)',
+                  borderRadius: '14px',
+                  color: '#fff',
+                  '& fieldset': {
+                    borderColor: 'rgba(255, 255, 255, 0.28)',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: 'rgba(255, 255, 255, 0.46)',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: GLASS.accent.orange,
+                    boxShadow: `0 0 0 3px rgba(247, 66, 17, 0.12)`,
+                  },
+                  '& .MuiInputBase-input': {
+                    color: '#fff',
+                  },
+                  '& .MuiInputBase-input::placeholder': {
+                    color: 'rgba(255, 255, 255, 0.82)',
+                    opacity: 1,
+                  },
+                },
+              }}
+            />
+            <Box
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                p: 0.4,
+                borderRadius: '14px',
+                bgcolor: GLASS.shell.filterBg,
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                border: `1px solid ${GLASS.border.subtle}`,
+                gap: 0.4,
+                overflowX: 'auto',
+              }}
+            >
+              {[
+                { value: 'all', label: `Todos (${summary.total})` },
+                { value: 'connected', label: `Conectados (${summary.connected})` },
+                { value: 'active', label: `Ativos (${summary.active})` },
+                { value: 'inactive', label: `Inativos (${summary.inactive})` },
+              ].map((item) => (
+                <Button
+                  key={item.value}
+                  size="small"
+                  disableElevation
+                  onClick={() => setClientFilter(item.value as typeof clientFilter)}
+                  sx={{
+                    whiteSpace: 'nowrap',
+                    px: 1.2,
+                    py: 0.5,
+                    minWidth: 'auto',
+                    fontSize: '0.72rem',
+                    fontWeight: clientFilter === item.value ? 650 : 450,
+                    borderRadius: '10px',
+                    textTransform: 'none',
+                    border: 'none',
+                    color: clientFilter === item.value ? GLASS.shell.filterActiveColor : GLASS.text.muted,
+                    bgcolor: clientFilter === item.value ? GLASS.shell.filterActiveBg : 'transparent',
+                    transition: `all ${GLASS.motion.duration.fast} ${GLASS.motion.easing}`,
+                    '&:hover': {
+                      bgcolor: clientFilter === item.value
+                        ? '#131940'
+                        : GLASS.sidebar.bgHover,
+                    },
+                  }}
                 >
-                  <Box sx={{ 
-                    pt: 3,
-                    pb: 1.5,
-                    px: 2,
-                    display: 'flex', 
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    position: 'relative',
-                    bgcolor: 'background.paper'
-                  }}>
-                    <Box sx={{ 
-                      position: 'relative',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: 1
-                    }}>
-                      <Box
-                        sx={{
-                          position: 'relative',
-                          width: 70,
-                          height: 70,
-                        }}
-                      >
-                        <SmartImage
-                          src={getAvatarImage(client)}
-                          clientId={client.id}
-                          alt={client.name}
-                          width={70}
-                          height={70}
-                          borderRadius="50%"
-                          fallbackText={client.name.charAt(0)}
-                          sx={{
-                            border: '2px solid',
-                            borderColor: 'divider',
-                            boxShadow: '0 1px 4px rgba(0, 0, 0, 0.1)',
-                            objectFit: 'cover',
-                            bgcolor: 'grey.100'
-                          }}
-                        />
-                        {client.profilePicture && (
-                          <Box
-                            sx={{
-                              position: 'absolute',
-                              bottom: -2,
-                              right: -2,
-                              bgcolor: theme.palette.primary.main,
-                              borderRadius: '50%',
-                              p: 0.4,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              border: '2px solid white',
-                              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.15)'
-                            }}
-                          >
-                            <InstagramIcon sx={{ fontSize: 14, color: 'white' }} />
-                          </Box>
-                        )}
-                      </Box>
-                    </Box>
-                  </Box>
-                  
-                  <CardContent sx={{ flexGrow: 1, pb: 1.5, pt: 1.5, px: 2 }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                      <Typography 
-                        variant="subtitle1" 
-                        align="center" 
-                        noWrap 
-                        sx={{ 
-                          fontWeight: 600,
-                          fontSize: '0.95rem',
-                          color: 'text.primary'
-                        }}
-                      >
-                        {client.name}
-                      </Typography>
-                      
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'center' }}>
-                        <Chip
-                          icon={<InstagramIcon sx={{ fontSize: 12 }} />}
-                          label={isInstagramConnected(client) ? 'Conectado' : 'Desconectado'}
-                          size="small"
-                          color={isInstagramConnected(client) ? 'success' : 'default'}
-                          sx={{
-                            height: 20,
-                            fontSize: '0.65rem',
-                            fontWeight: 500,
-                            '& .MuiChip-icon': {
-                              fontSize: 12
-                            }
-                          }}
-                        />
-                        {!clientIsActive && (
-                          <Chip
-                            label="Inativo"
-                            size="small"
-                            color="warning"
-                            variant="outlined"
-                            sx={{ height: 20, fontSize: '0.65rem', fontWeight: 600 }}
-                          />
-                        )}
-                      </Box>
-                    </Box>
-                    
-                    <Typography 
-                      variant="caption" 
-                      color="text.secondary" 
-                      align="center"
-                      sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        mb: 1.5,
-                        gap: 0.5,
-                        fontSize: '0.75rem'
-                      }}
-                    >
-                      <InstagramIcon sx={{ fontSize: 14, color: theme.palette.primary.main }} />
-                      @{client.instagram}
-                    </Typography>
-                    
-                    <Divider sx={{ my: 1 }} />
-                    
-                    {/* Estatísticas melhoradas */}
-                    <Box sx={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-around',
-                      alignItems: 'center',
-                      mt: 1.5,
-                      gap: 1
-                    }}>
-                      <Box sx={{ 
-                        display: 'flex', 
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        flex: 1
-                      }}>
-                        <Box sx={{ 
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.5,
-                          mb: 0.25
-                        }}>
-                          <ScheduleIcon sx={{ fontSize: 16, color: 'primary.main' }} />
-                          <Typography 
-                            variant="h6" 
-                            color="primary" 
-                            sx={{ 
-                              fontWeight: 700,
-                              fontSize: '1.1rem',
-                              lineHeight: 1
-                            }}
-                          >
-                            {clientStats[client.id]?.scheduled || 0}
-                          </Typography>
-                        </Box>
-                        <Typography 
-                          variant="caption" 
-                          color="text.secondary"
-                          sx={{ 
-                            fontSize: '0.7rem',
-                            fontWeight: 500
-                          }}
-                        >
-                          Agendados
-                        </Typography>
-                      </Box>
-                      
-                      <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-                      
-                      <Box sx={{ 
-                        display: 'flex', 
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        flex: 1
-                      }}>
-                        <Box sx={{ 
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.5,
-                          mb: 0.25
-                        }}>
-                          <CheckCircleIcon sx={{ fontSize: 16, color: 'success.main' }} />
-                          <Typography 
-                            variant="h6" 
-                            color="success.main" 
-                            sx={{ 
-                              fontWeight: 700,
-                              fontSize: '1.1rem',
-                              lineHeight: 1
-                            }}
-                          >
-                            {clientStats[client.id]?.posted || 0}
-                          </Typography>
-                        </Box>
-                        <Typography 
-                          variant="caption" 
-                          color="text.secondary"
-                          sx={{ 
-                            fontSize: '0.7rem',
-                            fontWeight: 500
-                          }}
-                        >
-                          Publicados
-                        </Typography>
-                      </Box>
-                      
-                      <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-                      
-                      <Box sx={{ 
-                        display: 'flex', 
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        flex: 1
-                      }}>
-                        <Box sx={{ 
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.5,
-                          mb: 0.25
-                        }}>
-                          <CancelIcon sx={{ fontSize: 16, color: 'error.main' }} />
-                          <Typography 
-                            variant="h6" 
-                            color="error.main" 
-                            sx={{ 
-                              fontWeight: 700,
-                              fontSize: '1.1rem',
-                              lineHeight: 1
-                            }}
-                          >
-                            {clientStats[client.id]?.draft || 0}
-                          </Typography>
-                        </Box>
-                        <Typography 
-                          variant="caption" 
-                          color="text.secondary"
-                          sx={{ 
-                            fontSize: '0.7rem',
-                            fontWeight: 500
-                          }}
-                        >
-                          Falhados
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </CardContent>
-                </CardActionArea>
-                
-                <Divider />
+                  {item.label}
+                </Button>
+              ))}
+            </Box>
+          </Box>
+        </Box>
+      </motion.div>
 
-                <CardActions sx={{ justifyContent: 'space-between', px: 1.5, py: 1 }}>
-                  <Box>
-                    <Tooltip title="Editar cliente">
-                      <IconButton 
-                        size="small" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedClient(client);
-                          setEditDialogOpen(true);
-                        }}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    
-                    <Tooltip title={isInstagramConnected(client) ? "Instagram conectado" : "Conectar Instagram"}>
-                      <IconButton 
-                        size="small" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedClient(client);
-                          setConnectInstagramOpen(true);
-                        }}
-                        sx={{ 
-                          color: isInstagramConnected(client) ? '#4caf50' : theme.palette.primary.main,
-                          '&:hover': { bgcolor: isInstagramConnected(client) ? 'rgba(76, 175, 80, 0.1)' : 'rgba(225, 48, 108, 0.1)' }
-                        }}
-                      >
-                        <InstagramIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+      {loading && !clients.length && (
+        <Box
+          sx={{
+            p: 5,
+            textAlign: 'center',
+            borderRadius: GLASS.radius.card,
+            border: `1px solid ${GLASS.border.outer}`,
+            bgcolor: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }}
+        >
+          <CircularProgress size={34} sx={{ color: GLASS.accent.orange }} />
+          <Typography variant="body2" sx={{ mt: 1.25, color: GLASS.text.muted }}>
+            Carregando clientes...
+          </Typography>
+        </Box>
+      )}
 
-                    <Tooltip
-                      title={
-                        clientIsActive
-                          ? 'Inativar cliente (continua na lista; alguns fluxos podem ocultá-lo)'
-                          : 'Ativar cliente no painel'
-                      }
-                    >
-                      <span>
-                        <IconButton
-                          size="small"
-                          color={clientIsActive ? 'warning' : 'success'}
-                          disabled={togglingActiveClientId === client.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void handleToggleClientActive(client);
-                          }}
-                          sx={{
-                            ...(clientIsActive
-                              ? {}
-                              : {
-                                  bgcolor: alpha(theme.palette.success.main, 0.12),
-                                  '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.2) },
-                                }),
-                          }}
-                        >
-                          {togglingActiveClientId === client.id ? (
-                            <CircularProgress size={18} color="inherit" />
-                          ) : clientIsActive ? (
-                            <BlockIcon fontSize="small" />
-                          ) : (
-                            <CheckCircleIcon fontSize="small" />
-                          )}
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                    
-                    <Tooltip title="Excluir cliente">
-                      <IconButton 
-                        size="small" 
-                        color="error"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedClient(client);
-                          setDeleteConfirmOpen(true);
-                        }}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                    <Tooltip title="Criar Post">
-                      <IconButton 
-                        size="small" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCreatePost(client);
-                        }}
-                        sx={{ 
-                          color: theme.palette.primary.main,
-                          '&:hover': { bgcolor: 'rgba(225, 48, 108, 0.1)' }
-                        }}
-                      >
-                        <PostAddIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    
-                    <Tooltip title="Criar Story">
-                      <IconButton 
-                        size="small" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCreateStory(client);
-                        }}
-                        sx={{ 
-                          color: '#FCAF45',
-                          '&:hover': { bgcolor: 'rgba(252, 175, 69, 0.1)' }
-                        }}
-                      >
-                        <StoryIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    
-                    <Tooltip title="Criar Reel">
-                      <IconButton 
-                        size="small" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/create-reels?clientId=${client.id}`);
-                        }}
-                        sx={{ 
-                          color: '#F56040',
-                          '&:hover': { bgcolor: 'rgba(245, 96, 64, 0.1)' }
-                        }}
-                      >
-                        <ReelsIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    
-                    <Tooltip title="Criar Carrossel">
-                      <IconButton 
-                        size="small" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCreatePost(client);
-                        }}
-                        sx={{ 
-                          color: '#833AB4',
-                          '&:hover': { bgcolor: 'rgba(131, 58, 180, 0.1)' }
-                        }}
-                      >
-                        <CarouselIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    
-                    <Tooltip title="Ver calendário">
-                      <IconButton 
-                        size="small" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewCalendar(client);
-                        }}
-                        sx={{ 
-                          color: 'text.secondary',
-                          '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.05)' }
-                        }}
-                      >
-                        <CalendarIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                </CardActions>
-              </Card>
-            </Grid>
+      {error && (
+        <Box
+          sx={{
+            p: 2.25,
+            mb: 2.5,
+            borderRadius: GLASS.radius.inner,
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+            bgcolor: 'rgba(239, 68, 68, 0.05)',
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            boxShadow: GLASS.shadow.cardInset,
+          }}
+        >
+          <Typography variant="body2" sx={{ color: '#b91c1c', fontWeight: 500 }}>
+            {error}
+          </Typography>
+          <Box
+            component="button"
+            onClick={fetchClients}
+            sx={{
+              mt: 1.5,
+              px: 2,
+              py: 0.8,
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: GLASS.radius.buttonSm,
+              bgcolor: 'rgba(239, 68, 68, 0.08)',
+              color: '#b91c1c',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              transition: `all ${GLASS.motion.duration.fast} ${GLASS.motion.easing}`,
+              '&:hover': {
+                bgcolor: 'rgba(239, 68, 68, 0.12)',
+              },
+              '&:focus-visible': {
+                outline: 'none',
+                boxShadow: '0 0 0 3px rgba(239, 68, 68, 0.2)',
+              },
+            }}
+          >
+            Tentar novamente
+          </Box>
+        </Box>
+      )}
+
+      {!loading && !error && filteredClients.length === 0 && (
+        <Box
+          sx={{
+            p: { xs: 3, md: 4.5 },
+            textAlign: 'center',
+            borderRadius: GLASS.radius.card,
+            border: `1px dashed ${GLASS.border.outer}`,
+            bgcolor: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            boxShadow: GLASS.shadow.cardInset,
+          }}
+        >
+          <PersonAddIcon sx={{ fontSize: 54, color: GLASS.text.muted, mb: 1.25, opacity: 0.5 }} />
+          <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5, color: GLASS.text.heading }}>
+            Nenhum cliente encontrado
+          </Typography>
+          <Typography variant="body2" sx={{ mb: 2.5, color: GLASS.text.muted }}>
+            {searchTerm || clientFilter !== 'all'
+              ? 'Ajuste sua busca ou filtros para encontrar clientes.'
+              : 'Comece conectando seu primeiro cliente para destravar o fluxo de conteúdo.'}
+          </Typography>
+          <Box
+            component="button"
+            onClick={handleNewClientViaOAuth}
+            disabled={creatingClient}
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 1,
+              px: 2.5,
+              py: 1.1,
+              border: 'none',
+              borderRadius: GLASS.radius.button,
+              bgcolor: GLASS.accent.orange,
+              color: '#fff',
+              cursor: creatingClient ? 'not-allowed' : 'pointer',
+              fontSize: '0.85rem',
+              fontWeight: 650,
+              fontFamily: 'inherit',
+              opacity: creatingClient ? 0.7 : 1,
+              boxShadow: `0 2px 10px -2px ${GLASS.status.connected.glow}`,
+              transition: `all ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
+              '&:hover': {
+                bgcolor: GLASS.accent.orangeDark,
+                boxShadow: `0 6px 20px -4px ${GLASS.status.connected.glow}`,
+              },
+              '&:focus-visible': {
+                outline: 'none',
+                boxShadow: '0 0 0 3px rgba(247, 66, 17, 0.3)',
+              },
+            }}
+          >
+            {creatingClient ? (
+              <CircularProgress size={18} sx={{ color: '#fff' }} />
+            ) : (
+              <PersonAddIcon sx={{ fontSize: 18 }} />
+            )}
+            {creatingClient ? 'Criando...' : 'Adicionar cliente'}
+          </Box>
+        </Box>
+      )}
+
+      {!loading && !error && filteredClients.length > 0 && (
+        <Grid container spacing={2.5}>
+          {filteredClients.map((client, index) => {
+            const connected = isInstagramConnected(client);
+            return (
+              <Grid item xs={12} sm={6} lg={4} key={client.id}>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.28, delay: Math.min(index * 0.05, 0.25) }}
+                  style={{ height: '100%' }}
+                >
+                  <ClienteCardPremium
+                    logo={getAvatarImage(client)}
+                    name={client.name}
+                    handle={client.instagram || 'sem-instagram'}
+                    agendados={clientStats[client.id]?.scheduled || 0}
+                    publicados={clientStats[client.id]?.posted || 0}
+                    status={connected ? 'Conectado' : 'Desconectado'}
+                    onOpen={() => handleViewCalendar(client)}
+                    onViewScheduled={() => navigate(`/calendar/${client.id}`)}
+                    onViewDashboard={() => navigate(`/client/${client.id}`)}
+                    onContentMenu={(e) => openContentMenu(e, client)}
+                    onMoreActions={(e) => openActionsMenu(e, client)}
+                  />
+                </motion.div>
+              </Grid>
             );
           })}
         </Grid>
       )}
+
+      <Menu
+        anchorEl={contentMenuAnchor}
+        open={Boolean(contentMenuAnchor)}
+        onClose={closeMenus}
+        PaperProps={{ elevation: 0, sx: { border: '1px solid', borderColor: 'divider', borderRadius: 2 } }}
+      >
+        <MenuItem
+          onClick={() => {
+            if (menuClient) handleCreatePost(menuClient);
+            closeMenus();
+          }}
+        >
+          <ListItemIcon><PostAddIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Criar post</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (menuClient) handleCreateStory(menuClient);
+            closeMenus();
+          }}
+        >
+          <ListItemIcon><StoryIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Criar story</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (menuClient) navigate(`/create-reels?clientId=${menuClient.id}`);
+            closeMenus();
+          }}
+        >
+          <ListItemIcon><ReelsIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Criar reel</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (menuClient) handleCreatePost(menuClient);
+            closeMenus();
+          }}
+        >
+          <ListItemIcon><CarouselIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Criar carrossel</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      <Menu
+        anchorEl={actionsMenuAnchor}
+        open={Boolean(actionsMenuAnchor)}
+        onClose={closeMenus}
+        PaperProps={{ elevation: 0, sx: { border: '1px solid', borderColor: 'divider', borderRadius: 2 } }}
+      >
+        <MenuItem
+          onClick={() => {
+            if (menuClient) {
+              setSelectedClient(menuClient);
+              setEditDialogOpen(true);
+            }
+            closeMenus();
+          }}
+        >
+          <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Editar cliente</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (menuClient) {
+              setSelectedClient(menuClient);
+              setConnectInstagramOpen(true);
+            }
+            closeMenus();
+          }}
+        >
+          <ListItemIcon><InstagramIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Conectar Instagram</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (menuClient) void handleToggleClientActive(menuClient);
+            closeMenus();
+          }}
+        >
+          <ListItemIcon>
+            {(menuClient?.isActive !== false) ? <BlockIcon fontSize="small" /> : <CheckCircleIcon fontSize="small" />}
+          </ListItemIcon>
+          <ListItemText>
+            {(menuClient?.isActive !== false) ? 'Inativar cliente' : 'Ativar cliente'}
+          </ListItemText>
+        </MenuItem>
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            if (menuClient) {
+              setSelectedClient(menuClient);
+              setDeleteConfirmOpen(true);
+            }
+            closeMenus();
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          <ListItemIcon sx={{ color: 'inherit' }}><DeleteIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>Excluir cliente</ListItemText>
+        </MenuItem>
+      </Menu>
       
       {/* Modal de edição de cliente */}
       <EditClientDialog

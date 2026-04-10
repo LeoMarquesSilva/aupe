@@ -34,8 +34,6 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  ListItemSecondaryAction,
-  Switch,
   Divider
 } from '@mui/material';
 
@@ -72,6 +70,8 @@ import { useAuth } from '../contexts/AuthContext';
 // Date formatting
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { GLASS } from '../theme/glassTokens';
+import { appShellContainerSx } from '../theme/appShellLayout';
 
 // TabPanel component
 interface TabPanelProps {
@@ -142,6 +142,7 @@ interface UserFormData {
 }
 
 const AdminSettings: React.FC = () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { user } = useAuth();
   const [currentTab, setCurrentTab] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -212,6 +213,7 @@ const AdminSettings: React.FC = () => {
     return () => {
       mounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadAllData = async () => {
@@ -823,11 +825,22 @@ const AdminSettings: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, mt: 4, mb: 4 }}>
       {/* Cabeçalho */}
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
-        <AdminIcon sx={{ fontSize: 32, mr: 2, color: 'primary.main' }} />
-        <Typography variant="h4" component="h1" sx={{ flexGrow: 1 }}>
+      <Box
+        className="grain-overlay premium-header-bg"
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          mb: 4,
+          p: { xs: 2, sm: 2.5 },
+          borderRadius: GLASS.radius.card,
+          border: `1px solid rgba(255, 255, 255, 0.18)`,
+          gap: 1.5,
+        }}
+      >
+        <AdminIcon sx={{ fontSize: 32, color: '#fff' }} />
+        <Typography variant="h4" component="h1" className="premium-header-title" sx={{ flexGrow: 1 }}>
           Painel de Administração
         </Typography>
         <Button
@@ -835,6 +848,13 @@ const AdminSettings: React.FC = () => {
           startIcon={<RefreshIcon />}
           onClick={refreshData}
           disabled={loading}
+          sx={{
+            borderColor: 'rgba(255,255,255,0.4)',
+            color: '#fff',
+            borderRadius: GLASS.radius.button,
+            bgcolor: 'rgba(10, 15, 45, 0.22)',
+            '&:hover': { borderColor: '#fff', bgcolor: 'rgba(10, 15, 45, 0.35)' },
+          }}
         >
           {loading ? <CircularProgress size={16} /> : 'Atualizar'}
         </Button>
@@ -842,99 +862,38 @@ const AdminSettings: React.FC = () => {
 
       {/* Cards de Estatísticas */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={2}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <PeopleIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-              <Typography variant="h4" component="div">
-                {stats.totalUsers}
-              </Typography>
-              <Typography color="text.secondary">
-                Usuários
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid item xs={12} sm={6} md={2}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <BusinessIcon sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
-              <Typography variant="h4" component="div">
-                {stats.totalClients}
-              </Typography>
-              <Typography color="text.secondary">
-                Clientes
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid item xs={12} sm={6} md={2}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <ArticleIcon sx={{ fontSize: 40, color: 'info.main', mb: 1 }} />
-              <Typography variant="h4" component="div">
-                {stats.totalPosts}
-              </Typography>
-              <Typography color="text.secondary">
-                Posts
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid item xs={12} sm={6} md={2}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <InstagramIcon sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
-              <Typography variant="h4" component="div">
-                {stats.activeConnections}
-              </Typography>
-              <Typography color="text.secondary">
-                Conexões Ativas
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid item xs={12} sm={6} md={2}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <AdminIcon sx={{ fontSize: 40, color: 'error.main', mb: 1 }} />
-              <Typography variant="h4" component="div">
-                {stats.adminCount}
-              </Typography>
-              <Typography color="text.secondary">
-                Admins
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid item xs={12} sm={6} md={2}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <StorageIcon sx={{ fontSize: 40, color: 'secondary.main', mb: 1 }} />
-              <Typography variant="h4" component="div">
-                {stats.cacheSize}
-              </Typography>
-              <Typography color="text.secondary">
-                Cache Items
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+        {[
+          { icon: <PeopleIcon sx={{ fontSize: 40, color: GLASS.accent.orange, mb: 1 }} />, value: stats.totalUsers, label: 'Usuários' },
+          { icon: <BusinessIcon sx={{ fontSize: 40, color: GLASS.accent.orangeLight, mb: 1 }} />, value: stats.totalClients, label: 'Clientes' },
+          { icon: <ArticleIcon sx={{ fontSize: 40, color: GLASS.accent.blue, mb: 1 }} />, value: stats.totalPosts, label: 'Posts' },
+          { icon: <InstagramIcon sx={{ fontSize: 40, color: GLASS.accent.orangeDark, mb: 1 }} />, value: stats.activeConnections, label: 'Conexões Ativas' },
+          { icon: <AdminIcon sx={{ fontSize: 40, color: GLASS.accent.orange, mb: 1 }} />, value: stats.adminCount, label: 'Admins' },
+          { icon: <StorageIcon sx={{ fontSize: 40, color: GLASS.text.muted, mb: 1 }} />, value: stats.cacheSize, label: 'Cache Items' },
+        ].map((item, idx) => (
+          <Grid item xs={12} sm={6} md={2} key={idx}>
+            <Card elevation={0} sx={{ border: `1px solid ${GLASS.border.outer}`, borderRadius: GLASS.radius.card, background: GLASS.surface.bg, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}` }}>
+              <CardContent sx={{ textAlign: 'center' }}>
+                {item.icon}
+                <Typography variant="h4" component="div" sx={{ color: GLASS.text.heading }}>
+                  {item.value}
+                </Typography>
+                <Typography sx={{ color: GLASS.text.muted }}>
+                  {item.label}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
       </Grid>
 
       {/* Tabs */}
-      <Paper sx={{ width: '100%' }}>
+      <Paper elevation={0} sx={{ width: '100%', border: `1px solid ${GLASS.border.outer}`, borderRadius: GLASS.radius.card, background: GLASS.surface.bg, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`, overflow: 'hidden' }}>
         <Tabs
           value={currentTab}
           onChange={handleTabChange}
           variant="scrollable"
           scrollButtons="auto"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
+          sx={{ borderBottom: `1px solid ${GLASS.border.outer}`, '& .Mui-selected': { color: `${GLASS.accent.orange} !important` }, '& .MuiTabs-indicator': { backgroundColor: GLASS.accent.orange } }}
         >
           <Tab icon={<PeopleIcon />} label="Usuários & Roles" />
           <Tab icon={<BusinessIcon />} label="Clientes" />
@@ -960,7 +919,7 @@ const AdminSettings: React.FC = () => {
               variant="contained"
               startIcon={<PersonAddIcon />}
               onClick={handleCreateUser}
-              sx={{ minWidth: 'auto', whiteSpace: 'nowrap' }}
+              sx={{ minWidth: 'auto', whiteSpace: 'nowrap', bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}
             >
               Novo Usuário
             </Button>
@@ -1239,10 +1198,10 @@ const AdminSettings: React.FC = () => {
 
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
-              <Card>
+              <Card elevation={0} sx={{ border: `1px solid ${GLASS.border.outer}`, borderRadius: GLASS.radius.card, background: GLASS.surface.bgStrong, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}` }}>
                 <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    <SecurityIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  <Typography variant="h6" gutterBottom sx={{ color: GLASS.text.heading }}>
+                    <SecurityIcon sx={{ mr: 1, verticalAlign: 'middle', color: GLASS.accent.orange }} />
                     Segurança
                   </Typography>
                   <List>
@@ -1279,10 +1238,10 @@ const AdminSettings: React.FC = () => {
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <Card>
+              <Card elevation={0} sx={{ border: `1px solid ${GLASS.border.outer}`, borderRadius: GLASS.radius.card, background: GLASS.surface.bgStrong, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}` }}>
                 <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    <StorageIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  <Typography variant="h6" gutterBottom sx={{ color: GLASS.text.heading }}>
+                    <StorageIcon sx={{ mr: 1, verticalAlign: 'middle', color: GLASS.accent.orange }} />
                     Banco de Dados
                   </Typography>
                   <List>
@@ -1360,6 +1319,7 @@ const AdminSettings: React.FC = () => {
       <Dialog
         open={deleteDialog.open}
         onClose={() => setDeleteDialog({ open: false, type: null, item: null })}
+        PaperProps={{ sx: { borderRadius: GLASS.radius.card, background: GLASS.surface.bgStrong, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}` } }}
       >
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -1402,10 +1362,11 @@ const AdminSettings: React.FC = () => {
       <Dialog
         open={roleDialog.open}
         onClose={() => setRoleDialog({ open: false, user: null, newRole: 'user' })}
+        PaperProps={{ sx: { borderRadius: GLASS.radius.card, background: GLASS.surface.bgStrong, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}` } }}
       >
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <ShieldIcon sx={{ mr: 1, color: 'primary.main' }} />
+            <ShieldIcon sx={{ mr: 1, color: GLASS.accent.orange }} />
             Alterar Role do Usuário
           </Box>
         </DialogTitle>
@@ -1449,6 +1410,7 @@ const AdminSettings: React.FC = () => {
             onClick={confirmRoleChange} 
             variant="contained"
             disabled={loading}
+            sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}
           >
             {loading ? <CircularProgress size={16} /> : 'Alterar Role'}
           </Button>
@@ -1461,10 +1423,11 @@ const AdminSettings: React.FC = () => {
         onClose={() => setUserDialog({ open: false, mode: 'create', user: null })}
         maxWidth="sm"
         fullWidth
+        PaperProps={{ sx: { borderRadius: GLASS.radius.card, background: GLASS.surface.bgStrong, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}` } }}
       >
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <PersonAddIcon sx={{ mr: 1, color: 'primary.main' }} />
+            <PersonAddIcon sx={{ mr: 1, color: GLASS.accent.orange }} />
             {userDialog.mode === 'create' ? 'Criar Novo Usuário' : 'Editar Usuário'}
           </Box>
         </DialogTitle>
@@ -1544,6 +1507,7 @@ const AdminSettings: React.FC = () => {
             variant="contained"
             startIcon={<SaveIcon />}
             disabled={loading}
+            sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}
           >
             {loading ? <CircularProgress size={16} /> : 
              userDialog.mode === 'create' ? 'Criar Usuário' : 'Salvar Alterações'}

@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Container,
-  Paper,
   Box,
   TextField,
   Button,
@@ -15,40 +13,40 @@ import {
   DialogContent,
   DialogActions,
   Fade,
-  alpha
+  alpha,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Visibility,
   VisibilityOff,
   Email as EmailIcon,
-  Lock as LockIcon
+  Lock as LockIcon,
+  ArrowForward as ArrowForwardIcon,
 } from '@mui/icons-material';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
-import BRAND_COLORS from '../theme/brandColors';
+import { GLASS } from '../theme/glassTokens';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  
-  // Reset password dialog
+
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
-  
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
 
-  // Redirecionar se já estiver logado
+  const [formData, setFormData] = useState({ email: '', password: '' });
+
   React.useEffect(() => {
     if (user) {
-      // Verificar se há redirecionamento salvo
       const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
       if (redirectAfterLogin) {
         sessionStorage.removeItem('redirectAfterLogin');
@@ -60,38 +58,25 @@ const Login: React.FC = () => {
   }, [user, navigate]);
 
   const handleInputChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: event.target.value
-    }));
-    // Limpar erros quando o usuário começar a digitar
+    setFormData(prev => ({ ...prev, [field]: event.target.value }));
     if (error) setError(null);
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    
     if (!formData.email || !formData.password) {
       setError('Email e senha são obrigatórios.');
       return;
     }
-
     setLoading(true);
     setError(null);
-
     try {
-      const { email, password } = formData;
-
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
+        email: formData.email,
+        password: formData.password,
       });
-
       if (error) throw error;
-
       console.log('Login realizado com sucesso:', data.user?.email);
-      
-      // Verificar se há redirecionamento salvo (ex: checkout com planId)
       const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
       if (redirectAfterLogin) {
         sessionStorage.removeItem('redirectAfterLogin');
@@ -100,12 +85,9 @@ const Login: React.FC = () => {
         navigate('/dashboard');
       }
     } catch (err: any) {
-      console.error('Erro na autenticação:', err);
-      
-      // Mensagens de erro mais amigáveis
-      if (err.message.includes('Invalid login credentials')) {
+      if (err.message?.includes('Invalid login credentials')) {
         setError('Email ou senha incorretos.');
-      } else if (err.message.includes('Email not confirmed')) {
+      } else if (err.message?.includes('Email not confirmed')) {
         setError('Verifique seu email e clique no link de confirmação antes de fazer login.');
       } else {
         setError('Erro ao fazer login. Tente novamente.');
@@ -120,20 +102,15 @@ const Login: React.FC = () => {
       setError('Digite seu email para redefinir a senha.');
       return;
     }
-
     setResetLoading(true);
     setError(null);
-
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/reset-password`
+        redirectTo: `${window.location.origin}/reset-password`,
       });
-
       if (error) throw error;
-
       setResetSuccess(true);
-    } catch (err: any) {
-      console.error('Erro ao redefinir senha:', err);
+    } catch {
       setError('Não foi possível enviar o email de redefinição.');
     } finally {
       setResetLoading(false);
@@ -147,170 +124,193 @@ const Login: React.FC = () => {
     setError(null);
   };
 
+  const inputSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: '10px',
+      backgroundColor: '#fafafa',
+      fontSize: '0.9rem',
+      '& fieldset': { borderColor: 'rgba(82,86,99,0.2)' },
+      '&:hover fieldset': { borderColor: GLASS.accent.orange },
+      '&.Mui-focused fieldset': {
+        borderColor: GLASS.accent.orange,
+        borderWidth: 2,
+        boxShadow: `0 0 0 3px ${alpha(GLASS.accent.orange, 0.10)}`,
+      },
+    },
+    '& .MuiInputLabel-root': {
+      color: GLASS.text.muted,
+      fontSize: '0.9rem',
+      '&.Mui-focused': { color: GLASS.accent.orange },
+    },
+  };
+
   return (
     <Box
       sx={{
         minHeight: '100vh',
-        background: `linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, ${BRAND_COLORS.secondary} 50%, ${BRAND_COLORS.softBlack} 100%)`,
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-        overflow: 'hidden'
+        flexDirection: isMobile ? 'column' : 'row',
+        overflow: 'hidden',
       }}
     >
-      {/* Background decorativo */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: -50,
-          right: -50,
-          width: 200,
-          height: 200,
-          borderRadius: '50%',
-          background: alpha(BRAND_COLORS.offWhite, 0.1),
-          animation: 'float 6s ease-in-out infinite'
-        }}
-      />
-      <Box
-        sx={{
-          position: 'absolute',
-          bottom: -30,
-          left: -30,
-          width: 150,
-          height: 150,
-          borderRadius: '50%',
-          background: alpha(BRAND_COLORS.lightGray, 0.05),
-          animation: 'float 8s ease-in-out infinite reverse'
-        }}
-      />
-      <Box
-        sx={{
-          position: 'absolute',
-          top: '20%',
-          left: '10%',
-          width: 100,
-          height: 100,
-          borderRadius: '50%',
-          background: alpha(BRAND_COLORS.primary, 0.1),
-          animation: 'float 10s ease-in-out infinite'
-        }}
-      />
+      {/* ── LEFT PANEL: Brand ───────────────────────────────────── */}
+      {!isMobile && (
+        <Box
+          className="grain-overlay premium-header-bg"
+          sx={{
+            width: '45%',
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            p: { md: 5, lg: 7 },
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Logo */}
+          <Box
+            component="img"
+            src="/Fundo transparente [digital]/logo-insyt-fundo-transparente-04.png"
+            alt="INSYT"
+            sx={{ height: 36, width: 'auto', objectFit: 'contain', display: 'block' }}
+          />
 
-      <Container component="main" maxWidth="sm">
-        <Fade in timeout={800}>
-          <Paper 
-            elevation={24}
-            sx={{ 
-              p: 6,
-              borderRadius: 4,
-              background: `linear-gradient(145deg, ${alpha(BRAND_COLORS.offWhite, 0.98)}, ${alpha('#ffffff', 0.95)})`,
-              backdropFilter: 'blur(20px)',
-              border: `1px solid ${alpha(BRAND_COLORS.lightGray, 0.3)}`,
-              boxShadow: `0 25px 50px -12px ${alpha(BRAND_COLORS.softBlack, 0.3)}`,
-              position: 'relative',
-              overflow: 'hidden'
-            }}
-          >
-            {/* Accent decorativo no topo */}
-            <Box
+          {/* Center content */}
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', py: 6 }}>
+            <Typography
               sx={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 4,
-                background: `linear-gradient(90deg, ${BRAND_COLORS.primary}, ${BRAND_COLORS.secondary})`
+                fontFamily: '"Cabinet Grotesk", sans-serif',
+                fontWeight: 800,
+                fontSize: { md: '2rem', lg: '2.6rem' },
+                color: '#fff',
+                letterSpacing: '-0.035em',
+                lineHeight: 1.15,
+                mb: 2,
               }}
-            />
+            >
+              Gerencie suas redes sociais com inteligência.
+            </Typography>
+            <Typography
+              sx={{
+                color: 'rgba(255,255,255,0.55)',
+                fontSize: '1rem',
+                lineHeight: 1.65,
+                maxWidth: 380,
+                fontWeight: 400,
+              }}
+            >
+              Agendamento, aprovação de clientes e métricas, tudo em um fluxo único e prático.
+            </Typography>
 
-            {/* Header com logo e título */}
-            <Box sx={{ textAlign: 'center', mb: 5 }}>
-              {/* Logo da AUPE */}
-              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-                <Box
-                  sx={{
-                    width: 120,
-                    height: 120,
-                    borderRadius: 3,
-                    background: `linear-gradient(45deg, ${BRAND_COLORS.primary}, ${BRAND_COLORS.secondary})`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: `0 15px 35px ${alpha(BRAND_COLORS.primary, 0.3)}`,
-                    position: 'relative',
-                    overflow: 'hidden',
-                    '&::before': {
-                      content: '""',
-                      position: 'absolute',
-                      inset: 3,
-                      borderRadius: 2,
-                      background: `linear-gradient(45deg, ${alpha('#fff', 0.1)}, transparent)`,
-                      pointerEvents: 'none'
-                    }
-                  }}
-                >
+            {/* Feature list */}
+            <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {[
+                'Agendamento automático de posts e Reels',
+                'Fluxo de aprovação para clientes',
+                'Dashboard de métricas por conta',
+              ].map((item) => (
+                <Box key={item} sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
                   <Box
-                    component="img"
-                    src="/LOGO-AUPE.jpg"
-                    alt="AUPE Logo"
                     sx={{
-                      width: '85%',
-                      height: '85%',
-                      objectFit: 'contain',
-                      borderRadius: 2,
-                      zIndex: 1
+                      width: 6, height: 6, borderRadius: '50%',
+                      bgcolor: GLASS.accent.orange, flexShrink: 0,
                     }}
                   />
+                  <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.88rem', fontWeight: 500 }}>
+                    {item}
+                  </Typography>
                 </Box>
-              </Box>
-              
-              <Typography 
-                variant="h3" 
-                component="h1" 
-                gutterBottom
-                sx={{ 
+              ))}
+            </Box>
+          </Box>
+
+          {/* Bottom tag */}
+          <Typography sx={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.72rem', fontWeight: 500, letterSpacing: '0.04em' }}>
+            © {new Date().getFullYear()} INSYT - Todos os direitos reservados
+          </Typography>
+        </Box>
+      )}
+
+      {/* ── RIGHT PANEL: Form ────────────────────────────────────── */}
+      <Box
+        sx={{
+          flex: 1,
+          bgcolor: '#f6f6f6',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: { xs: 3, md: 5 },
+          overflowY: 'auto',
+        }}
+      >
+        <Box sx={{ width: '100%', maxWidth: 420 }}>
+          {/* Mobile: logo mark only */}
+          {isMobile && (
+            <Box sx={{ textAlign: 'center', mb: 4 }}>
+              <Box
+                component="img"
+                src="/Fundo transparente [digital]/logo-insyt-fundo-transparente-07.png"
+                alt="INSYT"
+                sx={{ height: 52, width: 'auto', objectFit: 'contain' }}
+              />
+            </Box>
+          )}
+
+          {/* Form card */}
+          <Box
+            sx={{
+              bgcolor: '#ffffff',
+              borderRadius: '18px',
+              border: `1px solid rgba(82,86,99,0.12)`,
+              boxShadow: '0 4px 24px rgba(10,15,45,0.07)',
+              p: { xs: 3.5, md: 4.5 },
+            }}
+          >
+            {/* Icon + heading */}
+            <Box sx={{ mb: 3.5 }}>
+              <Box
+                component="img"
+                src="/Fundo transparente [digital]/logo-insyt-fundo-transparente-07.png"
+                alt="INSYT"
+                sx={{
+                  height: 40,
+                  width: 'auto',
+                  objectFit: 'contain',
+                  display: isMobile ? 'none' : 'block',
+                  mb: 2.5,
+                }}
+              />
+              <Typography
+                sx={{
+                  fontFamily: '"Cabinet Grotesk", sans-serif',
                   fontWeight: 800,
-                  background: `linear-gradient(45deg, ${BRAND_COLORS.primary}, ${BRAND_COLORS.secondary})`,
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  mb: 1,
-                  letterSpacing: '-0.02em'
+                  fontSize: '1.55rem',
+                  color: GLASS.text.heading,
+                  letterSpacing: '-0.03em',
+                  lineHeight: 1.15,
+                  mb: 0.5,
                 }}
               >
-                AUPE Manager
+                Entrar na plataforma
               </Typography>
-              
-              <Typography 
-                variant="h6" 
-                sx={{ 
-                  fontWeight: 300,
-                  color: BRAND_COLORS.greenBlack,
-                  opacity: 0.8
-                }}
-              >
-                Gerencie suas redes sociais com elegância
+              <Typography variant="body2" sx={{ color: GLASS.text.muted, fontWeight: 400 }}>
+                Bem-vindo de volta. Insira suas credenciais.
               </Typography>
             </Box>
 
             {error && (
               <Fade in>
-                <Alert 
-                  severity="error" 
-                  sx={{ 
-                    mb: 3,
-                    borderRadius: 2,
-                    backgroundColor: alpha(BRAND_COLORS.primary, 0.1),
-                    border: `1px solid ${alpha(BRAND_COLORS.primary, 0.2)}`,
-                    '& .MuiAlert-icon': {
-                      fontSize: 24,
-                      color: BRAND_COLORS.primary
-                    },
-                    '& .MuiAlert-message': {
-                      color: BRAND_COLORS.softBlack
-                    }
-                  }} 
+                <Alert
+                  severity="error"
+                  sx={{
+                    mb: 2.5,
+                    borderRadius: '10px',
+                    backgroundColor: 'rgba(239,68,68,0.07)',
+                    border: '1px solid rgba(239,68,68,0.18)',
+                    '& .MuiAlert-message': { color: GLASS.text.body },
+                  }}
                   onClose={() => setError(null)}
                 >
                   {error}
@@ -333,33 +333,11 @@ const Login: React.FC = () => {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <EmailIcon sx={{ color: BRAND_COLORS.primary }} />
+                      <EmailIcon sx={{ color: 'rgba(82,86,99,0.5)', fontSize: 20 }} />
                     </InputAdornment>
                   ),
                 }}
-                sx={{ 
-                  mb: 3,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    backgroundColor: alpha(BRAND_COLORS.offWhite, 0.5),
-                    '& fieldset': {
-                      borderColor: alpha(BRAND_COLORS.neutralGray, 0.5),
-                    },
-                    '&:hover fieldset': {
-                      borderColor: BRAND_COLORS.primary,
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: BRAND_COLORS.primary,
-                      borderWidth: 2
-                    }
-                  },
-                  '& .MuiInputLabel-root': {
-                    color: BRAND_COLORS.greenBlack,
-                    '&.Mui-focused': {
-                      color: BRAND_COLORS.primary,
-                    }
-                  }
-                }}
+                sx={{ mb: 2, ...inputSx }}
               />
 
               <TextField
@@ -376,7 +354,7 @@ const Login: React.FC = () => {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <LockIcon sx={{ color: BRAND_COLORS.primary }} />
+                      <LockIcon sx={{ color: 'rgba(82,86,99,0.5)', fontSize: 20 }} />
                     </InputAdornment>
                   ),
                   endAdornment: (
@@ -385,213 +363,167 @@ const Login: React.FC = () => {
                         aria-label="toggle password visibility"
                         onClick={() => setShowPassword(!showPassword)}
                         edge="end"
-                        sx={{ color: BRAND_COLORS.primary }}
+                        size="small"
+                        sx={{ color: 'rgba(82,86,99,0.5)' }}
                       >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                        {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                       </IconButton>
                     </InputAdornment>
                   ),
                 }}
-                sx={{ 
-                  mb: 4,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    backgroundColor: alpha(BRAND_COLORS.offWhite, 0.5),
-                    '& fieldset': {
-                      borderColor: alpha(BRAND_COLORS.neutralGray, 0.5),
-                    },
-                    '&:hover fieldset': {
-                      borderColor: BRAND_COLORS.primary,
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: BRAND_COLORS.primary,
-                      borderWidth: 2
-                    }
-                  },
-                  '& .MuiInputLabel-root': {
-                    color: BRAND_COLORS.greenBlack,
-                    '&.Mui-focused': {
-                      color: BRAND_COLORS.primary,
-                    }
-                  }
-                }}
+                sx={{ mb: 1, ...inputSx }}
               />
+
+              <Box sx={{ textAlign: 'right', mb: 3 }}>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => setResetDialogOpen(true)}
+                  sx={{
+                    textTransform: 'none',
+                    color: GLASS.accent.orange,
+                    fontWeight: 500,
+                    fontSize: '0.8rem',
+                    p: 0,
+                    minWidth: 0,
+                    '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' },
+                  }}
+                >
+                  Esqueceu a senha?
+                </Button>
+              </Box>
 
               <Button
                 type="submit"
                 fullWidth
                 variant="contained"
                 disabled={loading}
-                sx={{ 
-                  py: 2.5,
-                  borderRadius: 2,
-                  fontSize: '1.1rem',
-                  fontWeight: 600,
+                endIcon={!loading && <ArrowForwardIcon />}
+                sx={{
+                  py: 1.4,
+                  borderRadius: '10px',
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
                   textTransform: 'none',
-                  background: `linear-gradient(45deg, ${BRAND_COLORS.primary}, ${BRAND_COLORS.secondary})`,
-                  boxShadow: `0 8px 25px ${alpha(BRAND_COLORS.primary, 0.3)}`,
+                  bgcolor: GLASS.accent.orange,
+                  boxShadow: `0 4px 16px ${alpha(GLASS.accent.orange, 0.28)}`,
+                  letterSpacing: '-0.01em',
                   '&:hover': {
-                    background: `linear-gradient(45deg, ${BRAND_COLORS.secondary}, ${BRAND_COLORS.primary})`,
-                    boxShadow: `0 12px 35px ${alpha(BRAND_COLORS.primary, 0.4)}`,
-                    transform: 'translateY(-2px)'
+                    bgcolor: GLASS.accent.orangeDark,
+                    boxShadow: `0 8px 24px ${alpha(GLASS.accent.orange, 0.35)}`,
                   },
-                  '&:disabled': {
-                    background: BRAND_COLORS.neutralGray,
-                    color: BRAND_COLORS.softBlack
-                  },
-                  transition: 'all 0.3s ease'
+                  '&:disabled': { bgcolor: 'rgba(82,86,99,0.15)', color: GLASS.text.muted, boxShadow: 'none' },
                 }}
               >
                 {loading ? 'Entrando...' : 'Entrar'}
               </Button>
 
               <Box sx={{ textAlign: 'center', mt: 3 }}>
-                <Button
-                  variant="text"
-                  onClick={() => setResetDialogOpen(true)}
-                  sx={{ 
-                    textTransform: 'none',
-                    color: BRAND_COLORS.primary,
-                    fontWeight: 500,
-                    '&:hover': {
-                      background: alpha(BRAND_COLORS.primary, 0.1)
-                    }
-                  }}
-                >
-                  Esqueceu sua senha?
-                </Button>
-              </Box>
-
-              <Box sx={{ textAlign: 'center', mt: 2 }}>
-                <Typography variant="body2" sx={{ color: BRAND_COLORS.greenBlack, mb: 1 }}>
+                <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
                   Não tem uma conta?{' '}
                   <Button
                     variant="text"
+                    size="small"
                     onClick={() => {
                       const planId = sessionStorage.getItem('redirectAfterLogin')?.split('plan=')[1];
-                      if (planId) {
-                        navigate(`/signup?plan=${planId}`);
-                      } else {
-                        navigate('/signup');
-                      }
+                      navigate(planId ? `/signup?plan=${planId}` : '/signup');
                     }}
-                    sx={{ 
+                    sx={{
                       textTransform: 'none',
-                      color: BRAND_COLORS.primary,
-                      fontWeight: 600,
-                      '&:hover': {
-                        background: alpha(BRAND_COLORS.primary, 0.1)
-                      }
+                      color: GLASS.accent.orange,
+                      fontWeight: 700,
+                      p: 0,
+                      minWidth: 0,
+                      fontSize: '0.875rem',
+                      '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' },
                     }}
                   >
-                    Criar Conta
+                    Criar conta
                   </Button>
                 </Typography>
               </Box>
             </Box>
-          </Paper>
-        </Fade>
+          </Box>
+        </Box>
+      </Box>
 
-        {/* Reset Password Dialog */}
-        <Dialog 
-          open={resetDialogOpen} 
-          onClose={handleCloseResetDialog}
-          PaperProps={{
-            sx: {
-              borderRadius: 3,
-              p: 1,
-              background: BRAND_COLORS.offWhite
-            }
-          }}
-        >
-          <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>
-            <LockIcon sx={{ fontSize: 40, color: BRAND_COLORS.primary, mb: 1 }} />
-            <Typography variant="h6" component="div" sx={{ color: BRAND_COLORS.softBlack }}>
-              Redefinir Senha
-            </Typography>
-          </DialogTitle>
-          <DialogContent sx={{ px: 3, pb: 2 }}>
-            {!resetSuccess ? (
-              <>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
-                  Digite seu email para receber um link de redefinição de senha.
-                </Typography>
-                <TextField
-                  autoFocus
-                  margin="dense"
-                  id="resetEmail"
-                  label="Email"
-                  type="email"
-                  fullWidth
-                  variant="outlined"
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: 2,
-                      '&:hover fieldset': {
-                        borderColor: BRAND_COLORS.primary,
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: BRAND_COLORS.primary,
-                      }
-                    },
-                    '& .MuiInputLabel-root.Mui-focused': {
-                      color: BRAND_COLORS.primary,
-                    }
-                  }}
-                />
-              </>
-            ) : (
-              <Box sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="body1" sx={{ mb: 2, color: BRAND_COLORS.primary }}>
-                  ✅ Email de redefinição enviado!
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Verifique sua caixa de entrada e clique no link para redefinir sua senha.
-                </Typography>
-              </Box>
-            )}
-          </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 3 }}>
-            <Button 
-              onClick={handleCloseResetDialog}
-              sx={{ 
+      {/* ── Reset Password Dialog ────────────────────────────────── */}
+      <Dialog
+        open={resetDialogOpen}
+        onClose={handleCloseResetDialog}
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            p: 1,
+            bgcolor: '#fff',
+            border: `1px solid rgba(82,86,99,0.12)`,
+            boxShadow: '0 16px 48px rgba(10,15,45,0.15)',
+            minWidth: 340,
+          },
+        }}
+      >
+        <DialogTitle sx={{ textAlign: 'center', pb: 1, pt: 2.5 }}>
+          <LockIcon sx={{ fontSize: 36, color: GLASS.accent.orange, mb: 1, display: 'block', mx: 'auto' }} />
+          <Typography variant="h6" component="div" sx={{ fontWeight: 700, color: GLASS.text.heading, fontFamily: '"Cabinet Grotesk", sans-serif' }}>
+            Redefinir senha
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ px: 3, pb: 1 }}>
+          {!resetSuccess ? (
+            <>
+              <Typography variant="body2" sx={{ mb: 2.5, textAlign: 'center', color: GLASS.text.muted }}>
+                Digite seu email para receber o link de redefinição.
+              </Typography>
+              <TextField
+                autoFocus
+                margin="dense"
+                id="resetEmail"
+                label="Email"
+                type="email"
+                fullWidth
+                variant="outlined"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                sx={inputSx}
+              />
+            </>
+          ) : (
+            <Box sx={{ textAlign: 'center', py: 2 }}>
+              <Typography variant="body1" sx={{ mb: 1.5, color: GLASS.accent.orange, fontWeight: 600 }}>
+                Email enviado!
+              </Typography>
+              <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
+                Verifique sua caixa de entrada e clique no link para redefinir sua senha.
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
+          <Button
+            onClick={handleCloseResetDialog}
+            sx={{ textTransform: 'none', color: GLASS.text.muted, borderRadius: '8px', fontWeight: 500 }}
+          >
+            {resetSuccess ? 'Fechar' : 'Cancelar'}
+          </Button>
+          {!resetSuccess && (
+            <Button
+              onClick={handleResetPassword}
+              disabled={resetLoading}
+              variant="contained"
+              sx={{
                 textTransform: 'none',
-                color: BRAND_COLORS.greenBlack
+                borderRadius: '8px',
+                fontWeight: 700,
+                bgcolor: GLASS.accent.orange,
+                boxShadow: 'none',
+                '&:hover': { bgcolor: GLASS.accent.orangeDark, boxShadow: 'none' },
               }}
             >
-              {resetSuccess ? 'Fechar' : 'Cancelar'}
+              {resetLoading ? 'Enviando...' : 'Enviar'}
             </Button>
-            {!resetSuccess && (
-              <Button 
-                onClick={handleResetPassword}
-                disabled={resetLoading}
-                variant="contained"
-                sx={{
-                  textTransform: 'none',
-                  background: `linear-gradient(45deg, ${BRAND_COLORS.primary}, ${BRAND_COLORS.secondary})`,
-                  '&:hover': {
-                    background: `linear-gradient(45deg, ${BRAND_COLORS.secondary}, ${BRAND_COLORS.primary})`,
-                  }
-                }}
-              >
-                {resetLoading ? 'Enviando...' : 'Enviar'}
-              </Button>
-            )}
-          </DialogActions>
-        </Dialog>
-      </Container>
-
-      {/* Animações CSS */}
-      <style>
-        {`
-          @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(180deg); }
-          }
-        `}
-      </style>
+          )}
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

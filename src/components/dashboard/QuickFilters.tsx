@@ -8,18 +8,16 @@ import {
   MenuItem,
   Button,
   ButtonGroup,
-  Typography,
-  Divider
+  Typography
 } from '@mui/material';
 import {
-  Today as TodayIcon,
-  DateRange as DateRangeIcon,
   Image as ImageIcon,
   VideoLibrary as VideoIcon,
   ViewCarousel as CarouselIcon,
   Clear as ClearIcon
 } from '@mui/icons-material';
 import { PostsFilter } from '../../services/instagramMetricsService';
+import { GLASS } from '../../theme/glassTokens';
 
 interface QuickFiltersProps {
   filters: PostsFilter;
@@ -102,7 +100,15 @@ const handleMediaTypeFilter = (mediaType: 'all' | 'IMAGE' | 'VIDEO' | 'CAROUSEL_
   };
 
   return (
-    <Box sx={{ mb: 3 }}>
+    <Box sx={{ 
+      mb: 3,
+      background: GLASS.surface.bg,
+      backdropFilter: `blur(${GLASS.surface.blur})`,
+      borderRadius: GLASS.radius.card,
+      border: `1px solid ${GLASS.border.outer}`,
+      boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+      p: 3,
+    }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="h6" component="h3">
           Filtros Rápidos
@@ -125,7 +131,18 @@ const handleMediaTypeFilter = (mediaType: 'all' | 'IMAGE' | 'VIDEO' | 'CAROUSEL_
         <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
           Período
         </Typography>
-        <ButtonGroup size="small" variant="outlined">
+        <ButtonGroup size="small" variant="outlined" sx={{
+          '& .MuiButtonGroup-grouped.MuiButton-contained': {
+            bgcolor: GLASS.accent.orange,
+            color: '#fff',
+            borderColor: GLASS.accent.orange,
+            '&:hover': { bgcolor: GLASS.accent.orangeDark, borderColor: GLASS.accent.orangeDark },
+          },
+          '& .MuiButtonGroup-grouped.MuiButton-outlined:hover': {
+            borderColor: GLASS.accent.orange,
+            color: GLASS.accent.orange,
+          },
+        }}>
           <Button
             variant={getActivePeriod() === '7d' ? 'contained' : 'outlined'}
             onClick={() => handleQuickDateFilter('7d')}
@@ -164,7 +181,10 @@ const handleMediaTypeFilter = (mediaType: 'all' | 'IMAGE' | 'VIDEO' | 'CAROUSEL_
         <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
           Tipo de Mídia
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+        <Box sx={{ 
+          display: 'flex', gap: 1, flexWrap: 'wrap',
+          '& .MuiChip-filled.MuiChip-colorPrimary': { bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark } },
+        }}>
           <Chip
             icon={<ImageIcon />}
             label="Todas"
@@ -237,7 +257,10 @@ const handleMediaTypeFilter = (mediaType: 'all' | 'IMAGE' | 'VIDEO' | 'CAROUSEL_
           <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
             Filtros Ativos:
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Box sx={{ 
+            display: 'flex', gap: 1, flexWrap: 'wrap',
+            '& .MuiChip-outlinedPrimary': { borderColor: GLASS.accent.orange, color: GLASS.accent.orange },
+          }}>
             {filters.startDate && (
               <Chip
                 size="small"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Container,
   Paper,
@@ -46,15 +46,21 @@ import {
   Article as ArticleIcon,
   Settings as SettingsIcon,
   WhatsApp as WhatsAppIcon,
+  AutoAwesome as AutoAwesomeIcon,
+  PhotoCamera as PhotoCameraIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabaseClient';
 import WhatsAppSettings from '../components/settings/WhatsAppSettings';
-import { subscriptionService, Subscription } from '../services/subscriptionService';
+import { Subscription, subscriptionService } from '../services/subscriptionService';
+import { organizationLogoService } from '../services/organizationLogoService';
+import { ImageUrlService } from '../services/imageUrlService';
 import { subscriptionLimitsService } from '../services/subscriptionLimitsService';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
+import { GLASS } from '../theme/glassTokens';
+import { appShellContainerSx } from '../theme/appShellLayout';
 
 interface UserProfile {
   id: string;
@@ -106,7 +112,7 @@ function TabPanel(props: TabPanelProps) {
 
 const Settings: React.FC = () => {
   const theme = useTheme();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -148,13 +154,74 @@ const Settings: React.FC = () => {
   const [subscriptionLimits, setSubscriptionLimits] = useState<any>(null);
   const [loadingSubscription, setLoadingSubscription] = useState(true);
 
+  const [agencyLogoUrl, setAgencyLogoUrl] = useState<string | null>(null);
+  const [loadingAgencyBrand, setLoadingAgencyBrand] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const agencyLogoInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (user) {
       loadUserProfile();
       loadUserSettings();
       loadSubscription();
+      loadAgencyBranding();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  const loadAgencyBranding = async () => {
+    if (!user) return;
+    setLoadingAgencyBrand(true);
+    try {
+      const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single();
+      const orgId = (profile as { organization_id?: string })?.organization_id;
+      if (!orgId) {
+        setAgencyLogoUrl(null);
+        return;
+      }
+      const org = await subscriptionService.getOrganization(orgId);
+      setAgencyLogoUrl(org?.agency_logo_url ?? null);
+    } catch (e) {
+      console.error(e);
+      setAgencyLogoUrl(null);
+    } finally {
+      setLoadingAgencyBrand(false);
+    }
+  };
+
+  const handleAgencyLogoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploadingLogo(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const url = await organizationLogoService.uploadAgencyLogo(file, agencyLogoUrl);
+      setAgencyLogoUrl(url);
+      setSuccess('Logo da agência atualizada.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Não foi possível enviar a logo.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveAgencyLogo = async () => {
+    if (!agencyLogoUrl) return;
+    setUploadingLogo(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await organizationLogoService.clearAgencyLogo(agencyLogoUrl);
+      setAgencyLogoUrl(null);
+      setSuccess('Logo da agência removida.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Não foi possível remover a logo.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   const loadSubscription = async () => {
     setLoadingSubscription(true);
@@ -201,7 +268,7 @@ const Settings: React.FC = () => {
       // Em um app real, você salvaria no banco de dados
       const savedSettings = localStorage.getItem('user_settings');
       if (savedSettings) {
-        setSettings({ ...settings, ...JSON.parse(savedSettings) });
+        setSettings((prev) => ({ ...prev, ...JSON.parse(savedSettings) }));
       }
     } catch (err: any) {
       console.error('Erro ao carregar configurações:', err);
@@ -233,17 +300,6 @@ const Settings: React.FC = () => {
       setError('Não foi possível atualizar o perfil.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSaveSettings = async () => {
-    try {
-      // Salvar no localStorage (em um app real, salvaria no banco)
-      localStorage.setItem('user_settings', JSON.stringify(settings));
-      setSuccess('Configurações salvas com sucesso!');
-    } catch (err: any) {
-      console.error('Erro ao salvar configurações:', err);
-      setError('Não foi possível salvar as configurações.');
     }
   };
 
@@ -307,11 +363,26 @@ const Settings: React.FC = () => {
     return email.substring(0, 2).toUpperCase();
   };
 
+  const premiumCardSx = {
+    border: `1px solid ${GLASS.border.outer}`,
+    borderRadius: GLASS.radius.card,
+    background: GLASS.surface.bgStrong,
+    backdropFilter: `blur(${GLASS.surface.blur})`,
+    boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+    overflow: 'hidden',
+  };
+
+  const containerSx = {
+    ...appShellContainerSx,
+    py: { xs: 3, md: 4 },
+    pb: { xs: 6, md: 8 },
+  };
+
   if (!user || !profile) {
     return (
-      <Container maxWidth="lg" sx={{ py: 6 }}>
+      <Container maxWidth={false} disableGutters sx={{ ...containerSx, py: 6 }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-          <CircularProgress size={40} sx={{ color: 'primary.main' }} />
+          <CircularProgress size={40} sx={{ color: GLASS.accent.orange }} />
           <Typography variant="body2" color="text.secondary">Carregando configurações…</Typography>
         </Box>
       </Container>
@@ -319,18 +390,53 @@ const Settings: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4, pb: 8 }}>
-      <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
-          <SettingsIcon sx={{ fontSize: 28, color: 'primary.main' }} />
-          <Typography variant="h4" sx={{ fontWeight: 600, letterSpacing: '-0.02em' }}>
-            Configurações
+    <Container maxWidth={false} disableGutters sx={containerSx}>
+      <Paper
+        elevation={0}
+        className="grain-overlay premium-header-bg"
+        sx={{
+          mb: 3,
+          p: { xs: 2, sm: 2.75, md: 3.25 },
+          borderRadius: `calc(${GLASS.radius.card} + 2px)`,
+          border: `1px solid ${alpha(GLASS.accent.orange, 0.28)}`,
+          boxShadow: '0 16px 38px -20px rgba(247, 66, 17, 0.8)',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <Box sx={{ position: 'relative', zIndex: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mb: 1 }}>
+            <SettingsIcon sx={{ fontSize: 30, color: '#fff' }} />
+            <Typography variant="h4" className="premium-header-title" sx={{ letterSpacing: '-0.02em' }}>
+              Configurações
+            </Typography>
+          </Box>
+          <Typography variant="body2" className="premium-header-subtitle" sx={{ mb: 2.25, maxWidth: 'min(72ch, 100%)' }}>
+            Centralize preferências da sua conta com o mesmo padrão premium do sistema: perfil, assinatura, segurança e notificações via WhatsApp.
           </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            <Chip
+              size="small"
+              icon={<AutoAwesomeIcon sx={{ color: '#fff !important' }} />}
+              label="Experiência premium"
+              className="premium-header-chip"
+              sx={{ '& .MuiChip-label': { fontWeight: 600 } }}
+            />
+            <Chip
+              size="small"
+              label={`Idioma: ${settings.language}`}
+              className="premium-header-chip"
+              sx={{ '& .MuiChip-label': { fontWeight: 500 } }}
+            />
+            <Chip
+              size="small"
+              label={`Fuso: ${settings.timezone.replace('_', ' ')}`}
+              className="premium-header-chip"
+              sx={{ '& .MuiChip-label': { fontWeight: 500 } }}
+            />
+          </Box>
         </Box>
-        <Typography variant="body2" color="text.secondary">
-          Gerencie seu perfil, assinatura e segurança da conta.
-        </Typography>
-      </Box>
+      </Paper>
 
       {error && (
         <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }} onClose={() => setError(null)}>
@@ -347,8 +453,11 @@ const Settings: React.FC = () => {
       <Paper
         elevation={0}
         sx={{
-          border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
-          borderRadius: 3,
+          border: `1px solid ${GLASS.border.outer}`,
+          borderRadius: GLASS.radius.card,
+          background: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
           overflow: 'hidden',
           mb: 4
         }}
@@ -356,32 +465,39 @@ const Settings: React.FC = () => {
         <Tabs
           value={currentTab}
           onChange={(_, newValue) => setCurrentTab(newValue)}
-          variant="fullWidth"
+          variant="scrollable"
+          allowScrollButtonsMobile
           sx={{
-            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-            minHeight: 56,
-            '& .MuiTab-root': { fontWeight: 500, textTransform: 'none', fontSize: '0.95rem' },
-            '& .Mui-selected': { color: 'primary.main' },
-            '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0' }
+            borderBottom: `1px solid ${GLASS.border.outer}`,
+            minHeight: 62,
+            px: { xs: 1, sm: 2 },
+            '& .MuiTab-root': {
+              fontWeight: 600,
+              textTransform: 'none',
+              fontSize: '0.92rem',
+              minHeight: 62,
+              minWidth: 128,
+              borderRadius: GLASS.radius.button,
+              my: 1,
+            },
+            '& .Mui-selected': { color: `${GLASS.accent.orange} !important` },
+            '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0', backgroundColor: GLASS.accent.orange }
           }}
         >
           <Tab icon={<PersonIcon />} iconPosition="start" label="Perfil" />
+          <Tab icon={<PhotoCameraIcon />} iconPosition="start" label="Marca da agência" />
           <Tab icon={<CreditCardIcon />} iconPosition="start" label="Assinatura" />
           <Tab icon={<SecurityIcon />} iconPosition="start" label="Segurança" />
-          <Tab icon={<WhatsAppIcon />} iconPosition="start" label="Notificações" />
+          <Tab icon={<WhatsAppIcon />} iconPosition="start" label="Notificações WhatsApp" />
         </Tabs>
 
         {/* Tab: Perfil */}
         <TabPanel value={currentTab} index={0}>
           <Grid container spacing={4} sx={{ px: { xs: 0, sm: 2 } }}>
-            <Grid item xs={12} lg={8}>
+            <Grid item xs={12}>
               <Card
                 elevation={0}
-                sx={{
-                  border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                  borderRadius: 3,
-                  overflow: 'hidden'
-                }}
+                sx={premiumCardSx}
               >
                 <CardContent sx={{ p: { xs: 2, sm: 3, md: 4 }, overflow: 'visible' }}>
                   <Box
@@ -391,9 +507,9 @@ const Settings: React.FC = () => {
                       alignItems: { xs: 'flex-start', sm: 'center' },
                       gap: { xs: 2, sm: 2.5 },
                       p: { xs: 2, sm: 2.5, md: 3 },
-                      borderRadius: 2,
-                      background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.06)} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`,
-                      border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
+                      borderRadius: GLASS.radius.inner,
+                      background: `linear-gradient(135deg, rgba(247, 66, 17, 0.06) 0%, rgba(247, 66, 17, 0.02) 100%)`,
+                      border: `1px solid rgba(247, 66, 17, 0.12)`,
                       mb: 4,
                       width: '100%',
                       boxSizing: 'border-box',
@@ -405,10 +521,10 @@ const Settings: React.FC = () => {
                         width: { xs: 64, sm: 80 },
                         height: { xs: 64, sm: 80 },
                         flexShrink: 0,
-                        bgcolor: 'primary.main',
+                        bgcolor: GLASS.accent.orange,
                         fontSize: { xs: '1.35rem', sm: '1.75rem' },
                         fontWeight: 600,
-                        boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
+                        boxShadow: `0 4px 12px rgba(247, 66, 17, 0.3)`
                       }}
                     >
                       {getUserInitials(profile.full_name || '', profile.email)}
@@ -432,7 +548,7 @@ const Settings: React.FC = () => {
                         size="small"
                         variant="outlined"
                         sx={{
-                          borderColor: alpha(theme.palette.primary.main, 0.4),
+                          borderColor: 'rgba(247, 66, 17, 0.4)',
                           color: 'text.secondary',
                           fontWeight: 500,
                           maxWidth: '100%',
@@ -462,9 +578,9 @@ const Settings: React.FC = () => {
                       />
                     </Box>
                   ) : (
-                    <List disablePadding sx={{ '& .MuiListItem-root': { py: 2, px: 0, borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` }, '& .MuiListItem-root:last-of-type': { borderBottom: 0 } }}>
+                    <List disablePadding sx={{ '& .MuiListItem-root': { py: 2, px: 0, borderBottom: `1px solid ${GLASS.border.outer}` }, '& .MuiListItem-root:last-of-type': { borderBottom: 0 } }}>
                       <ListItem>
-                        <ListItemIcon sx={{ minWidth: 44, color: 'primary.main' }}>
+                        <ListItemIcon sx={{ minWidth: 44, color: GLASS.accent.orange }}>
                           <PersonIcon />
                         </ListItemIcon>
                         <ListItemText
@@ -474,7 +590,7 @@ const Settings: React.FC = () => {
                         />
                       </ListItem>
                       <ListItem>
-                        <ListItemIcon sx={{ minWidth: 44, color: 'primary.main' }}>
+                        <ListItemIcon sx={{ minWidth: 44, color: GLASS.accent.orange }}>
                           <EmailIcon />
                         </ListItemIcon>
                         <ListItemText
@@ -484,7 +600,7 @@ const Settings: React.FC = () => {
                         />
                       </ListItem>
                       <ListItem>
-                        <ListItemIcon sx={{ minWidth: 44, color: 'primary.main' }}>
+                        <ListItemIcon sx={{ minWidth: 44, color: GLASS.accent.orange }}>
                           <PhoneIcon />
                         </ListItemIcon>
                         <ListItemText
@@ -496,18 +612,18 @@ const Settings: React.FC = () => {
                     </List>
                   )}
                 </CardContent>
-                <CardActions sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`, bgcolor: alpha(theme.palette.grey[500], 0.02) }}>
+                <CardActions sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 2, borderTop: `1px solid ${GLASS.border.outer}`, bgcolor: GLASS.surface.bgFooter }}>
                   {editingProfile ? (
                     <Box sx={{ display: 'flex', gap: 1.5 }}>
-                      <Button startIcon={<SaveIcon />} onClick={handleSaveProfile} disabled={loading} variant="contained">
+                      <Button startIcon={<SaveIcon />} onClick={handleSaveProfile} disabled={loading} variant="contained" sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}>
                         Salvar
                       </Button>
-                      <Button startIcon={<CancelIcon />} onClick={() => setEditingProfile(false)} disabled={loading} variant="outlined">
+                      <Button startIcon={<CancelIcon />} onClick={() => setEditingProfile(false)} disabled={loading} variant="outlined" sx={{ borderColor: GLASS.border.outer, borderRadius: GLASS.radius.button }}>
                         Cancelar
                       </Button>
                     </Box>
                   ) : (
-                    <Button startIcon={<EditIcon />} onClick={() => setEditingProfile(true)} variant="outlined">
+                    <Button startIcon={<EditIcon />} onClick={() => setEditingProfile(true)} variant="outlined" sx={{ borderColor: GLASS.accent.orange, color: GLASS.accent.orange, borderRadius: GLASS.radius.button, '&:hover': { borderColor: GLASS.accent.orangeDark, bgcolor: 'rgba(247, 66, 17,0.06)' } }}>
                       Editar perfil
                     </Button>
                   )}
@@ -517,27 +633,91 @@ const Settings: React.FC = () => {
           </Grid>
         </TabPanel>
 
-        {/* Tab: Assinatura */}
+        {/* Tab: Marca da agência */}
         <TabPanel value={currentTab} index={1}>
+          <Grid container spacing={4} sx={{ px: { xs: 0, sm: 2 } }}>
+            <Grid item xs={12} md={8} lg={6}>
+              <Card elevation={0} sx={premiumCardSx}>
+                <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                    <PhotoCameraIcon sx={{ color: GLASS.accent.orange, fontSize: 26 }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>Logo da agência</Typography>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+                    Aparece no painel, na página inicial e nos links públicos de aprovação e dashboard compartilhado com o cliente. PNG ou JPG recomendado (máx. 2 MB).
+                  </Typography>
+                  {loadingAgencyBrand ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                      <CircularProgress size={36} sx={{ color: GLASS.accent.orange }} />
+                    </Box>
+                  ) : (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2 }}>
+                      <Avatar
+                        src={agencyLogoUrl ? ImageUrlService.getPublicUrl(agencyLogoUrl) : undefined}
+                        variant="rounded"
+                        sx={{
+                          width: 120,
+                          height: 120,
+                          flexShrink: 0,
+                          bgcolor: 'rgba(0,0,0,0.06)',
+                          border: `1px solid ${GLASS.border.outer}`,
+                          objectFit: 'contain',
+                          p: 1,
+                        }}
+                      />
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <input
+                          ref={agencyLogoInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                          hidden
+                          onChange={handleAgencyLogoFile}
+                        />
+                        <Button
+                          variant="contained"
+                          startIcon={<PhotoCameraIcon />}
+                          disabled={uploadingLogo}
+                          onClick={() => agencyLogoInputRef.current?.click()}
+                          sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button, alignSelf: 'flex-start' }}
+                        >
+                          {uploadingLogo ? 'Enviando…' : 'Enviar nova logo'}
+                        </Button>
+                        {agencyLogoUrl && (
+                          <Button
+                            variant="outlined"
+                            color="inherit"
+                            disabled={uploadingLogo}
+                            onClick={handleRemoveAgencyLogo}
+                            sx={{ borderColor: GLASS.border.outer, borderRadius: GLASS.radius.button, alignSelf: 'flex-start' }}
+                          >
+                            Remover logo
+                          </Button>
+                        )}
+                      </Box>
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </TabPanel>
+
+        {/* Tab: Assinatura */}
+        <TabPanel value={currentTab} index={2}>
           {loadingSubscription ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
-              <CircularProgress size={40} sx={{ color: 'primary.main' }} />
+              <CircularProgress size={40} sx={{ color: GLASS.accent.orange }} />
             </Box>
           ) : subscription && subscriptionLimits ? (
             <Grid container spacing={4} sx={{ px: { xs: 0, sm: 2 } }}>
               <Grid item xs={12} lg={5}>
                 <Card
                   elevation={0}
-                  sx={{
-                    height: '100%',
-                    border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                    borderRadius: 3,
-                    overflow: 'hidden'
-                  }}
+                  sx={{ ...premiumCardSx, height: '100%' }}
                 >
                   <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-                      <CreditCardIcon sx={{ color: 'primary.main', fontSize: 26 }} />
+                      <CreditCardIcon sx={{ color: GLASS.accent.orange, fontSize: 26 }} />
                       <Typography variant="h6" sx={{ fontWeight: 600 }}>Plano atual</Typography>
                     </Box>
                     <Box sx={{ mb: 2 }}>
@@ -607,8 +787,8 @@ const Settings: React.FC = () => {
                         )}
                       </List>
                   </CardContent>
-                  <CardActions sx={{ px: { xs: 2, sm: 3 }, py: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`, bgcolor: alpha(theme.palette.grey[500], 0.02) }}>
-                    <Button variant="outlined" onClick={() => navigate('/')} startIcon={<TrendingUpIcon />}>
+                  <CardActions sx={{ px: { xs: 2, sm: 3 }, py: 2, borderTop: `1px solid ${GLASS.border.outer}`, bgcolor: GLASS.surface.bgFooter }}>
+                    <Button variant="outlined" onClick={() => navigate('/')} startIcon={<TrendingUpIcon />} sx={{ borderColor: GLASS.accent.orange, color: GLASS.accent.orange, borderRadius: GLASS.radius.button, '&:hover': { borderColor: GLASS.accent.orangeDark, bgcolor: 'rgba(247, 66, 17,0.06)' } }}>
                       Ver planos
                     </Button>
                   </CardActions>
@@ -618,16 +798,11 @@ const Settings: React.FC = () => {
               <Grid item xs={12} lg={7}>
                 <Card
                   elevation={0}
-                  sx={{
-                    height: '100%',
-                    border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                    borderRadius: 3,
-                    overflow: 'hidden'
-                  }}
+                  sx={{ ...premiumCardSx, height: '100%' }}
                 >
                   <CardContent sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 4 }}>
-                      <TrendingUpIcon sx={{ color: 'primary.main', fontSize: 28 }} />
+                      <TrendingUpIcon sx={{ color: GLASS.accent.orange, fontSize: 28 }} />
                       <Typography variant="h6" sx={{ fontWeight: 600 }}>Limites e uso</Typography>
                     </Box>
 
@@ -641,9 +816,9 @@ const Settings: React.FC = () => {
                           sx={{
                             mb: 3,
                             p: 2.5,
-                            borderRadius: 2,
-                            border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                            bgcolor: alpha(theme.palette.primary.main, 0.02)
+                            borderRadius: GLASS.radius.inner,
+                            border: `1px solid ${GLASS.border.outer}`,
+                            bgcolor: 'rgba(247, 66, 17, 0.02)'
                           }}
                         >
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1, mb: 2 }}>
@@ -651,7 +826,7 @@ const Settings: React.FC = () => {
                               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>Contas Instagram</Typography>
                               <Typography variant="caption" color="text.secondary">Contas conectadas à sua organização</Typography>
                             </Box>
-                            <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                            <Typography variant="h6" sx={{ fontWeight: 600, color: GLASS.accent.orange }}>
                               {subscriptionLimits.currentClients} / {subscriptionLimits.maxClients === 999999 ? '∞' : subscriptionLimits.maxClients}
                             </Typography>
                           </Box>
@@ -677,9 +852,9 @@ const Settings: React.FC = () => {
                           sx={{
                             mb: 3,
                             p: 2.5,
-                            borderRadius: 2,
-                            border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                            bgcolor: alpha(theme.palette.primary.main, 0.02)
+                            borderRadius: GLASS.radius.inner,
+                            border: `1px solid ${GLASS.border.outer}`,
+                            bgcolor: 'rgba(247, 66, 17, 0.02)'
                           }}
                         >
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1, mb: 2 }}>
@@ -687,7 +862,7 @@ const Settings: React.FC = () => {
                               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>Posts este mês</Typography>
                               <Typography variant="caption" color="text.secondary">Posts agendados no período atual</Typography>
                             </Box>
-                            <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                            <Typography variant="h6" sx={{ fontWeight: 600, color: GLASS.accent.orange }}>
                               {subscriptionLimits.currentPostsThisMonth.toLocaleString('pt-BR')} / {subscriptionLimits.maxPostsPerMonth === 999999 ? '∞' : subscriptionLimits.maxPostsPerMonth.toLocaleString('pt-BR')}
                             </Typography>
                           </Box>
@@ -714,10 +889,10 @@ const Settings: React.FC = () => {
                             sx={{
                               mt: 3,
                               p: 2.5,
-                              borderRadius: 2,
-                              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-                              color: 'primary.contrastText',
-                              boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.35)}`
+                              borderRadius: GLASS.radius.inner,
+                              background: `linear-gradient(135deg, ${GLASS.accent.orange} 0%, ${GLASS.accent.orangeDark} 100%)`,
+                              color: '#fff',
+                              boxShadow: `0 4px 16px rgba(247, 66, 17, 0.35)`
                             }}
                           >
                             <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, color: 'inherit' }}>
@@ -751,11 +926,11 @@ const Settings: React.FC = () => {
                       </Box>
                     )}
                   </CardContent>
-                  <CardActions sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`, bgcolor: alpha(theme.palette.grey[500], 0.02), gap: 1.5 }}>
-                    <Button variant="contained" onClick={() => navigate('/')} startIcon={<TrendingUpIcon />}>
+                  <CardActions sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 2, borderTop: `1px solid ${GLASS.border.outer}`, bgcolor: GLASS.surface.bgFooter, gap: 1.5 }}>
+                    <Button variant="contained" onClick={() => navigate('/')} startIcon={<TrendingUpIcon />} sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}>
                       Fazer upgrade
                     </Button>
-                    <Button variant="outlined" onClick={loadSubscription} startIcon={<RefreshIcon />}>
+                    <Button variant="outlined" onClick={loadSubscription} startIcon={<RefreshIcon />} sx={{ borderColor: GLASS.accent.orange, color: GLASS.accent.orange, borderRadius: GLASS.radius.button, '&:hover': { borderColor: GLASS.accent.orangeDark, bgcolor: 'rgba(247, 66, 17,0.06)' } }}>
                       Atualizar
                     </Button>
                   </CardActions>
@@ -766,17 +941,10 @@ const Settings: React.FC = () => {
             <Box sx={{ px: { xs: 0, sm: 2 } }}>
               <Card
                 elevation={0}
-                sx={{
-                  maxWidth: 480,
-                  mx: 'auto',
-                  border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                  borderRadius: 3,
-                  overflow: 'hidden',
-                  textAlign: 'center'
-                }}
+                sx={{ ...premiumCardSx, maxWidth: 480, mx: 'auto', textAlign: 'center' }}
               >
                 <CardContent sx={{ py: 5, px: 4 }}>
-                  <CreditCardIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2, opacity: 0.9 }} />
+                  <CreditCardIcon sx={{ fontSize: 48, color: GLASS.accent.orange, mb: 2, opacity: 0.9 }} />
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>Nenhuma assinatura ativa</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                     Para começar a usar o sistema, assine um plano.
@@ -791,21 +959,16 @@ const Settings: React.FC = () => {
         </TabPanel>
 
         {/* Tab: Segurança */}
-        <TabPanel value={currentTab} index={2}>
+        <TabPanel value={currentTab} index={3}>
           <Grid container spacing={4} sx={{ px: { xs: 0, sm: 2 } }}>
             <Grid item xs={12} md={6}>
               <Card
                 elevation={0}
-                sx={{
-                  border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                  borderRadius: 3,
-                  overflow: 'hidden',
-                  height: '100%'
-                }}
+                sx={{ ...premiumCardSx, height: '100%' }}
               >
                 <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                    <SecurityIcon sx={{ color: 'primary.main', fontSize: 26 }} />
+                    <SecurityIcon sx={{ color: GLASS.accent.orange, fontSize: 26 }} />
                     <Typography variant="h6" sx={{ fontWeight: 600 }}>Alterar senha</Typography>
                   </Box>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
@@ -832,12 +995,13 @@ const Settings: React.FC = () => {
                     />
                   </Box>
                 </CardContent>
-                <CardActions sx={{ px: { xs: 2, sm: 3 }, py: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`, bgcolor: alpha(theme.palette.grey[500], 0.02) }}>
+                <CardActions sx={{ px: { xs: 2, sm: 3 }, py: 2, borderTop: `1px solid ${GLASS.border.outer}`, bgcolor: GLASS.surface.bgFooter }}>
                   <Button
                     startIcon={<SecurityIcon />}
                     onClick={handleChangePassword}
                     disabled={changingPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
                     variant="contained"
+                    sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}
                   >
                     {changingPassword ? 'Alterando…' : 'Alterar senha'}
                   </Button>
@@ -850,9 +1014,11 @@ const Settings: React.FC = () => {
                 elevation={0}
                 sx={{
                   border: `2px solid ${alpha(theme.palette.error.main, 0.5)}`,
-                  borderRadius: 3,
+                  borderRadius: GLASS.radius.card,
                   overflow: 'hidden',
-                  bgcolor: alpha(theme.palette.error.main, 0.02),
+                  background: `linear-gradient(135deg, ${alpha(theme.palette.error.main, 0.03)}, ${GLASS.surface.bg})`,
+                  backdropFilter: `blur(${GLASS.surface.blur})`,
+                  boxShadow: GLASS.shadow.cardInset,
                   height: '100%'
                 }}
               >
@@ -877,12 +1043,12 @@ const Settings: React.FC = () => {
         </TabPanel>
 
         {/* Tab: Notificações WhatsApp */}
-        <TabPanel value={currentTab} index={3}>
+        <TabPanel value={currentTab} index={4}>
           <WhatsAppSettings />
         </TabPanel>
       </Paper>
 
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} PaperProps={{ sx: { borderRadius: 3, maxWidth: 420 } }}>
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)} PaperProps={{ sx: { borderRadius: GLASS.radius.card, maxWidth: 420, background: GLASS.surface.bgStrong, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}` } }}>
         <DialogTitle sx={{ fontWeight: 600, color: 'error.main', pb: 1 }}>
           Excluir conta permanentemente
         </DialogTitle>

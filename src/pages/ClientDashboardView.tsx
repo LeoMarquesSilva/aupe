@@ -12,20 +12,19 @@ import {
   alpha,
   useTheme,
   useMediaQuery,
-  AppBar,
-  Toolbar,
   Chip
 } from '@mui/material';
-import { Instagram as InstagramIcon } from '@mui/icons-material';
 import { formatDistanceToNow, format, subDays, isAfter, parseISO, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { fetchDashboardByToken } from '../services/shareLinkService';
 import { instagramMetricsService, InstagramPost } from '../services/instagramMetricsService';
 import { MetricsOverview, FeaturedPost, PostsTable, PostDetails, PeriodSelector, ConversionFunnel } from '../components/dashboard';
 import type { PeriodConfig } from '../components/dashboard';
+import { GLASS } from '../theme/glassTokens';
+import { appShellContainerSx } from '../theme/appShellLayout';
+import { resolveAgencyLogoSrc } from '../services/imageUrlService';
 
-const AGENCY_LOGO_URL = '/LOGO-AUPE.jpg';
-const APP_NAME = 'AUPE';
+const APP_NAME = 'INSYT';
 
 const ClientDashboardView: React.FC = () => {
   const theme = useTheme();
@@ -77,7 +76,7 @@ const ClientDashboardView: React.FC = () => {
     return () => { cancelled = true; };
   }, [decodedToken]);
 
-  const posts = (data?.posts as InstagramPost[] | undefined) || [];
+  const posts = useMemo(() => (data?.posts as InstagramPost[] | undefined) || [], [data?.posts]);
 
   const { periodStart, periodEnd, prevPeriodStart, prevPeriodEnd, prevPeriodLabel } = useMemo(() => {
     if (periodConfig.mode === 'month') {
@@ -243,7 +242,7 @@ const ClientDashboardView: React.FC = () => {
       },
       engagementBreakdown,
     };
-  }, [dashboardData, period, posts, periodConfig, periodStart, periodEnd, prevPeriodStart, prevPeriodEnd]);
+  }, [dashboardData, posts, periodConfig, periodStart, periodEnd, prevPeriodStart, prevPeriodEnd]);
 
   const formatTimeAgo = (timestamp: string) =>
     formatDistanceToNow(new Date(timestamp), { addSuffix: true, locale: ptBR });
@@ -266,7 +265,7 @@ const ClientDashboardView: React.FC = () => {
           justifyContent: 'center',
           flexDirection: 'column',
           gap: 2,
-          bgcolor: 'background.default',
+          bgcolor: '#f6f6f6',
         }}
       >
         <CircularProgress />
@@ -284,17 +283,27 @@ const ClientDashboardView: React.FC = () => {
           alignItems: 'center',
           justifyContent: 'center',
           p: 3,
-          bgcolor: 'background.default',
+          bgcolor: '#f6f6f6',
         }}
       >
-        <Paper sx={{ p: 4, maxWidth: 400, textAlign: 'center' }}>
+        <Paper sx={{
+          p: 4,
+          maxWidth: 400,
+          textAlign: 'center',
+          borderRadius: GLASS.radius.card,
+          bgcolor: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }}>
           <Typography variant="h6" color="error" gutterBottom>
             Link inválido ou expirado
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ mb: 2, color: GLASS.text.muted }}>
             {error}
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
             Peça um novo link ao seu gestor para visualizar o relatório do Instagram.
           </Typography>
         </Paper>
@@ -311,74 +320,94 @@ const ClientDashboardView: React.FC = () => {
     client.logoUrl;
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: 6 }}>
-      {/* AppBar — mesmo padrão do Header do sistema */}
-      <AppBar
-        position="static"
-        elevation={0}
+    <Box sx={{ minHeight: '100vh', bgcolor: '#f6f6f6', pb: 6 }}>
+      {/* Header — dark grain, INSYT + agency logos */}
+      <Box
+        className="grain-overlay premium-header-bg"
         sx={{
-          borderRadius: '0 0 20px 20px',
-          backgroundColor: theme.palette.background.paper,
-          boxShadow: `0 4px 20px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.08)'}`,
+          borderRadius: '0 0 16px 16px',
+          px: { xs: 2, md: 3 },
+          py: 1.25,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          minHeight: 60,
+          flexShrink: 0,
         }}
       >
-        <Toolbar sx={{ minHeight: 56, py: 0, px: { xs: 1.5, sm: 2 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mr: { xs: 1, md: 3 } }}>
+        {/* INSYT brand mark */}
+        <Box
+          component="img"
+          src="/Fundo transparente [digital]/logo-insyt-fundo-transparente-07.png"
+          alt="INSYT"
+          sx={{ height: 32, width: 'auto', objectFit: 'contain', flexShrink: 0, display: 'block' }}
+        />
+
+        {/* Vertical divider */}
+        <Box sx={{ width: '1px', height: 28, bgcolor: 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
+
+        {/* Agency block */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1, minWidth: 0 }}>
+          {data?.agencyLogoUrl && (
             <Avatar
-              src={AGENCY_LOGO_URL}
-              alt={APP_NAME}
-              sx={{ width: 36, height: 36, flexShrink: 0, boxShadow: theme.shadows[1] }}
-            />
-            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-              <Typography
-                variant="subtitle1"
-                sx={{
-                  fontFamily: '"Poppins", sans-serif',
-                  fontWeight: 600,
-                  color: theme.palette.text.primary,
-                  lineHeight: 1.2,
-                }}
-              >
-                {APP_NAME}
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{
-                  fontFamily: '"Poppins", sans-serif',
-                  color: theme.palette.text.secondary,
-                  display: 'block',
-                  lineHeight: 1.2,
-                }}
-              >
-                Relatório compartilhado
-              </Typography>
-            </Box>
-          </Box>
-          {data.expiresAt && (
-            <Typography
-              variant="caption"
+              src={resolveAgencyLogoSrc(data.agencyLogoUrl)}
+              alt="Agência"
               sx={{
-                ml: 'auto',
-                color: theme.palette.text.secondary,
-                fontWeight: 500,
+                width: 32,
+                height: 32,
+                flexShrink: 0,
+                border: '2px solid rgba(255,255,255,0.3)',
+                bgcolor: 'rgba(255,255,255,0.1)',
+              }}
+            />
+          )}
+          <Box sx={{ minWidth: 0 }}>
+            <Typography
+              sx={{
+                fontFamily: '"Cabinet Grotesk", sans-serif',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                color: '#fff',
+                lineHeight: 1.2,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
-              Link expira em {format(parseISO(data.expiresAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+              {client?.name ?? 'Cliente'}
             </Typography>
-          )}
-        </Toolbar>
-      </AppBar>
+            <Typography
+              variant="caption"
+              sx={{ color: 'rgba(255,255,255,0.55)', lineHeight: 1.2, display: 'block' }}
+            >
+              Relatório compartilhado
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Expiry */}
+        {data.expiresAt && (
+          <Typography
+            variant="caption"
+            sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 500, flexShrink: 0, display: { xs: 'none', sm: 'block' } }}
+          >
+            Expira em {format(parseISO(data.expiresAt), "dd/MM 'às' HH:mm", { locale: ptBR })}
+          </Typography>
+        )}
+      </Box>
 
       {/* Header do cliente */}
-      <Container maxWidth="lg" sx={{ mt: 2 }}>
+      <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, mt: 2 }}>
         <Paper
           elevation={0}
           sx={{
             mb: 3,
-            borderRadius: 3,
-            bgcolor: 'background.paper',
-            border: '1px solid',
-            borderColor: 'divider',
+            borderRadius: GLASS.radius.card,
+            bgcolor: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
             overflow: 'hidden',
           }}
         >
@@ -398,11 +427,11 @@ const ClientDashboardView: React.FC = () => {
                 sx={{
                   width: { xs: 48, md: 56 },
                   height: { xs: 48, md: 56 },
-                  border: '2px solid',
-                  borderColor: 'divider',
-                  bgcolor: theme.palette.primary.main,
+                  border: `2px solid ${GLASS.accent.orange}`,
+                  bgcolor: GLASS.accent.orange,
                   fontSize: { xs: '1.25rem', md: '1.5rem' },
                   fontWeight: 700,
+                  boxShadow: GLASS.shadow.avatar,
                 }}
               >
                 {client.name.charAt(0).toUpperCase()}
@@ -430,8 +459,8 @@ const ClientDashboardView: React.FC = () => {
                         height: 22,
                         fontSize: '0.68rem',
                         fontWeight: 600,
-                        bgcolor: alpha('#059669', 0.08),
-                        color: '#059669',
+                        bgcolor: alpha('#d4380d', 0.08),
+                        color: '#d4380d',
                       }}
                     />
                   )}
@@ -449,9 +478,8 @@ const ClientDashboardView: React.FC = () => {
           <Box sx={{ 
             px: { xs: 2, md: 2.5 },
             py: 1.5,
-            borderTop: '1px solid',
-            borderColor: 'divider',
-            bgcolor: alpha(theme.palette.text.primary, 0.015),
+            borderTop: `1px solid ${GLASS.border.subtle}`,
+            bgcolor: GLASS.surface.bgFooter,
             display: 'flex',
             alignItems: 'center',
             gap: 2,
@@ -471,7 +499,7 @@ const ClientDashboardView: React.FC = () => {
         </Paper>
       </Container>
 
-      <Container maxWidth="lg">
+      <Container maxWidth={false} disableGutters sx={appShellContainerSx}>
         {filteredPosts.length === 0 ? (
           <Alert severity="info">
             Não há posts no período selecionado para exibir métricas.

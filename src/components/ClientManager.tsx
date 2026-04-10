@@ -4,7 +4,6 @@ import {
   Button, 
   TextField, 
   List, 
-  ListItem, 
   ListItemText, 
   ListItemAvatar, 
   Avatar, 
@@ -35,6 +34,7 @@ import ConnectInstagram from './ConnectInstagram';
 import { getAuthorizationUrl, InstagramAuthData } from '../services/instagramAuthService';
 import { subscriptionLimitsService } from '../services/subscriptionLimitsService';
 import SubscriptionLimitsAlert from './SubscriptionLimitsAlert';
+import { GLASS } from '../theme/glassTokens';
 
 interface ClientManagerProps {
   clients: Client[];
@@ -60,7 +60,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
   onClientDeleted,
   addOnly = false
 }) => {
-  const theme = useTheme();
+  const _theme = useTheme();
   const [name, setName] = useState<string>('');
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [appId, setAppId] = useState<string>('');
@@ -356,9 +356,13 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                   elevation={0}
                   sx={{ 
                     mb: 2, 
-                    borderRadius: 2,
-                    border: client.id === selectedClientId ? `2px solid ${theme.palette.primary.main}` : '1px solid rgba(0,0,0,0.08)',
-                    overflow: 'hidden'
+                    borderRadius: GLASS.radius.inner,
+                    border: client.id === selectedClientId ? `2px solid ${GLASS.accent.orange}` : `1px solid ${GLASS.border.outer}`,
+                    overflow: 'hidden',
+                    bgcolor: GLASS.surface.bg,
+                    backdropFilter: `blur(${GLASS.surface.blur})`,
+                    WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+                    boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
                   }}
                 >
                   <Box sx={{ 
@@ -383,7 +387,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                           sx={{ 
                             width: 56, 
                             height: 56,
-                            border: client.profilePicture ? `2px solid ${theme.palette.primary.main}` : 'none'
+                            border: client.profilePicture ? `2px solid ${GLASS.accent.orange}` : 'none'
                           }}
                         >
                           {client.name.charAt(0)}
@@ -396,7 +400,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                               {client.name}
                             </Typography>
                             {client.profilePicture && (
-                              <InstagramIcon sx={{ fontSize: 16, color: theme.palette.primary.main }} />
+                              <InstagramIcon sx={{ fontSize: 16, color: GLASS.accent.orange }} />
                             )}
                           </Box>
                         } 
@@ -422,7 +426,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                   
                   <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.02)' }}>
                     <Typography variant="subtitle2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-                      <InstagramIcon fontSize="small" sx={{ mr: 1, color: theme.palette.primary.main }} />
+                      <InstagramIcon fontSize="small" sx={{ mr: 1, color: GLASS.accent.orange }} />
                       Conexão com Instagram
                     </Typography>
                     
@@ -495,6 +499,16 @@ const ClientManager: React.FC<ClientManagerProps> = ({
       <Dialog
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: GLASS.radius.card,
+            bgcolor: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }
+        }}
       >
         <DialogTitle>Confirmar exclusão</DialogTitle>
         <DialogContent>

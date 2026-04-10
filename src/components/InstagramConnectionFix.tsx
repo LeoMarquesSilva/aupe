@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button, Box, Typography, Alert, CircularProgress, Paper } from '@mui/material';
 import { fixInstagramConnection } from 'services/instagramFixService';
 import { Client } from '../types';
+import { GLASS } from '../theme/glassTokens';
 
 interface InstagramConnectionFixProps {
   client: Client;
@@ -39,7 +40,15 @@ const InstagramConnectionFix: React.FC<InstagramConnectionFixProps> = ({ client,
 
   return (
     <Box sx={{ mt: 2 }}>
-      <Paper elevation={0} sx={{ p: 2, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 2 }}>
+      <Paper elevation={0} sx={{
+        p: 2,
+        borderRadius: GLASS.radius.inner,
+        bgcolor: GLASS.surface.bg,
+        backdropFilter: `blur(${GLASS.surface.blur})`,
+        WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+        border: `1px solid ${GLASS.border.outer}`,
+        boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+      }}>
         <Typography variant="h6">Corrigir Conexão do Instagram</Typography>
         
         <Typography variant="body2" sx={{ mt: 1, mb: 2 }}>
@@ -51,9 +60,13 @@ const InstagramConnectionFix: React.FC<InstagramConnectionFixProps> = ({ client,
         
         <Button 
           variant="contained" 
-          color="primary" 
           onClick={handleFix} 
           disabled={loading}
+          sx={{
+            bgcolor: GLASS.accent.orange,
+            borderRadius: GLASS.radius.button,
+            '&:hover': { bgcolor: GLASS.accent.orangeDark },
+          }}
         >
           {loading ? <CircularProgress size={24} /> : 'Corrigir Conexão'}
         </Button>

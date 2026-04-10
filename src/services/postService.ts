@@ -1,6 +1,6 @@
 import { Client, PostImage, PostData, ScheduledPost, PostStatus } from '../types';
 import { supabaseStorageService, UploadResult } from './supabaseStorageService';
-import { supabaseVideoStorageService, VideoUploadResult } from './supabaseVideoStorageService';
+import { supabaseVideoStorageService } from './supabaseVideoStorageService';
 import { postService } from './supabaseClient';
 import { authService } from './supabaseClient';
 

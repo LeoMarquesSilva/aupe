@@ -42,7 +42,7 @@ import {
   Image as ImageIcon,
   PlayArrow as PlayIcon
 } from '@mui/icons-material';
-import { Client, ReelVideo, ReelData, PostImage } from '../types';
+import { Client, ReelVideo, PostImage } from '../types';
 import { scheduleInstagramPost } from '../services/postService';
 import ClientManager from '../components/ClientManager';
 import VideoUploader from '../components/VideoUploader';
@@ -52,6 +52,8 @@ import DateTimePicker from '../components/DateTimePicker';
 import SubscriptionLimitsAlert from '../components/SubscriptionLimitsAlert';
 import AppSnackbar from '../components/AppSnackbar';
 import { getUserFriendlyMessage } from '../utils/errorMessages';
+import { GLASS } from '../theme/glassTokens';
+import { appShellContainerSx } from '../theme/appShellLayout';
 
 const CreateReels: React.FC = () => {
   const navigate = useNavigate();
@@ -77,6 +79,7 @@ const CreateReels: React.FC = () => {
   });
 
   const theme = useTheme();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
@@ -316,18 +319,18 @@ const CreateReels: React.FC = () => {
   const hasInstagramAuth = selectedClient?.accessToken && selectedClient?.instagramAccountId;
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4, flexGrow: 1 }}>
+    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 4, flexGrow: 1 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
           <Typography variant="h4" component="h1" sx={{ 
             mb: 1, 
             fontWeight: 'bold',
             fontFamily: '"Montserrat", sans-serif',
-            color: '#121212'
+            color: GLASS.text.heading,
           }}>
             Criar Reels
           </Typography>
-          <Typography variant="subtitle1" color="text.secondary">
+          <Typography variant="subtitle1" sx={{ color: GLASS.text.muted }}>
             Crie e agende Reels para o Instagram com suporte a arquivos de até 2GB
           </Typography>
         </Box>
@@ -335,16 +338,19 @@ const CreateReels: React.FC = () => {
         <Stack direction="row" spacing={2}>
           <Button
             variant="outlined"
-            color="secondary"
             startIcon={<ImageIcon />}
             onClick={handleCreatePost}
             sx={{ 
-              borderRadius: 2,
+              borderRadius: GLASS.radius.button,
               textTransform: 'none',
               px: 3,
               py: 1,
-              color: theme.palette.secondary.main,
-              borderColor: theme.palette.secondary.main
+              color: GLASS.accent.orange,
+              borderColor: GLASS.accent.orange,
+              '&:hover': {
+                backgroundColor: 'rgba(247, 66, 17, 0.04)',
+                borderColor: GLASS.accent.orangeDark,
+              }
             }}
           >
             Criar Post
@@ -352,16 +358,19 @@ const CreateReels: React.FC = () => {
 
           <Button
             variant="outlined"
-            color="secondary"
             startIcon={<PlayIcon />}
             onClick={handleCreateStory}
             sx={{ 
-              borderRadius: 2,
+              borderRadius: GLASS.radius.button,
               textTransform: 'none',
               px: 3,
               py: 1,
-              color: theme.palette.secondary.main,
-              borderColor: theme.palette.secondary.main
+              color: GLASS.accent.orange,
+              borderColor: GLASS.accent.orange,
+              '&:hover': {
+                backgroundColor: 'rgba(247, 66, 17, 0.04)',
+                borderColor: GLASS.accent.orangeDark,
+              }
             }}
           >
             Criar Story
@@ -375,14 +384,17 @@ const CreateReels: React.FC = () => {
         sx={{ 
           p: 3, 
           mb: 4, 
-          border: '1px solid rgba(0,0,0,0.08)',
-          borderRadius: 2,
-          backgroundColor: '#fff'
+          background: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          borderRadius: GLASS.radius.card,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 'medium', display: 'flex', alignItems: 'center' }}>
-            <InstagramIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+          <Typography variant="h6" sx={{ fontWeight: 'medium', display: 'flex', alignItems: 'center', color: GLASS.text.heading }}>
+            <InstagramIcon sx={{ mr: 1, color: GLASS.accent.orange }} />
             Selecione a Conta do Instagram
           </Typography>
           <Button 
@@ -390,7 +402,7 @@ const CreateReels: React.FC = () => {
             startIcon={<AddIcon />} 
             onClick={() => setClientDialogOpen(true)}
             size="small"
-            sx={{ color: theme.palette.primary.main }}
+            sx={{ color: GLASS.accent.orange, borderColor: GLASS.accent.orange, borderRadius: GLASS.radius.button }}
           >
             Novo Cliente
           </Button>
@@ -525,7 +537,7 @@ const CreateReels: React.FC = () => {
                     {selectedClient.name}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: theme.palette.primary.main }} />
+                    <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: GLASS.accent.orange }} />
                     <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                       @{selectedClient.instagram}
                     </Typography>
@@ -597,9 +609,12 @@ const CreateReels: React.FC = () => {
         sx={{ 
           p: 3, 
           mb: 4, 
-          border: '1px solid rgba(0,0,0,0.08)',
-          borderRadius: 2,
-          backgroundColor: '#fff'
+          background: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          borderRadius: GLASS.radius.card,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
         }}
       >
         <Box sx={{ 
@@ -607,9 +622,9 @@ const CreateReels: React.FC = () => {
           alignItems: 'center', 
           mb: 3, 
           pb: 2, 
-          borderBottom: '1px solid rgba(0,0,0,0.08)' 
+          borderBottom: `1px solid ${GLASS.border.subtle}`,
         }}>
-          <ReelsIcon sx={{ mr: 1.5, color: '#7c3aed' }} />
+          <ReelsIcon sx={{ mr: 1.5, color: GLASS.accent.orange }} />
           <Typography variant="h5" sx={{ fontWeight: 'medium' }}>
             Novo Reel
           </Typography>
@@ -655,12 +670,12 @@ const CreateReels: React.FC = () => {
               severity="info" 
               variant="outlined"
               sx={{ 
-                borderRadius: 2,
-                backgroundColor: 'rgba(233, 30, 99, 0.04)'
+                borderRadius: GLASS.radius.inner,
+                backgroundColor: 'rgba(247, 66, 17, 0.04)'
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <ReelsIcon sx={{ color: '#7c3aed' }} />
+                <ReelsIcon sx={{ color: GLASS.accent.orange }} />
                 <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                   <strong>Reel:</strong> Será criado um Reel com duração de {Math.round(video.duration)}s
                   {video.publicUrl && (
@@ -682,7 +697,7 @@ const CreateReels: React.FC = () => {
         {/* Upload de Capa Personalizada */}
         <Box sx={{ mb: 4 }}>
           <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
-            <ImageIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+            <ImageIcon sx={{ mr: 1, color: GLASS.accent.orange }} />
             Capa Personalizada (Opcional)
           </Typography>
           
@@ -755,7 +770,6 @@ const CreateReels: React.FC = () => {
         <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
           <Button
             variant="outlined"
-            color="primary"
             size="large"
             startIcon={<SendIcon />}
             onClick={handlePostNow}
@@ -763,12 +777,12 @@ const CreateReels: React.FC = () => {
             sx={{ 
               px: 4, 
               py: 1.5, 
-              borderRadius: 2,
-              borderColor: '#7c3aed',
-              color: '#7c3aed',
+              borderRadius: GLASS.radius.button,
+              borderColor: GLASS.accent.orange,
+              color: GLASS.accent.orange,
               '&:hover': {
-                backgroundColor: 'rgba(233, 30, 99, 0.04)',
-                borderColor: '#C2185B'
+                backgroundColor: 'rgba(247, 66, 17, 0.06)',
+                borderColor: GLASS.accent.orangeDark,
               },
               '&.Mui-disabled': {
                 color: 'rgba(0, 0, 0, 0.26)'
@@ -787,11 +801,13 @@ const CreateReels: React.FC = () => {
             sx={{ 
               px: 4, 
               py: 1.5, 
-              borderRadius: 2,
-              backgroundColor: '#7c3aed',
+              borderRadius: GLASS.radius.button,
+              backgroundColor: GLASS.accent.orange,
               color: '#ffffff',
+              boxShadow: GLASS.shadow.button,
               '&:hover': {
-                backgroundColor: '#C2185B'
+                backgroundColor: GLASS.accent.orangeDark,
+                boxShadow: GLASS.shadow.buttonHover,
               },
               '&.Mui-disabled': {
                 color: 'rgba(255, 255, 255, 0.3)'
@@ -821,11 +837,21 @@ const CreateReels: React.FC = () => {
         onClose={() => setClientDialogOpen(false)}
         fullWidth 
         maxWidth="md"
+        PaperProps={{
+          sx: {
+            background: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            borderRadius: GLASS.radius.card,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: GLASS.shadow.card,
+          }
+        }}
       >
         <DialogTitle sx={{ 
-          borderBottom: '1px solid rgba(0,0,0,0.08)',
+          borderBottom: `1px solid ${GLASS.border.outer}`,
           fontWeight: 'bold',
-          backgroundColor: '#f9f9f9'
+          color: GLASS.text.heading,
         }}>
           Gerenciar Clientes
         </DialogTitle>

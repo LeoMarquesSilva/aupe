@@ -30,39 +30,30 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Menu,
-  Divider,
-  Tooltip,
   LinearProgress
 } from '@mui/material';
 import {
-  AdminPanelSettings as AdminIcon,
   Business as BusinessIcon,
   CreditCard as CreditCardIcon,
   WorkspacePremium as PlanIcon,
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  MoreVert as MoreVertIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Warning as WarningIcon,
   Refresh as RefreshIcon,
-  Logout as LogoutIcon,
-  Dashboard as DashboardIcon
+  Logout as LogoutIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { GLASS } from '../theme/glassTokens';
+import { appShellContainerSx } from '../theme/appShellLayout';
 
 // Services
-import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   subscriptionService, 
   Organization, 
   Subscription, 
-  SubscriptionPlan,
-  SubscriptionUsage 
+  SubscriptionPlan
 } from '../services/subscriptionService';
 
 // TabPanel component
@@ -152,10 +143,6 @@ const SuperAdminDashboard: React.FC = () => {
     active: true,
     features: {}
   });
-
-  // Menu anchor
-  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
-  const [selectedItem, setSelectedItem] = useState<any>(null);
 
   // Delete confirmation dialog
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -426,7 +413,7 @@ const SuperAdminDashboard: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 4 }}>
       {/* Header */}
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
@@ -443,6 +430,7 @@ const SuperAdminDashboard: React.FC = () => {
             onClick={loadAllData}
             disabled={loading}
             variant="outlined"
+            sx={{ borderColor: GLASS.accent.orange, color: GLASS.accent.orange, borderRadius: GLASS.radius.button, '&:hover': { borderColor: GLASS.accent.orangeDark, bgcolor: 'rgba(247, 66, 17,0.06)' } }}
           >
             Atualizar
           </Button>
@@ -459,67 +447,39 @@ const SuperAdminDashboard: React.FC = () => {
 
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={4}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography variant="h3" fontWeight="bold">
-                    {stats.totalOrganizations}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Organizações
-                  </Typography>
+        {[
+          { icon: <BusinessIcon sx={{ fontSize: 48, color: GLASS.accent.orange, opacity: 0.4 }} />, value: stats.totalOrganizations, label: 'Organizações' },
+          { icon: <CreditCardIcon sx={{ fontSize: 48, color: GLASS.accent.orangeLight, opacity: 0.4 }} />, value: stats.activeSubscriptions, label: 'Subscriptions Ativas' },
+          { icon: <PlanIcon sx={{ fontSize: 48, color: GLASS.accent.orangeDark, opacity: 0.4 }} />, value: stats.availablePlans, label: 'Planos Disponíveis' },
+        ].map((item, idx) => (
+          <Grid item xs={12} sm={4} key={idx}>
+            <Card elevation={0} sx={{ border: `1px solid ${GLASS.border.outer}`, borderRadius: GLASS.radius.card, background: GLASS.surface.bg, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}` }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box>
+                    <Typography variant="h3" fontWeight="bold" sx={{ color: GLASS.text.heading }}>
+                      {item.value}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
+                      {item.label}
+                    </Typography>
+                  </Box>
+                  {item.icon}
                 </Box>
-                <BusinessIcon sx={{ fontSize: 48, color: 'primary.main', opacity: 0.3 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={4}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography variant="h3" fontWeight="bold">
-                    {stats.activeSubscriptions}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Subscriptions Ativas
-                  </Typography>
-                </Box>
-                <CreditCardIcon sx={{ fontSize: 48, color: 'success.main', opacity: 0.3 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={4}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography variant="h3" fontWeight="bold">
-                    {stats.availablePlans}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Planos Disponíveis
-                  </Typography>
-                </Box>
-                <PlanIcon sx={{ fontSize: 48, color: 'warning.main', opacity: 0.3 }} />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
       </Grid>
 
       {/* Tabs */}
-      <Paper sx={{ width: '100%' }}>
+      <Paper elevation={0} sx={{ width: '100%', border: `1px solid ${GLASS.border.outer}`, borderRadius: GLASS.radius.card, background: GLASS.surface.bg, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`, overflow: 'hidden' }}>
         <Tabs
           value={currentTab}
           onChange={handleTabChange}
           variant="scrollable"
           scrollButtons="auto"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
+          sx={{ borderBottom: `1px solid ${GLASS.border.outer}`, '& .Mui-selected': { color: `${GLASS.accent.orange} !important` }, '& .MuiTabs-indicator': { backgroundColor: GLASS.accent.orange } }}
         >
           <Tab icon={<BusinessIcon />} label="Organizações" />
           <Tab icon={<CreditCardIcon />} label="Subscriptions" />
@@ -536,6 +496,7 @@ const SuperAdminDashboard: React.FC = () => {
               variant="contained"
               startIcon={<AddIcon />}
               onClick={handleCreateOrg}
+              sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}
             >
               Nova Organização
             </Button>
@@ -573,7 +534,7 @@ const SuperAdminDashboard: React.FC = () => {
                       <IconButton
                         size="small"
                         onClick={() => handleEditOrg(org)}
-                        color="primary"
+                        sx={{ color: GLASS.accent.orange }}
                       >
                         <EditIcon fontSize="small" />
                       </IconButton>
@@ -602,6 +563,7 @@ const SuperAdminDashboard: React.FC = () => {
               variant="contained"
               startIcon={<AddIcon />}
               onClick={handleCreateSub}
+              sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}
             >
               Nova Subscription
             </Button>
@@ -747,7 +709,7 @@ const SuperAdminDashboard: React.FC = () => {
                         <IconButton
                           size="small"
                           onClick={() => handleEditSub(sub)}
-                          color="primary"
+                          sx={{ color: GLASS.accent.orange }}
                         >
                           <EditIcon fontSize="small" />
                         </IconButton>
@@ -777,6 +739,7 @@ const SuperAdminDashboard: React.FC = () => {
               variant="contained"
               startIcon={<AddIcon />}
               onClick={handleCreatePlan}
+              sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}
             >
               Novo Plano
             </Button>
@@ -816,7 +779,7 @@ const SuperAdminDashboard: React.FC = () => {
                       <IconButton
                         size="small"
                         onClick={() => handleEditPlan(plan)}
-                        color="primary"
+                        sx={{ color: GLASS.accent.orange }}
                       >
                         <EditIcon fontSize="small" />
                       </IconButton>
@@ -837,7 +800,7 @@ const SuperAdminDashboard: React.FC = () => {
       </Paper>
 
       {/* Dialog: Organization */}
-      <Dialog open={orgDialog.open} onClose={() => setOrgDialog({ open: false, mode: 'create', organization: null })} maxWidth="sm" fullWidth>
+      <Dialog open={orgDialog.open} onClose={() => setOrgDialog({ open: false, mode: 'create', organization: null })} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: GLASS.radius.card, background: GLASS.surface.bgStrong, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}` } }}>
         <DialogTitle>
           {orgDialog.mode === 'create' ? 'Nova Organização' : 'Editar Organização'}
         </DialogTitle>
@@ -915,14 +878,14 @@ const SuperAdminDashboard: React.FC = () => {
           <Button onClick={() => setOrgDialog({ open: false, mode: 'create', organization: null })}>
             Cancelar
           </Button>
-          <Button onClick={handleSaveOrg} variant="contained" disabled={loading}>
+          <Button onClick={handleSaveOrg} variant="contained" disabled={loading} sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}>
             {loading ? <CircularProgress size={20} /> : 'Salvar'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Dialog: Subscription */}
-      <Dialog open={subDialog.open} onClose={() => setSubDialog({ open: false, mode: 'create', subscription: null })} maxWidth="sm" fullWidth>
+      <Dialog open={subDialog.open} onClose={() => setSubDialog({ open: false, mode: 'create', subscription: null })} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: GLASS.radius.card, background: GLASS.surface.bgStrong, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}` } }}>
         <DialogTitle>
           {subDialog.mode === 'create' ? 'Nova Subscription' : 'Editar Subscription'}
         </DialogTitle>
@@ -991,14 +954,14 @@ const SuperAdminDashboard: React.FC = () => {
           <Button onClick={() => setSubDialog({ open: false, mode: 'create', subscription: null })}>
             Cancelar
           </Button>
-          <Button onClick={handleSaveSub} variant="contained" disabled={loading}>
+          <Button onClick={handleSaveSub} variant="contained" disabled={loading} sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}>
             {loading ? <CircularProgress size={20} /> : 'Salvar'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* Dialog: Plan */}
-      <Dialog open={planDialog.open} onClose={() => setPlanDialog({ open: false, mode: 'create', plan: null })} maxWidth="sm" fullWidth>
+      <Dialog open={planDialog.open} onClose={() => setPlanDialog({ open: false, mode: 'create', plan: null })} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: GLASS.radius.card, background: GLASS.surface.bgStrong, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}` } }}>
         <DialogTitle>
           {planDialog.mode === 'create' ? 'Novo Plano' : 'Editar Plano'}
         </DialogTitle>
@@ -1082,7 +1045,7 @@ const SuperAdminDashboard: React.FC = () => {
           <Button onClick={() => setPlanDialog({ open: false, mode: 'create', plan: null })}>
             Cancelar
           </Button>
-          <Button onClick={handleSavePlan} variant="contained" disabled={loading}>
+          <Button onClick={handleSavePlan} variant="contained" disabled={loading} sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}>
             {loading ? <CircularProgress size={20} /> : 'Salvar'}
           </Button>
         </DialogActions>
@@ -1092,6 +1055,7 @@ const SuperAdminDashboard: React.FC = () => {
       <Dialog
         open={deleteDialog.open}
         onClose={() => setDeleteDialog({ open: false, type: null, id: null, name: '' })}
+        PaperProps={{ sx: { borderRadius: GLASS.radius.card, background: GLASS.surface.bgStrong, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}` } }}
       >
         <DialogTitle>Confirmar Exclusão</DialogTitle>
         <DialogContent>

@@ -15,8 +15,6 @@ import {
   IconButton,
   Collapse,
   Chip,
-  AppBar,
-  Toolbar,
   Link,
 } from '@mui/material';
 import {
@@ -37,7 +35,7 @@ import {
   uploadApprovalFeedbackAttachment,
   type ApprovalRequestPublicData,
 } from '../services/approvalService';
-import { ImageUrlService } from '../services/imageUrlService';
+import { ImageUrlService, resolveAgencyLogoSrc } from '../services/imageUrlService';
 import PublicApprovalPostExpandedDialog from '../components/PublicApprovalPostExpandedDialog';
 import {
   POST_TYPE,
@@ -45,13 +43,13 @@ import {
   getImageUrls,
   PostMediaPreview,
 } from '../components/PublicApprovalPostMedia';
+import { GLASS } from '../theme/glassTokens';
 
 export { POST_TYPE, getFirstImageUrl, getImageUrls, PostMediaPreview } from '../components/PublicApprovalPostMedia';
 
 type PostItem = ApprovalRequestPublicData['posts'][number];
 
-const AGENCY_LOGO_URL = '/LOGO-AUPE.jpg';
-const APP_NAME = 'AUPE';
+const APP_NAME = 'INSYT';
 
 const ClientApprovalView: React.FC = () => {
   const theme = useTheme();
@@ -169,66 +167,84 @@ const ClientApprovalView: React.FC = () => {
   const username = data?.client?.instagram?.replace(/^@/, '') || data?.client?.name || 'cliente';
 
   const renderHeader = (expiresAt?: string) => (
-    <AppBar
-      position="static"
-      elevation={0}
+    <Box
+      className="grain-overlay premium-header-bg"
       sx={{
-        borderRadius: '0 0 20px 20px',
-        backgroundColor: theme.palette.background.paper,
-        boxShadow: `0 4px 20px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.08)'}`,
+        borderRadius: '0 0 16px 16px',
+        px: { xs: 2, md: 3 },
+        py: 1.25,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        minHeight: 60,
+        flexShrink: 0,
       }}
     >
-      <Toolbar sx={{ minHeight: 56, py: 0, px: { xs: 1.5, sm: 2 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mr: { xs: 1, md: 3 } }}>
+      {/* INSYT brand mark */}
+      <Box
+        component="img"
+        src="/Fundo transparente [digital]/logo-insyt-fundo-transparente-07.png"
+        alt="INSYT"
+        sx={{ height: 32, width: 'auto', objectFit: 'contain', flexShrink: 0, display: 'block' }}
+      />
+
+      {/* Vertical divider */}
+      <Box sx={{ width: '1px', height: 28, bgcolor: 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
+
+      {/* Agency block */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1, minWidth: 0 }}>
+        {data?.agencyLogoUrl && (
           <Avatar
-            src={AGENCY_LOGO_URL}
-            alt={APP_NAME}
-            sx={{ width: 36, height: 36, flexShrink: 0, boxShadow: theme.shadows[1] }}
-          />
-          <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-            <Typography
-              variant="subtitle1"
-              sx={{
-                fontFamily: '"Poppins", sans-serif',
-                fontWeight: 600,
-                color: theme.palette.text.primary,
-                lineHeight: 1.2,
-              }}
-            >
-              {APP_NAME}
-            </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                fontFamily: '"Poppins", sans-serif',
-                color: theme.palette.text.secondary,
-                display: 'block',
-                lineHeight: 1.2,
-              }}
-            >
-              Aprovação de postagens
-            </Typography>
-          </Box>
-        </Box>
-        {expiresAt && (
-          <Typography
-            variant="caption"
+            src={resolveAgencyLogoSrc(data.agencyLogoUrl)}
+            alt="Agência"
             sx={{
-              ml: 'auto',
-              color: theme.palette.text.secondary,
-              fontWeight: 500,
+              width: 32,
+              height: 32,
+              flexShrink: 0,
+              border: '2px solid rgba(255,255,255,0.3)',
+              bgcolor: 'rgba(255,255,255,0.1)',
+            }}
+          />
+        )}
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            sx={{
+              fontFamily: '"Cabinet Grotesk", sans-serif',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              color: '#fff',
+              lineHeight: 1.2,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}
           >
-            Link expira em {format(parseISO(expiresAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+            {data?.client?.name ?? 'Cliente'}
           </Typography>
-        )}
-      </Toolbar>
-    </AppBar>
+          <Typography
+            variant="caption"
+            sx={{ color: 'rgba(255,255,255,0.55)', lineHeight: 1.2, display: 'block' }}
+          >
+            Aprovação de postagens
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Expiry */}
+      {expiresAt && (
+        <Typography
+          variant="caption"
+          sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 500, flexShrink: 0, display: { xs: 'none', sm: 'block' } }}
+        >
+          Expira em {format(parseISO(expiresAt), "dd/MM 'às' HH:mm", { locale: ptBR })}
+        </Typography>
+      )}
+    </Box>
   );
 
   if (loading) {
     return (
-      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: 6 }}>
+      <Box sx={{ minHeight: '100vh', bgcolor: '#f6f6f6', pb: 6 }}>
         {renderHeader()}
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, py: 6, px: 2 }}>
           <CircularProgress />
@@ -240,14 +256,24 @@ const ClientApprovalView: React.FC = () => {
 
   if (error || !data) {
     return (
-      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: 6 }}>
+      <Box sx={{ minHeight: '100vh', bgcolor: '#f6f6f6', pb: 6 }}>
         {renderHeader()}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', p: 3, flex: 1 }}>
-          <Paper sx={{ p: 4, maxWidth: 400, textAlign: 'center' }}>
+          <Paper sx={{
+            p: 4,
+            maxWidth: 400,
+            textAlign: 'center',
+            borderRadius: GLASS.radius.card,
+            bgcolor: GLASS.surface.bg,
+            backdropFilter: `blur(${GLASS.surface.blur})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+          }}>
             <Typography variant="h6" color="error" gutterBottom>
               Link inválido ou expirado
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
               {error || 'Peça um novo link ao seu gestor. O gestor envia o link; use-o para aprovar as postagens.'}
             </Typography>
           </Paper>
@@ -257,7 +283,7 @@ const ClientApprovalView: React.FC = () => {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: 6 }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: '#f6f6f6', pb: 6 }}>
       {renderHeader(data.expiresAt)}
       <Box
         sx={{
@@ -276,8 +302,18 @@ const ClientApprovalView: React.FC = () => {
         </Box>
 
       {data.posts.length === 0 ? (
-        <Paper sx={{ mx: 2, p: 3, textAlign: 'center' }}>
-          <Typography color="text.secondary">Nenhuma postagem pendente nesta solicitação.</Typography>
+        <Paper elevation={0} sx={{
+          mx: 2,
+          p: 3,
+          textAlign: 'center',
+          borderRadius: GLASS.radius.inner,
+          bgcolor: GLASS.surface.bg,
+          backdropFilter: `blur(${GLASS.surface.blur})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }}>
+          <Typography sx={{ color: GLASS.text.muted }}>Nenhuma postagem pendente nesta solicitação.</Typography>
         </Paper>
       ) : (
         data.posts.map((post) => {
@@ -296,13 +332,18 @@ const ClientApprovalView: React.FC = () => {
           return (
             <Paper
               key={post.id}
-              elevation={1}
+              elevation={0}
               sx={{
                 mb: 2,
                 overflow: 'hidden',
-                borderRadius: 2,
+                borderRadius: GLASS.radius.inner,
                 maxWidth: 500,
                 mx: isMobile ? 1 : 0,
+                bgcolor: GLASS.surface.bg,
+                backdropFilter: `blur(${GLASS.surface.blur})`,
+                WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+                border: `1px solid ${GLASS.border.outer}`,
+                boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
               }}
             >
               {/* Instagram-style header */}
@@ -353,7 +394,6 @@ const ClientApprovalView: React.FC = () => {
               <Box sx={{ px: 1.5, pb: 1, pt: 0 }}>
                 <Button
                   variant="outlined"
-                  color="primary"
                   size="medium"
                   fullWidth={isMobile}
                   startIcon={<OpenInFullIcon />}
@@ -362,8 +402,14 @@ const ClientApprovalView: React.FC = () => {
                   sx={{
                     py: 1,
                     minHeight: 44,
-                    fontFamily: '"Poppins", sans-serif',
                     textTransform: 'none',
+                    color: GLASS.accent.orange,
+                    borderColor: GLASS.accent.orange,
+                    borderRadius: GLASS.radius.button,
+                    '&:hover': {
+                      borderColor: GLASS.accent.orangeDark,
+                      bgcolor: GLASS.status.connected.bg,
+                    },
                   }}
                 >
                   Ampliar conteúdo
@@ -380,7 +426,7 @@ const ClientApprovalView: React.FC = () => {
                   <Typography variant="overline" sx={{ color: '#64748b', fontWeight: 600, mb: 1, display: 'block' }}>
                     Roteiro de Reels
                   </Typography>
-                  <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', color: '#1e293b', lineHeight: 1.7 }}>
+                  <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', color: '#131940', lineHeight: 1.7 }}>
                     {post.caption}
                   </Typography>
                 </Box>
@@ -541,13 +587,21 @@ const ClientApprovalView: React.FC = () => {
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                         <Button
                           variant="contained"
-                          color="success"
                           size="large"
                           fullWidth
                           startIcon={submitting === post.id ? <CircularProgress size={20} color="inherit" /> : <CheckCircleIcon />}
                           onClick={() => handleApprove(post.id)}
                           disabled={!!submitting}
-                          sx={{ py: 1.5 }}
+                          sx={{
+                            py: 1.5,
+                            bgcolor: GLASS.accent.orange,
+                            borderRadius: GLASS.radius.button,
+                            boxShadow: GLASS.shadow.button,
+                            '&:hover': {
+                              bgcolor: GLASS.accent.orangeDark,
+                              boxShadow: GLASS.shadow.buttonHover,
+                            },
+                          }}
                         >
                           Aprovar postagem
                         </Button>

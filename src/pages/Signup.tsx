@@ -28,9 +28,8 @@ import {
   Description as DescriptionIcon,
 } from '@mui/icons-material';
 import { supabase } from '../services/supabaseClient';
-import { subscriptionService } from '../services/subscriptionService';
 import { roleService } from '../services/roleService';
-import BRAND_COLORS from '../theme/brandColors';
+import { GLASS } from '../theme/glassTokens';
 
 const steps = ['Informações da Organização', 'Dados de Acesso'];
 
@@ -288,11 +287,36 @@ const Signup: React.FC = () => {
     }
   };
 
+  const glassInputSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: GLASS.radius.button,
+      backgroundColor: GLASS.surface.bg,
+      backdropFilter: `blur(${GLASS.surface.blur})`,
+      '& fieldset': {
+        borderColor: GLASS.border.outer,
+      },
+      '&:hover fieldset': {
+        borderColor: GLASS.accent.orange,
+      },
+      '&.Mui-focused fieldset': {
+        borderColor: GLASS.accent.orange,
+        borderWidth: 2,
+        boxShadow: `0 0 0 3px ${alpha(GLASS.accent.orange, 0.12)}`,
+      },
+    },
+    '& .MuiInputLabel-root': {
+      color: GLASS.text.muted,
+      '&.Mui-focused': {
+        color: GLASS.accent.orange,
+      },
+    },
+  };
+
   return (
     <Box
       sx={{
         minHeight: '100vh',
-        background: `linear-gradient(135deg, ${alpha(BRAND_COLORS.primary, 0.1)} 0%, ${alpha(BRAND_COLORS.secondary, 0.1)} 100%)`,
+        background: `linear-gradient(135deg, ${alpha(GLASS.accent.orange, 0.08)} 0%, ${alpha(GLASS.accent.orangeLight, 0.05)} 50%, ${alpha(GLASS.accent.orangeDark, 0.08)} 100%)`,
         display: 'flex',
         alignItems: 'center',
         py: 4,
@@ -300,25 +324,58 @@ const Signup: React.FC = () => {
     >
       <Container maxWidth="md">
         <Paper
-          elevation={24}
+          elevation={0}
           sx={{
             p: 4,
-            borderRadius: 3,
-            background: `linear-gradient(135deg, ${alpha('#fff', 0.95)} 0%, ${alpha('#f5f5f5', 0.95)} 100%)`,
+            borderRadius: GLASS.radius.card,
+            background: GLASS.surface.bgStrong,
+            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+            border: `1px solid ${GLASS.border.outer}`,
+            boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
+          {/* Green accent bar */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 4,
+              background: `linear-gradient(90deg, ${GLASS.accent.orange}, ${GLASS.accent.orangeLight})`,
+            }}
+          />
+
           {/* Header */}
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, color: BRAND_COLORS.primary }}>
+          <Box sx={{ textAlign: 'center', mb: 4, mt: 1 }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, color: GLASS.accent.orange }}>
               Criar Conta
             </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
               Preencha os dados da sua organização e crie sua conta
             </Typography>
           </Box>
 
           {/* Stepper */}
-          <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+          <Stepper
+            activeStep={activeStep}
+            sx={{
+              mb: 4,
+              '& .MuiStepIcon-root': {
+                color: GLASS.border.outer,
+                '&.Mui-active': { color: GLASS.accent.orange },
+                '&.Mui-completed': { color: GLASS.accent.orangeDark },
+              },
+              '& .MuiStepLabel-label': {
+                color: GLASS.text.muted,
+                '&.Mui-active': { color: GLASS.text.heading, fontWeight: 600 },
+                '&.Mui-completed': { color: GLASS.text.body },
+              },
+            }}
+          >
             {steps.map((label) => (
               <Step key={label}>
                 <StepLabel>{label}</StepLabel>
@@ -328,7 +385,15 @@ const Signup: React.FC = () => {
 
           {/* Error Alert */}
           {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
+            <Alert
+              severity="error"
+              sx={{
+                mb: 3,
+                borderRadius: GLASS.radius.button,
+                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+              }}
+            >
               {error}
             </Alert>
           )}
@@ -347,10 +412,11 @@ const Signup: React.FC = () => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <BusinessIcon sx={{ color: BRAND_COLORS.primary }} />
+                          <BusinessIcon sx={{ color: GLASS.accent.orange }} />
                         </InputAdornment>
                       ),
                     }}
+                    sx={glassInputSx}
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -364,10 +430,11 @@ const Signup: React.FC = () => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <EmailIcon sx={{ color: BRAND_COLORS.primary }} />
+                          <EmailIcon sx={{ color: GLASS.accent.orange }} />
                         </InputAdornment>
                       ),
                     }}
+                    sx={glassInputSx}
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -380,10 +447,11 @@ const Signup: React.FC = () => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <PhoneIcon sx={{ color: BRAND_COLORS.primary }} />
+                          <PhoneIcon sx={{ color: GLASS.accent.orange }} />
                         </InputAdornment>
                       ),
                     }}
+                    sx={glassInputSx}
                   />
                 </Grid>
                 <Grid item xs={12}>
@@ -396,10 +464,11 @@ const Signup: React.FC = () => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <DescriptionIcon sx={{ color: BRAND_COLORS.primary }} />
+                          <DescriptionIcon sx={{ color: GLASS.accent.orange }} />
                         </InputAdornment>
                       ),
                     }}
+                    sx={glassInputSx}
                   />
                 </Grid>
               </Grid>
@@ -417,10 +486,11 @@ const Signup: React.FC = () => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <PersonIcon sx={{ color: BRAND_COLORS.primary }} />
+                          <PersonIcon sx={{ color: GLASS.accent.orange }} />
                         </InputAdornment>
                       ),
                     }}
+                    sx={glassInputSx}
                   />
                 </Grid>
                 <Grid item xs={12}>
@@ -434,10 +504,11 @@ const Signup: React.FC = () => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <EmailIcon sx={{ color: BRAND_COLORS.primary }} />
+                          <EmailIcon sx={{ color: GLASS.accent.orange }} />
                         </InputAdornment>
                       ),
                     }}
+                    sx={glassInputSx}
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -451,7 +522,7 @@ const Signup: React.FC = () => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <LockIcon sx={{ color: BRAND_COLORS.primary }} />
+                          <LockIcon sx={{ color: GLASS.accent.orange }} />
                         </InputAdornment>
                       ),
                       endAdornment: (
@@ -465,6 +536,7 @@ const Signup: React.FC = () => {
                         </InputAdornment>
                       ),
                     }}
+                    sx={glassInputSx}
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -478,7 +550,7 @@ const Signup: React.FC = () => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <LockIcon sx={{ color: BRAND_COLORS.primary }} />
+                          <LockIcon sx={{ color: GLASS.accent.orange }} />
                         </InputAdornment>
                       ),
                       endAdornment: (
@@ -492,6 +564,7 @@ const Signup: React.FC = () => {
                         </InputAdornment>
                       ),
                     }}
+                    sx={glassInputSx}
                   />
                 </Grid>
               </Grid>
@@ -500,7 +573,16 @@ const Signup: React.FC = () => {
             {/* Actions */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
               {activeStep > 0 && (
-                <Button onClick={handleBack} disabled={loading}>
+                <Button
+                  onClick={handleBack}
+                  disabled={loading}
+                  sx={{
+                    borderRadius: GLASS.radius.button,
+                    color: GLASS.text.muted,
+                    textTransform: 'none',
+                    '&:hover': { background: alpha(GLASS.accent.orange, 0.08) },
+                  }}
+                >
                   Voltar
                 </Button>
               )}
@@ -510,8 +592,15 @@ const Signup: React.FC = () => {
                   type="submit"
                   variant="contained"
                   sx={{
-                    bgcolor: BRAND_COLORS.primary,
-                    '&:hover': { bgcolor: BRAND_COLORS.secondary },
+                    borderRadius: GLASS.radius.button,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    background: `linear-gradient(45deg, ${GLASS.accent.orange}, ${GLASS.accent.orangeLight})`,
+                    boxShadow: `0 4px 14px ${alpha(GLASS.accent.orange, 0.3)}`,
+                    '&:hover': {
+                      background: `linear-gradient(45deg, ${GLASS.accent.orangeDark}, ${GLASS.accent.orange})`,
+                      boxShadow: `0 6px 20px ${alpha(GLASS.accent.orange, 0.4)}`,
+                    },
                   }}
                 >
                   Próximo
@@ -522,9 +611,20 @@ const Signup: React.FC = () => {
                   variant="contained"
                   disabled={loading}
                   sx={{
-                    bgcolor: BRAND_COLORS.primary,
-                    '&:hover': { bgcolor: BRAND_COLORS.secondary },
+                    borderRadius: GLASS.radius.button,
+                    textTransform: 'none',
+                    fontWeight: 600,
                     minWidth: 120,
+                    background: `linear-gradient(45deg, ${GLASS.accent.orange}, ${GLASS.accent.orangeLight})`,
+                    boxShadow: `0 4px 14px ${alpha(GLASS.accent.orange, 0.3)}`,
+                    '&:hover': {
+                      background: `linear-gradient(45deg, ${GLASS.accent.orangeDark}, ${GLASS.accent.orange})`,
+                      boxShadow: `0 6px 20px ${alpha(GLASS.accent.orange, 0.4)}`,
+                    },
+                    '&:disabled': {
+                      background: GLASS.border.outer,
+                      color: GLASS.text.muted,
+                    },
                   }}
                 >
                   {loading ? <CircularProgress size={24} color="inherit" /> : 'Criar Conta'}
@@ -535,13 +635,18 @@ const Signup: React.FC = () => {
 
           {/* Login Link */}
           <Box sx={{ textAlign: 'center', mt: 3 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
               Já tem uma conta?{' '}
               <Button
                 variant="text"
                 size="small"
                 onClick={() => navigate('/login')}
-                sx={{ color: BRAND_COLORS.primary }}
+                sx={{
+                  color: GLASS.accent.orange,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  '&:hover': { background: alpha(GLASS.accent.orange, 0.1) },
+                }}
               >
                 Fazer Login
               </Button>

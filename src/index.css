@@ -1,5 +1,18 @@
-/* Importando a fonte Poppins do Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('../public/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Variable.woff2') format('woff2'),
+       url('../public/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Variable.woff') format('woff'),
+       url('../public/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Variable.ttf') format('truetype');
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+}
 
 body {
   margin: 0;
@@ -9,8 +22,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: #f6f6f6;
+  color: #0a0f2d;
 }
 
 code {
@@ -18,140 +31,153 @@ code {
     monospace;
 }
 
-/* Variáveis da paleta minimalista (Supabase/Vercel) */
 :root {
-  --primary: #0f766e;
-  --primary-light: #14b8a6;
-  --primary-dark: #0d9488;
-  --secondary: #64748b;
-  --background-default: #f8fafc;
+  --primary: #f74211;
+  --primary-light: #ff6b42;
+  --primary-dark: #d4380d;
+  --secondary: #525663;
+  --background-default: #f6f6f6;
   --background-paper: #ffffff;
-  --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --border: #e2e8f0;
-  --border-muted: #f1f5f9;
-  --off-white: #fafafa;
-  /* Legado para scrollbar e utilitários que referenciam nomes antigos */
-  --light-gray: #e2e8f0;
-  --neutral-gray: #cbd5e1;
-  --soft-black: #0f172a;
+  --surface-subtle: rgba(255, 255, 255, 0.55);
+  --surface-hover: rgba(247, 66, 17, 0.06);
+  --text-primary: #0a0f2d;
+  --text-secondary: #525663;
+  --border: rgba(82, 86, 99, 0.18);
+  --border-muted: rgba(82, 86, 99, 0.12);
+  --off-white: #f6f6f6;
+  --navy: #0a0f2d;
+  --medium-blue: #3e54b5;
+  --light-blue: #bbc9f9;
+  --nav-bg: rgba(255, 255, 255, 0.6);
+  --nav-border: rgba(82, 86, 99, 0.15);
+  --nav-hover: rgba(247, 66, 17, 0.06);
+  --nav-active: rgba(247, 66, 17, 0.1);
+  --light-gray: rgba(82, 86, 99, 0.18);
+  --neutral-gray: #525663;
+  --soft-black: #0a0f2d;
+  --texture-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.05' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='0.18'/%3E%3C/svg%3E");
+  --texture-grain-subtle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'%3E%3Cfilter id='n2'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n2)' opacity='0.1'/%3E%3C/svg%3E");
+  --gradient-01: var(--texture-grain), linear-gradient(135deg, #ffc4b6, #f74211);
+  --gradient-02: var(--texture-grain-subtle), linear-gradient(135deg, #56180b, #0a0f2d);
 }
 
-/* Transições suaves */
 a, button, .MuiButtonBase-root {
-  transition: all 0.2s ease-in-out !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-/* Scrollbar personalizada */
+::selection {
+  background: rgba(247, 66, 17, 0.16);
+  color: #0a0f2d;
+}
+
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--off-white);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
+  background: rgba(82, 86, 99, 0.3);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--neutral-gray);
+  background: rgba(82, 86, 99, 0.5);
 }
 
-/* Efeitos de hover suaves */
 .hover-effect {
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .hover-effect:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(15, 118, 110, 0.08);
+  box-shadow: 0 12px 32px rgba(10, 15, 45, 0.1);
 }
 
-/* Animações */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .fade-in {
-  animation: fadeIn 0.3s ease-in-out;
+  animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Estilos para layouts de página */
+/* Área principal ao lado da sidebar: usa toda a largura disponível (cresce ao recolher o menu). */
 .page-container {
   padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  box-sizing: border-box;
 }
 
 .page-title {
-  font-family: 'Argent CF', serif;
-  font-weight: 400;
+  font-family: 'Cabinet Grotesk', sans-serif;
+  font-weight: 800;
   margin-bottom: 24px;
-  color: var(--primary);
-  font-size: 1.75rem;
-  text-transform: lowercase;
+  color: var(--text-primary);
+  font-size: 1.625rem;
+  letter-spacing: -0.02em;
 }
 
-/* Cards modernos */
 .modern-card {
-  background-color: var(--background-paper);
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--border);
+  background-color: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(10, 15, 45, 0.06), 0 1px 2px rgba(10, 15, 45, 0.04);
+  border: 1px solid rgba(82, 86, 99, 0.12);
   padding: 24px;
-  transition: all 0.2s ease-in-out;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .modern-card:hover {
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 8px 24px -4px rgba(10, 15, 45, 0.1);
 }
 
-/* Botões personalizados */
 .btn-primary {
-  background-color: var(--primary);
+  background-image: var(--gradient-01);
+  background-size: 240px 240px, auto;
+  background-blend-mode: soft-light, normal;
   color: white;
   border: none;
-  border-radius: 8px;
-  padding: 10px 20px;
+  border-radius: 10px;
+  padding: 10px 22px;
   font-family: 'Poppins', sans-serif;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-primary:hover {
-  background-color: var(--primary-dark);
-  box-shadow: 0 4px 8px rgba(15, 118, 110, 0.2);
+  background: #d4380d;
+  box-shadow: 0 8px 20px -4px rgba(247, 66, 17, 0.3);
 }
 
 .btn-secondary {
-  background-color: var(--off-white);
-  color: var(--primary);
-  border: 2px solid var(--primary);
-  border-radius: 8px;
+  background-color: #ffffff;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
   padding: 8px 18px;
   font-family: 'Poppins', sans-serif;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-secondary:hover {
-  background-color: rgba(15, 118, 110, 0.05);
-  box-shadow: 0 4px 8px rgba(15, 118, 110, 0.1);
+  background-color: rgba(247, 66, 17, 0.04);
+  box-shadow: 0 6px 16px -4px rgba(10, 15, 45, 0.1);
 }
 
-/* Elementos de texto */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Argent CF', serif;
-  font-weight: 400;
-  color: var(--primary);
-  text-transform: lowercase;
+  font-family: 'Cabinet Grotesk', sans-serif;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 
 .text-primary {
@@ -178,7 +204,77 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 700;
 }
 
-/* Layouts responsivos */
+.product-shell {
+  background: var(--background-default);
+}
+
+.product-shell .MuiDrawer-paper {
+  background-color: transparent;
+  border-right: none;
+}
+
+.marketing-shell {
+  background:
+    var(--texture-grain-subtle),
+    linear-gradient(180deg, #0a0f2d 0%, #080c24 100%);
+  background-size: 240px 240px, auto;
+  background-blend-mode: soft-light, normal;
+  color: #f7f8f8;
+}
+
+.grain-overlay {
+  position: relative;
+  isolation: isolate;
+}
+
+.grain-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background-image: var(--texture-grain);
+  background-size: 220px 220px;
+  background-repeat: repeat;
+  mix-blend-mode: soft-light;
+  opacity: 0.32;
+  z-index: 0;
+}
+
+.grain-overlay > * {
+  position: relative;
+  z-index: 1;
+}
+
+.premium-header-bg {
+  background: var(--gradient-02);
+  background-size: 240px 240px, auto;
+  background-blend-mode: soft-light, normal;
+  color: #ffffff;
+}
+
+.premium-header-title {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+.premium-header-subtitle {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.premium-header-chip {
+  background-color: rgba(10, 15, 45, 0.34) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .grain-overlay::before {
+    opacity: 0.14;
+  }
+}
+
 @media (max-width: 600px) {
   .page-container {
     padding: 16px;

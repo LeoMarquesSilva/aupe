@@ -6,18 +6,14 @@ import {
   Tab,
   Tabs,
   CircularProgress,
-  Alert,
   TextField,
   InputAdornment,
   IconButton,
-  Button,
   Grid,
   Typography,
   Chip,
   LinearProgress,
   Tooltip,
-  alpha,
-  useTheme
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -28,18 +24,16 @@ import {
   Search as SearchIcon,
   Clear as ClearIcon,
   FileDownload as ExportIcon,
-  Refresh as RefreshIcon,
-  Update as UpdateIcon,
-  CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
-  Schedule as ScheduleIcon
+  ArrowBack as ArrowBackIcon,
+  BarChart as BarChartIcon,
 } from '@mui/icons-material';
+import { motion } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
 import { Client } from '../types';
 import { 
   instagramMetricsService, 
   InstagramPost, 
-  InstagramProfile, 
   PostsFilter,
   DashboardSummary,
   MediaTypeAnalysis,
@@ -52,6 +46,7 @@ import { pdfExportService } from '../services/pdfExportService';
 import { formatDistanceToNow, subDays, isAfter, parseISO, startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { devLog, logClientError } from '../utils/clientLogger';
+import { appShellContainerSx } from '../theme/appShellLayout';
 
 // Importar componentes
 import ClientHeader from '../components/ClientHeader';
@@ -100,7 +95,6 @@ function TabPanel(props: TabPanelProps) {
 const SingleClientDashboard: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
-  const theme = useTheme();
   const [tabValue, setTabValue] = useState(0);
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,7 +103,7 @@ const SingleClientDashboard: React.FC = () => {
   // Instagram data com cache
   const [cachedData, setCachedData] = useState<CachedData | null>(null);
   const [syncInProgress, setSyncInProgress] = useState(false);
-  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [, setLastSyncTime] = useState<Date | null>(null);
   
   // Dashboard data
   const [dashboardData, setDashboardData] = useState<{
@@ -245,6 +239,7 @@ const SingleClientDashboard: React.FC = () => {
     
     fetchClient();
     fetchScheduledPosts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, fetchScheduledPosts]);
 
   /**
@@ -376,27 +371,6 @@ const SingleClientDashboard: React.FC = () => {
     await loadInstagramDataWithCache(clientId, true);
   };
 
-  /**
-   * Limpa o cache e recarrega
-   */
-  const handleClearCache = async () => {
-    if (!clientId || syncInProgress) return;
-    
-    try {
-      devLog('🗑️ Limpando cache...');
-      await instagramCacheService.clearCache(clientId);
-      setCachedData(null);
-      setDashboardData(null);
-      setError(null);
-      
-      // Recarregar dados
-      await loadInstagramDataWithCache(clientId, true);
-    } catch (err: any) {
-      logClientError('Erro ao limpar cache', err);
-      setError('Não foi possível limpar o cache.');
-    }
-  };
-  
   const handleViewPostDetails = (post: InstagramPost) => {
     setSelectedPost(post);
     setPostDetailsOpen(true);
@@ -608,7 +582,7 @@ const SingleClientDashboard: React.FC = () => {
     });
   };
   
-  // Filter posts com período global
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const posts = cachedData?.posts || [];
   
   const { periodStart, periodEnd, prevPeriodStart, prevPeriodEnd, prevPeriodLabel } = useMemo(() => {
@@ -728,14 +702,6 @@ const SingleClientDashboard: React.FC = () => {
       const itemDate = parseISO(item.date + '-01');
       return isAfter(itemDate, cutoffDate);
     });
-
-    // Calcular totais do período filtrado
-    const totals = filteredTimeline.reduce((acc, item) => ({
-      posts: acc.posts + (item.posts || 0),
-      engagement: acc.engagement + (item.engagement || 0),
-      reach: acc.reach + (item.reach || 0),
-      impressions: acc.impressions + (item.impressions || 0),
-    }), { posts: 0, engagement: 0, reach: 0, impressions: 0 });
 
     // Calcular proporção de likes/comments baseado no total do breakdown
     const totalEngagement = dashboardData.engagement_breakdown.total;
@@ -936,473 +902,596 @@ const SingleClientDashboard: React.FC = () => {
   
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-          <CircularProgress />
-          <Typography variant="body1" color="text.secondary">
-            {syncInProgress ? 'Sincronizando dados do Instagram...' : 'Carregando dashboard...'}
-          </Typography>
-          {syncInProgress && (
-            <LinearProgress sx={{ width: '100%', maxWidth: 400 }} />
-          )}
-        </Box>
+      <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: { xs: 2, md: 3.5 } }}>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+          <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2.5,
+            py: 8,
+            borderRadius: '14px',
+            bgcolor: '#fff',
+            border: '1px solid #e8eaed',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          }}>
+            <Box sx={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: '#f0fdf4',
+            }}>
+              <CircularProgress size={28} sx={{ color: '#f74211' }} />
+            </Box>
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography sx={{ color: '#0a0f2d', fontWeight: 600, fontSize: '0.95rem', mb: 0.5 }}>
+                {syncInProgress ? 'Sincronizando dados do Instagram' : 'Carregando dashboard'}
+              </Typography>
+              <Typography sx={{ color: '#6b7280', fontSize: '0.82rem' }}>
+                {syncInProgress ? 'Buscando informações mais recentes...' : 'Preparando seus dados...'}
+              </Typography>
+            </Box>
+            {syncInProgress && (
+              <LinearProgress sx={{
+                width: '100%',
+                maxWidth: 320,
+                borderRadius: 8,
+                height: 4,
+                bgcolor: 'rgba(247, 66, 17, 0.08)',
+                '& .MuiLinearProgress-bar': { bgcolor: '#f74211', borderRadius: 8 },
+              }} />
+            )}
+          </Box>
+        </motion.div>
       </Container>
     );
   }
   
   if (error && !cachedData) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
-        <Alert 
-          severity="error"
-          action={
-            <Button color="inherit" size="small" onClick={() => window.location.reload()}>
-              Recarregar
-            </Button>
-          }
-        >
-          {error}
-        </Alert>
+      <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: { xs: 2, md: 3.5 } }}>
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}>
+          <Box sx={{
+            p: { xs: 3, md: 4 },
+            borderRadius: '14px',
+            bgcolor: '#fff',
+            border: '1px solid rgba(239, 68, 68, 0.18)',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            textAlign: 'center',
+          }}>
+            <Box sx={{
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'rgba(239, 68, 68, 0.08)',
+              mx: 'auto',
+              mb: 2,
+            }}>
+              <ErrorIcon sx={{ color: '#ef4444', fontSize: 24 }} />
+            </Box>
+            <Typography sx={{ color: '#0a0f2d', fontWeight: 600, fontSize: '1rem', mb: 0.75 }}>
+              Erro ao carregar
+            </Typography>
+            <Typography sx={{ color: '#6b7280', fontSize: '0.85rem', mb: 3, maxWidth: 400, mx: 'auto' }}>
+              {error}
+            </Typography>
+            <Box
+              component="button"
+              onClick={() => window.location.reload()}
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.75,
+                px: 2.5,
+                py: 1,
+                border: 'none',
+                borderRadius: '10px',
+                bgcolor: '#0a0f2d',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: '0.82rem',
+                fontWeight: 650,
+                fontFamily: 'inherit',
+                transition: 'background-color 0.2s ease',
+                '&:hover': { bgcolor: '#131940' },
+                '&:focus-visible': { outline: 'none', boxShadow: '0 0 0 3px rgba(247, 66, 17, 0.3)' },
+              }}
+            >
+              Recarregar página
+            </Box>
+          </Box>
+        </motion.div>
       </Container>
     );
   }
   
   if (!client) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
-        <Alert severity="error">Cliente não encontrado</Alert>
+      <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: { xs: 2, md: 3.5 } }}>
+        <Box sx={{
+          p: 4,
+          borderRadius: '14px',
+          bgcolor: '#fff',
+          border: '1px solid rgba(239, 68, 68, 0.18)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+          textAlign: 'center',
+        }}>
+          <ErrorIcon sx={{ color: '#ef4444', fontSize: 36, mb: 1.5, opacity: 0.7 }} />
+          <Typography sx={{ color: '#0a0f2d', fontWeight: 600, fontSize: '1rem' }}>
+            Cliente não encontrado
+          </Typography>
+        </Box>
       </Container>
     );
   }
   
   const hasInstagramAuth = Boolean(client.accessToken && client.instagramAccountId);
 
+  const tabIconSx = {
+    '&.Mui-selected': { '& .MuiSvgIcon-root': { color: '#f74211' } }
+  };
+
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
-      <ClientHeader 
-        client={client} 
-        profile={cachedData?.profile || null} 
-        onCreatePost={handleCreatePost}
-        onCreateStory={handleCreateStory}
-        onCreateReels={handleCreateReels}
-        onViewCalendar={handleViewCalendar}
-        cacheStatus={cachedData?.cacheStatus || null}
-        isStale={cachedData?.isStale || false}
-        formatTimeAgo={formatTimeAgo}
-        onForceRefresh={handleForceRefresh}
-        syncInProgress={syncInProgress}
-        postsStats={postsStats}
-        onExportPDF={() => setPdfExportDialogOpen(true)}
-        onShareLink={() => setShareLinkDialogOpen(true)}
-      />
-
-      {/* Erro não crítico - Simplificado */}
-      {error && cachedData && (
-        <Box sx={{ 
-          mb: 2,
-          p: 1.5,
-          borderRadius: 1,
-          bgcolor: 'warning.light',
-          border: '1px solid',
-          borderColor: 'warning.main',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 2
-        }}>
-          <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ErrorIcon fontSize="small" sx={{ color: 'warning.main' }} />
-            {error} (Usando dados em cache)
-          </Typography>
-          <IconButton 
-            size="small" 
-            onClick={() => setError(null)}
-            sx={{ p: 0.5 }}
-          >
-            <ClearIcon fontSize="small" />
-          </IconButton>
-        </Box>
-      )}
-
-      {/* Alerta de Permissão de Insights */}
-      {insightsPermissionError && hasInstagramAuth && (
-        <Alert 
-          severity="warning" 
-          sx={{ mb: 3 }}
-          action={
-            <Button 
-              color="inherit" 
-              size="small" 
-              onClick={handleConnectInstagram}
-              sx={{ fontWeight: 600 }}
-            >
-              Reconectar
-            </Button>
-          }
-        >
-          <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-            Token sem permissão para insights
-          </Typography>
-          <Typography variant="body2">
-            O token atual não tem a permissão 'instagram_manage_insights'. Reconecte a conta do Instagram para acessar impressões, reach e outras métricas detalhadas.
-          </Typography>
-        </Alert>
-      )}
-
-      
-      <Box 
-        sx={{ 
-          mb: 4,
-          position: 'relative'
-        }}
-      >
-        <Tabs 
-          value={tabValue} 
-          onChange={handleTabChange} 
-          aria-label="dashboard tabs"
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{
-            position: 'relative',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: '2px',
-              background: `linear-gradient(90deg, ${alpha('#000', 0.05)}, ${alpha('#000', 0.02)}, ${alpha('#000', 0.05)})`,
-            },
-            '& .MuiTabs-indicator': {
-              height: 3,
-              borderRadius: '3px 3px 0 0',
-              background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.primary.light || theme.palette.primary.main})`,
-              boxShadow: `0 -2px 8px ${alpha(theme.palette.primary.main, 0.3)}`,
-            },
-            '& .MuiTab-root': {
-              minHeight: 72,
-              textTransform: 'none',
+    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: { xs: 2, md: 3.5 } }}>
+      {/* Back navigation */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+        <Box sx={{ mb: 2 }}>
+          <Box
+            component="button"
+            onClick={() => navigate('/clients')}
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.5,
+              px: 0,
+              py: 0.5,
+              border: 'none',
+              bgcolor: 'transparent',
+              color: '#6b7280',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
               fontWeight: 500,
-              fontSize: '0.9375rem',
-              px: 3,
-              py: 2,
-              color: 'text.secondary',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              position: 'relative',
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                borderRadius: '12px 12px 0 0',
-                background: 'transparent',
-                transition: 'all 0.3s ease',
-                zIndex: 0
-              },
-              '&:hover': {
-                color: 'primary.main',
-                '&::before': {
-                  background: alpha(theme.palette.primary.main, 0.06)
-                },
-                transform: 'translateY(-2px)'
-              },
-              '&.Mui-selected': {
-                color: 'primary.main',
-                fontWeight: 700,
-                fontSize: '0.96875rem',
-                '&::before': {
-                  background: alpha(theme.palette.primary.main, 0.08)
-                },
-                '& .MuiSvgIcon-root': {
-                  transform: 'scale(1.1)',
-                  filter: `drop-shadow(0 2px 4px ${alpha(theme.palette.primary.main, 0.3)})`
-                }
-              },
-              '& .MuiSvgIcon-root': {
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                fontSize: '1.25rem',
-                mr: 1
-              }
-            }
-          }}
-        >
-          <Tab 
-            icon={<DashboardIcon />} 
-            iconPosition="start" 
-            label="Dashboard" 
-            id="tab-0" 
-            aria-controls="tabpanel-0"
-            sx={{
-              '&.Mui-selected': {
-                '& .MuiSvgIcon-root': {
-                  color: 'primary.main'
-                }
-              }
+              fontFamily: 'inherit',
+              transition: 'color 0.15s ease',
+              '&:hover': { color: '#f74211' },
             }}
-          />
-          <Tab 
-            icon={<CalendarIcon />} 
-            iconPosition="start" 
-            label="Agendamentos" 
-            id="tab-1" 
-            aria-controls="tabpanel-1"
-            sx={{
-              '&.Mui-selected': {
-                '& .MuiSvgIcon-root': {
-                  color: 'primary.main'
-                }
-              }
-            }}
-          />
-          <Tab 
-            icon={<SettingsIcon />} 
-            iconPosition="start" 
-            label="Configurações" 
-            id="tab-2" 
-            aria-controls="tabpanel-2"
-            sx={{
-              '&.Mui-selected': {
-                '& .MuiSvgIcon-root': {
-                  color: 'primary.main'
-                }
-              }
-            }}
-          />
-        </Tabs>
-      </Box>
+          >
+            <ArrowBackIcon sx={{ fontSize: 16 }} />
+            Voltar para clientes
+          </Box>
+        </Box>
+      </motion.div>
 
-      <TabPanel value={tabValue} index={0}>
-        {!hasInstagramAuth ? (
-          <Box sx={{ 
-            p: 3,
-            borderRadius: 2,
-            bgcolor: 'info.light',
-            border: '1px solid',
-            borderColor: 'info.main',
+      {/* Client Header */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.05 }}>
+        <ClientHeader 
+          client={client} 
+          profile={cachedData?.profile || null} 
+          onCreatePost={handleCreatePost}
+          onCreateStory={handleCreateStory}
+          onCreateReels={handleCreateReels}
+          onViewCalendar={handleViewCalendar}
+          cacheStatus={cachedData?.cacheStatus || null}
+          isStale={cachedData?.isStale || false}
+          formatTimeAgo={formatTimeAgo}
+          onForceRefresh={handleForceRefresh}
+          syncInProgress={syncInProgress}
+          postsStats={postsStats}
+          onExportPDF={() => setPdfExportDialogOpen(true)}
+          onShareLink={() => setShareLinkDialogOpen(true)}
+        />
+      </motion.div>
+
+      {/* Alerts */}
+      {error && cachedData && (
+        <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+          <Box sx={{
+            mb: 2.5,
+            p: 1.5,
+            borderRadius: '10px',
+            bgcolor: '#fffbeb',
+            border: '1px solid rgba(245, 158, 11, 0.15)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: 2
+            gap: 2,
           }}>
-            <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <InstagramIcon sx={{ color: 'info.main' }} />
-              Conecte a conta do Instagram para visualizar o dashboard completo.
+            <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#92400e', fontWeight: 500, fontSize: '0.82rem' }}>
+              <ErrorIcon sx={{ fontSize: 16, color: '#d97706' }} />
+              {error} (Usando dados em cache)
             </Typography>
-            <Button 
-              variant="contained" 
-              size="small" 
-              onClick={handleConnectInstagram}
-              startIcon={<InstagramIcon />}
+            <IconButton
+              size="small"
+              onClick={() => setError(null)}
+              sx={{ p: 0.5, color: '#d97706', '&:hover': { bgcolor: 'rgba(245, 158, 11, 0.08)' } }}
             >
-              Conectar Instagram
-            </Button>
+              <ClearIcon sx={{ fontSize: 16 }} />
+            </IconButton>
           </Box>
+        </motion.div>
+      )}
+
+      {insightsPermissionError && hasInstagramAuth && (
+        <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+          <Box sx={{
+            mb: 2.5,
+            p: 2,
+            borderRadius: '10px',
+            bgcolor: '#fffbeb',
+            border: '1px solid rgba(245, 158, 11, 0.15)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 2,
+            flexWrap: 'wrap',
+          }}>
+            <Box sx={{ flex: 1, minWidth: 200 }}>
+              <Typography variant="body2" sx={{ fontWeight: 650, color: '#92400e', mb: 0.3, fontSize: '0.82rem' }}>
+                Token sem permissão para insights
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#a16207', lineHeight: 1.5, fontSize: '0.78rem' }}>
+                Reconecte para acessar métricas detalhadas.
+              </Typography>
+            </Box>
+            <Box
+              component="button"
+              onClick={handleConnectInstagram}
+              sx={{
+                px: 2,
+                py: 0.75,
+                border: 'none',
+                borderRadius: '8px',
+                bgcolor: '#f74211',
+                color: '#fff',
+                fontWeight: 600,
+                fontSize: '0.78rem',
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
+                '&:hover': { bgcolor: '#d4380d' },
+              }}
+            >
+              Reconectar
+            </Box>
+          </Box>
+        </motion.div>
+      )}
+
+      {/* Tab Navigation */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.1 }}>
+        <Box
+          sx={{
+            mb: 3,
+            borderRadius: '14px',
+            bgcolor: '#fff',
+            border: '1px solid #e8eaed',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            overflow: 'hidden',
+          }}
+        >
+          <Tabs
+            value={tabValue}
+            onChange={handleTabChange}
+            aria-label="dashboard tabs"
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{
+              minHeight: 0,
+              '& .MuiTabs-indicator': {
+                height: 2,
+                borderRadius: '2px 2px 0 0',
+                bgcolor: '#f74211',
+              },
+              '& .MuiTab-root': {
+                minHeight: 52,
+                textTransform: 'none',
+                fontWeight: 500,
+                fontSize: '0.875rem',
+                px: 2.5,
+                color: '#6b7280',
+                transition: 'color 0.2s ease',
+                '&:hover': {
+                  color: '#f74211',
+                },
+                '&.Mui-selected': {
+                  color: '#f74211',
+                  fontWeight: 600,
+                },
+                '& .MuiSvgIcon-root': {
+                  fontSize: '1.15rem',
+                  mr: 0.75,
+                },
+              },
+            }}
+          >
+            <Tab icon={<DashboardIcon />} iconPosition="start" label="Dashboard" id="tab-0" aria-controls="tabpanel-0" sx={tabIconSx} />
+            <Tab icon={<CalendarIcon />} iconPosition="start" label="Agendamentos" id="tab-1" aria-controls="tabpanel-1" sx={tabIconSx} />
+            <Tab icon={<SettingsIcon />} iconPosition="start" label="Configurações" id="tab-2" aria-controls="tabpanel-2" sx={tabIconSx} />
+          </Tabs>
+        </Box>
+      </motion.div>
+
+      {/* Tab Content */}
+      <TabPanel value={tabValue} index={0}>
+        {!hasInstagramAuth ? (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}>
+            <Box sx={{
+              p: { xs: 3, md: 4.5 },
+              borderRadius: '14px',
+              bgcolor: '#fff',
+              border: '1px dashed #d1d5db',
+              textAlign: 'center',
+            }}>
+              <InstagramIcon sx={{ fontSize: 48, color: '#9ca3af', mb: 1.5, opacity: 0.4 }} />
+              <Typography sx={{ fontWeight: 600, fontSize: '1rem', color: '#0a0f2d', mb: 0.5 }}>
+                Instagram não conectado
+              </Typography>
+              <Typography sx={{ color: '#6b7280', fontSize: '0.85rem', mb: 3, maxWidth: 400, mx: 'auto' }}>
+                Conecte a conta do Instagram para visualizar o dashboard completo com métricas, posts e insights.
+              </Typography>
+              <Box
+                component="button"
+                onClick={handleConnectInstagram}
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  px: 2.5,
+                  py: 1.1,
+                  border: 'none',
+                  borderRadius: '10px',
+                  bgcolor: '#f74211',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  fontWeight: 650,
+                  fontFamily: 'inherit',
+                  transition: 'background-color 0.2s ease',
+                  '&:hover': { bgcolor: '#d4380d' },
+                  '&:focus-visible': { outline: 'none', boxShadow: '0 0 0 3px rgba(247, 66, 17, 0.3)' },
+                }}
+              >
+                <InstagramIcon sx={{ fontSize: 18 }} />
+                Conectar Instagram
+              </Box>
+            </Box>
+          </motion.div>
         ) : loadingDashboard ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', my: 6, gap: 2 }}>
-            <CircularProgress />
-            <Typography variant="body2" color="text.secondary">
+          <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            py: 8,
+            borderRadius: '14px',
+            bgcolor: '#fff',
+            border: '1px solid #e8eaed',
+            gap: 2,
+          }}>
+            <Box sx={{
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: '#f0fdf4',
+            }}>
+              <CircularProgress size={24} sx={{ color: '#f74211' }} />
+            </Box>
+            <Typography sx={{ color: '#6b7280', fontWeight: 500, fontSize: '0.85rem' }}>
               Carregando métricas...
             </Typography>
           </Box>
         ) : !dashboardData ? (
-          <Box sx={{ 
-            p: 3,
-            borderRadius: 2,
-            bgcolor: 'info.light',
-            border: '1px solid',
-            borderColor: 'info.main',
-            textAlign: 'center'
-          }}>
-            <Typography variant="body1" color="text.secondary">
-              Não foram encontrados dados suficientes para gerar o dashboard.
-            </Typography>
-          </Box>
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}>
+            <Box sx={{
+              p: { xs: 3, md: 4.5 },
+              borderRadius: '14px',
+              bgcolor: '#fff',
+              border: '1px dashed #d1d5db',
+              textAlign: 'center',
+            }}>
+              <BarChartIcon sx={{ fontSize: 48, color: '#9ca3af', mb: 1.5, opacity: 0.4 }} />
+              <Typography sx={{ fontWeight: 600, color: '#0a0f2d', mb: 0.5 }}>
+                Sem dados disponíveis
+              </Typography>
+              <Typography sx={{ color: '#6b7280', fontSize: '0.85rem', maxWidth: 380, mx: 'auto' }}>
+                Não foram encontrados dados suficientes para gerar o dashboard.
+              </Typography>
+            </Box>
+          </motion.div>
         ) : (
           <>
-            {/* Header com Período */}
-            <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              mb: 3,
-              flexWrap: 'wrap',
-              gap: 2
-            }}>
-              <Typography variant="h6" fontWeight={700} sx={{ lineHeight: 1.2 }}>
-                Métricas de Performance
-              </Typography>
-              
-              <PeriodSelector
-                config={periodConfig}
-                onChange={(newConfig) => {
-                  setPeriodConfig(newConfig);
-                  if (newConfig.mode === 'quick') {
-                    setPeriod(newConfig.quickPeriod);
-                  }
-                }}
-              />
-            </Box>
-
-            <Box sx={{ mb: 4 }}>
-              <MetricsOverview 
-                metrics={legacyMetrics} 
-                periodComparisons={periodComparisons}
-                previousPeriodValues={previousPeriodValues}
-                comparisonLabel={periodConfig.mode === 'month' ? `vs ${prevPeriodLabel}` : undefined}
-              />
-            </Box>
-            
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-              {legacyMetrics.mostEngagedPost && (
-                <Grid item xs={12} md={legacyMetrics.engagementBreakdown?.total > 0 ? 7 : 12}>
-                  <FeaturedPost 
-                    post={legacyMetrics.mostEngagedPost}
-                    onViewDetails={handleViewPostDetails}
-                    formatTimeAgo={formatTimeAgo}
-                  />
-                </Grid>
-              )}
-              {legacyMetrics.engagementBreakdown?.total > 0 && (
-                <Grid item xs={12} md={legacyMetrics.mostEngagedPost ? 5 : 12}>
-                  <ConversionFunnel
-                    data={{
-                      impressions: legacyMetrics.totalImpressions || 0,
-                      reach: legacyMetrics.totalReach || 0,
-                      engagement: legacyMetrics.engagementBreakdown.total || 0,
-                      saves: legacyMetrics.engagementBreakdown.saved || 0,
-                      shares: legacyMetrics.engagementBreakdown.shares || 0,
+            {/* Metrics Section */}
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}>
+              <Box sx={{ mb: 3 }}>
+                <Box sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  mb: 2,
+                  flexWrap: 'wrap',
+                  gap: 1.5,
+                }}>
+                  <Typography sx={{
+                    fontWeight: 700,
+                    fontSize: { xs: '1rem', md: '1.1rem' },
+                    color: '#0a0f2d',
+                    letterSpacing: '-0.01em',
+                  }}>
+                    Métricas de Performance
+                  </Typography>
+                  <PeriodSelector
+                    config={periodConfig}
+                    onChange={(newConfig) => {
+                      setPeriodConfig(newConfig);
+                      if (newConfig.mode === 'quick') {
+                        setPeriod(newConfig.quickPeriod);
+                      }
                     }}
                   />
-                </Grid>
-              )}
-            </Grid>
-
-            {/* Seção de Posts */}
-            <Box sx={{ mb: 2 }}>
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 1.5, 
-                mb: 2,
-                pb: 1.5,
-                borderBottom: '1px solid',
-                borderColor: 'divider'
-              }}>
-                <InstagramIcon sx={{ color: 'text.secondary', fontSize: 22 }} />
-                <Typography variant="h6" fontWeight={700}>
-                  Posts do Instagram
-                </Typography>
-                <Chip 
-                  label={`${filteredPosts.length} posts`} 
-                  size="small"
-                  sx={{ 
-                    height: 22, 
-                    fontSize: '0.7rem', 
-                    fontWeight: 600,
-                    bgcolor: 'action.hover'
-                  }} 
-                />
-              </Box>
-              
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 1.5, 
-                mb: 3,
-                flexWrap: 'wrap'
-              }}>
-                <TextField
-                  placeholder="Buscar por legenda..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  size="small"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon fontSize="small" sx={{ color: 'text.secondary' }} />
-                      </InputAdornment>
-                    ),
-                    endAdornment: searchQuery && (
-                      <InputAdornment position="end">
-                        <IconButton 
-                          size="small" 
-                          onClick={() => setSearchQuery('')}
-                          sx={{ p: 0.5 }}
-                        >
-                          <ClearIcon fontSize="small" />
-                        </IconButton>
-                      </InputAdornment>
-                    )
-                  }}
-                  sx={{ 
-                    flexGrow: 1, 
-                    maxWidth: { xs: '100%', sm: 320 },
-                    '& .MuiOutlinedInput-root': {
-                      bgcolor: 'background.paper',
-                      '&:hover': {
-                        bgcolor: 'background.paper'
-                      }
-                    }
-                  }}
-                />
-                
-                <Box sx={{ display: 'flex', gap: 0.5 }}>
-                  <Tooltip title="Filtros">
-                    <IconButton 
-                      onClick={handleOpenFilterDialog}
-                      sx={{ 
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        bgcolor: 'background.paper',
-                        '&:hover': {
-                          bgcolor: 'action.hover',
-                          borderColor: 'primary.main'
-                        }
-                      }}
-                    >
-                      <FilterIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  
-                  <Tooltip title="Exportar dados">
-                    <IconButton 
-                      onClick={handleExportData}
-                      disabled={filteredPosts.length === 0}
-                      sx={{ 
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        bgcolor: 'background.paper',
-                        '&:hover': {
-                          bgcolor: 'action.hover',
-                          borderColor: 'primary.main'
-                        },
-                        '&.Mui-disabled': {
-                          borderColor: 'divider',
-                          opacity: 0.5
-                        }
-                      }}
-                    >
-                      <ExportIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
                 </Box>
+                <MetricsOverview
+                  metrics={legacyMetrics}
+                  periodComparisons={periodComparisons}
+                  previousPeriodValues={previousPeriodValues}
+                  comparisonLabel={periodConfig.mode === 'month' ? `vs ${prevPeriodLabel}` : undefined}
+                />
               </Box>
-              
-              <PostsTable 
-                posts={filteredPosts}
-                onViewDetails={handleViewPostDetails}
-                formatTimestamp={formatTimestamp}
-              />
-            </Box>
+            </motion.div>
+
+            {/* Featured Post + Funnel */}
+            {(legacyMetrics.mostEngagedPost || (legacyMetrics.engagementBreakdown?.total > 0)) && (
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.05 }}>
+                <Grid container spacing={2.5} sx={{ mb: 3 }}>
+                  {legacyMetrics.mostEngagedPost && (
+                    <Grid item xs={12} md={legacyMetrics.engagementBreakdown?.total > 0 ? 7 : 12}>
+                      <FeaturedPost
+                        post={legacyMetrics.mostEngagedPost}
+                        onViewDetails={handleViewPostDetails}
+                        formatTimeAgo={formatTimeAgo}
+                      />
+                    </Grid>
+                  )}
+                  {legacyMetrics.engagementBreakdown?.total > 0 && (
+                    <Grid item xs={12} md={legacyMetrics.mostEngagedPost ? 5 : 12}>
+                      <ConversionFunnel
+                        data={{
+                          impressions: legacyMetrics.totalImpressions || 0,
+                          reach: legacyMetrics.totalReach || 0,
+                          engagement: legacyMetrics.engagementBreakdown.total || 0,
+                          saves: legacyMetrics.engagementBreakdown.saved || 0,
+                          shares: legacyMetrics.engagementBreakdown.shares || 0,
+                        }}
+                      />
+                    </Grid>
+                  )}
+                </Grid>
+              </motion.div>
+            )}
+
+            {/* Posts Section */}
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.1 }}>
+              <Box sx={{ mb: 3 }}>
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: { xs: 'flex-start', sm: 'center' },
+                  justifyContent: 'space-between',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  gap: 1.5,
+                  mb: 2,
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: '#0a0f2d', lineHeight: 1.2 }}>
+                      Posts do Instagram
+                    </Typography>
+                    <Chip
+                      label={`${filteredPosts.length}`}
+                      size="small"
+                      sx={{
+                        height: 22,
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        bgcolor: '#f3f4f6',
+                        color: '#6b7280',
+                      }}
+                    />
+                  </Box>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    <TextField
+                      placeholder="Buscar por legenda..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      size="small"
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon sx={{ fontSize: 16, color: '#9ca3af' }} />
+                          </InputAdornment>
+                        ),
+                        endAdornment: searchQuery ? (
+                          <InputAdornment position="end">
+                            <IconButton size="small" onClick={() => setSearchQuery('')} sx={{ p: 0.25 }}>
+                              <ClearIcon sx={{ fontSize: 14, color: '#9ca3af' }} />
+                            </IconButton>
+                          </InputAdornment>
+                        ) : null,
+                      }}
+                      sx={{
+                        width: { xs: '100%', sm: 240 },
+                        '& .MuiOutlinedInput-root': {
+                          height: 36,
+                          fontSize: '0.8rem',
+                          bgcolor: '#fafafa',
+                          borderRadius: '8px',
+                          '& fieldset': { borderColor: '#e8eaed' },
+                          '&:hover fieldset': { borderColor: '#d1d5db' },
+                          '&.Mui-focused fieldset': {
+                            borderColor: '#f74211',
+                            boxShadow: '0 0 0 3px rgba(247, 66, 17, 0.1)',
+                          },
+                        },
+                      }}
+                    />
+                    <Tooltip title="Filtros">
+                      <IconButton
+                        size="small"
+                        onClick={handleOpenFilterDialog}
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          border: '1px solid #e8eaed',
+                          bgcolor: '#fff',
+                          transition: 'border-color 0.15s ease',
+                          '&:hover': { borderColor: '#d1d5db' },
+                        }}
+                      >
+                        <FilterIcon sx={{ fontSize: 16, color: '#6b7280' }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Exportar CSV">
+                      <IconButton
+                        size="small"
+                        onClick={handleExportData}
+                        disabled={filteredPosts.length === 0}
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          border: '1px solid #e8eaed',
+                          bgcolor: '#fff',
+                          transition: 'border-color 0.15s ease',
+                          '&:hover': { borderColor: '#d1d5db' },
+                          '&.Mui-disabled': { opacity: 0.35 },
+                        }}
+                      >
+                        <ExportIcon sx={{ fontSize: 16, color: '#6b7280' }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </Box>
+
+                <PostsTable
+                  posts={filteredPosts}
+                  onViewDetails={handleViewPostDetails}
+                  formatTimestamp={formatTimestamp}
+                />
+              </Box>
+            </motion.div>
           </>
         )}
       </TabPanel>
 
       <TabPanel value={tabValue} index={1}>
-        <ScheduledPostsList 
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}>
+          <ScheduledPostsList
             posts={scheduledPosts}
             onRefreshPosts={fetchScheduledPosts}
             onEditPost={(post) => {
@@ -1418,39 +1507,41 @@ const SingleClientDashboard: React.FC = () => {
                   .from('scheduled_posts')
                   .delete()
                   .eq('id', postId);
-                
+
                 if (error) throw error;
-                
+
                 setScheduledPosts(prev => prev.filter(p => p.id !== postId));
-                devLog('✅ Post agendado excluído:', postId);
+                devLog('Post agendado excluído:', postId);
               } catch (err: any) {
                 logClientError('Erro ao excluir post', err);
                 setError('Não foi possível excluir o post agendado.');
               }
             }}
           />
+        </motion.div>
       </TabPanel>
 
       <TabPanel value={tabValue} index={2}>
-        <ClientSettings 
-          client={client}
-          hasInstagramAuth={hasInstagramAuth}
-          onEditClient={handleEditClient}
-          onConnectInstagram={handleConnectInstagram}
-          onDisconnectInstagram={handleDisconnectInstagram}
-        />
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}>
+          <ClientSettings
+            client={client}
+            hasInstagramAuth={hasInstagramAuth}
+            onEditClient={handleEditClient}
+            onConnectInstagram={handleConnectInstagram}
+            onDisconnectInstagram={handleDisconnectInstagram}
+          />
+        </motion.div>
       </TabPanel>
 
-      {/* Dialogs */}
-      <PostFilters 
+      <PostFilters
         open={filterDialogOpen}
         filters={filters}
         onClose={handleCloseFilterDialog}
         onApply={handleApplyFilters}
         onReset={handleResetFilters}
       />
-      
-      <PostDetails 
+
+      <PostDetails
         open={postDetailsOpen}
         post={selectedPost}
         onClose={handleClosePostDetails}

@@ -25,9 +25,6 @@ export class StripeService {
     userId: string
   ): Promise<CheckoutSession> {
     try {
-      // Obter origem atual para redirect URLs
-      const origin = window.location.origin;
-
       // Chamar Edge Function
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
         body: {

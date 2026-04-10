@@ -316,7 +316,7 @@ class RoleService {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // 4. Criar perfil via RPC (agora com organization_id)
-      const { data, error } = await supabase.rpc('create_user_profile', {
+      const { error } = await supabase.rpc('create_user_profile', {
         user_id: authData.user.id,
         user_email: userData.email,
         user_full_name: userData.full_name,
@@ -414,7 +414,7 @@ class RoleService {
       console.log('🔄 Deletando usuário:', userId);
 
       // Usar a função RPC para deletar
-      const { data, error } = await supabase.rpc('delete_user_simple', {
+      const { error } = await supabase.rpc('delete_user_simple', {
         user_id: userId
       });
 

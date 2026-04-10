@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { clientService, postService } from '../services/supabaseClient';
+import { clientService } from '../services/supabaseClient';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Box, 
@@ -8,7 +8,6 @@ import {
   Button, 
   Paper, 
   Alert, 
-  Divider, 
   FormControl,
   InputLabel,
   Select,
@@ -32,8 +31,7 @@ import {
   Step,
   StepLabel,
   StepContent,
-  Fade,
-  CircularProgress
+  Fade
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -59,6 +57,8 @@ import SubscriptionLimitsAlert from '../components/SubscriptionLimitsAlert';
 import AppSnackbar from '../components/AppSnackbar';
 import { getUserFriendlyMessage } from '../utils/errorMessages';
 import { scheduleInstagramPost, uploadImagesToSupabaseStorage } from '../services/postService';
+import { GLASS } from '../theme/glassTokens';
+import { appShellContainerSx } from '../theme/appShellLayout';
 
 const CreateStory: React.FC = () => {
   const navigate = useNavigate();
@@ -395,31 +395,36 @@ const CreateStory: React.FC = () => {
   ];
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4, flexGrow: 1 }}>
+    <Container maxWidth={false} disableGutters sx={{ ...appShellContainerSx, py: 4, flexGrow: 1 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
           <Typography variant="h4" component="h1" sx={{ 
             mb: 1, 
             fontWeight: 'bold',
             fontFamily: '"Montserrat", sans-serif',
-            color: '#121212'
+            color: GLASS.text.heading,
           }}>
             Criar Story
           </Typography>
-          <Typography variant="subtitle1" color="text.secondary">
+          <Typography variant="subtitle1" sx={{ color: GLASS.text.muted }}>
             Crie e agende stories para o Instagram dos seus clientes
           </Typography>
         </Box>
         
         <Button
           variant="outlined"
-          color="primary"
           onClick={() => navigate('/create-post')}
           sx={{ 
-            borderRadius: 2,
+            borderRadius: GLASS.radius.button,
             textTransform: 'none',
             px: 3,
-            py: 1
+            py: 1,
+            color: GLASS.accent.orange,
+            borderColor: GLASS.accent.orange,
+            '&:hover': {
+              backgroundColor: 'rgba(247, 66, 17, 0.04)',
+              borderColor: GLASS.accent.orangeDark,
+            }
           }}
         >
           Criar Post
@@ -453,14 +458,17 @@ const CreateStory: React.FC = () => {
               sx={{ 
                 p: 3, 
                 mb: 4, 
-                border: '1px solid rgba(0,0,0,0.08)',
-                borderRadius: 2,
-                backgroundColor: '#fff'
+                background: GLASS.surface.bg,
+                backdropFilter: `blur(${GLASS.surface.blur})`,
+                WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+                border: `1px solid ${GLASS.border.outer}`,
+                borderRadius: GLASS.radius.card,
+                boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="h6" sx={{ fontWeight: 'medium', display: 'flex', alignItems: 'center' }}>
-                  <InstagramIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+                <Typography variant="h6" sx={{ fontWeight: 'medium', display: 'flex', alignItems: 'center', color: GLASS.text.heading }}>
+                  <InstagramIcon sx={{ mr: 1, color: GLASS.accent.orange }} />
                   Selecione a Conta do Instagram
                 </Typography>
                 <Button 
@@ -468,7 +476,7 @@ const CreateStory: React.FC = () => {
                   startIcon={<AddIcon />} 
                   onClick={() => setClientDialogOpen(true)}
                   size="small"
-                  sx={{ color: theme.palette.primary.main }}
+                  sx={{ color: GLASS.accent.orange, borderColor: GLASS.accent.orange, borderRadius: GLASS.radius.button }}
                 >
                   Novo Cliente
                 </Button>
@@ -603,7 +611,7 @@ const CreateStory: React.FC = () => {
                           {selectedClient.name}
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: theme.palette.primary.main }} />
+                          <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: GLASS.accent.orange }} />
                           <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                             @{selectedClient.instagram}
                           </Typography>
@@ -678,9 +686,12 @@ const CreateStory: React.FC = () => {
               sx={{ 
                 p: 3, 
                 mb: 4, 
-                border: '1px solid rgba(0,0,0,0.08)',
-                borderRadius: 2,
-                backgroundColor: '#fff'
+                background: GLASS.surface.bg,
+                backdropFilter: `blur(${GLASS.surface.blur})`,
+                WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+                border: `1px solid ${GLASS.border.outer}`,
+                borderRadius: GLASS.radius.card,
+                boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
               }}
             >
               <Box sx={{ 
@@ -688,9 +699,9 @@ const CreateStory: React.FC = () => {
                 alignItems: 'center', 
                 mb: 3, 
                 pb: 2, 
-                borderBottom: '1px solid rgba(0,0,0,0.08)' 
+                borderBottom: `1px solid ${GLASS.border.subtle}`,
               }}>
-                <EditIcon sx={{ mr: 1.5, color: theme.palette.primary.main }} />
+                <EditIcon sx={{ mr: 1.5, color: GLASS.accent.orange }} />
                 <Typography variant="h5" sx={{ fontWeight: 'medium' }}>
                   Editor de Story
                 </Typography>
@@ -744,7 +755,7 @@ const CreateStory: React.FC = () => {
                     variant="outlined" 
                     onClick={() => setPreviewOpen(true)}
                     startIcon={<VisibilityIcon />}
-                    sx={{ color: theme.palette.primary.main }}
+                    sx={{ color: GLASS.accent.orange, borderColor: GLASS.accent.orange, borderRadius: GLASS.radius.button }}
                   >
                     Visualizar
                   </Button>
@@ -755,10 +766,13 @@ const CreateStory: React.FC = () => {
                     onClick={handleNext}
                     disabled={!story || !selectedClientId}
                     sx={{ 
-                      backgroundColor: '#121212',
+                      backgroundColor: GLASS.accent.orange,
                       color: '#ffffff',
+                      borderRadius: GLASS.radius.button,
+                      boxShadow: GLASS.shadow.button,
                       '&:hover': {
-                        backgroundColor: '#333'
+                        backgroundColor: GLASS.accent.orangeDark,
+                        boxShadow: GLASS.shadow.buttonHover,
                       },
                       '&.Mui-disabled': {
                         color: 'rgba(255, 255, 255, 0.3)'
@@ -785,9 +799,12 @@ const CreateStory: React.FC = () => {
                 sx={{ 
                   p: 2, 
                   mb: 4, 
-                  borderRadius: 2,
-                  bgcolor: 'rgba(0,0,0,0.02)',
-                  border: '1px solid rgba(0,0,0,0.08)',
+                  borderRadius: GLASS.radius.inner,
+                  background: GLASS.surface.bg,
+                  backdropFilter: `blur(${GLASS.surface.blur})`,
+                  WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+                  border: `1px solid ${GLASS.border.outer}`,
+                  boxShadow: GLASS.shadow.cardInset,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between'
@@ -802,11 +819,11 @@ const CreateStory: React.FC = () => {
                     {selectedClient.name.charAt(0)}
                   </Avatar>
                   <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'medium', color: GLASS.text.heading }}>
                       Agendando para:
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: theme.palette.primary.main }} />
+                      <InstagramIcon sx={{ fontSize: 16, mr: 0.5, color: GLASS.accent.orange }} />
                       <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                         @{selectedClient.instagram}
                       </Typography>
@@ -840,9 +857,12 @@ const CreateStory: React.FC = () => {
               sx={{ 
                 p: 3, 
                 mb: 4, 
-                border: '1px solid rgba(0,0,0,0.08)',
-                borderRadius: 2,
-                backgroundColor: '#fff'
+                background: GLASS.surface.bg,
+                backdropFilter: `blur(${GLASS.surface.blur})`,
+                WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
+                border: `1px solid ${GLASS.border.outer}`,
+                borderRadius: GLASS.radius.card,
+                boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
               }}
             >
               <DateTimePicker scheduledDate={scheduledDate} onChange={handleDateChange} />
@@ -870,7 +890,7 @@ const CreateStory: React.FC = () => {
                   variant="outlined" 
                   onClick={handleBack}
                   startIcon={<ArrowBackIcon />}
-                  sx={{ color: theme.palette.primary.main }}
+                  sx={{ color: GLASS.accent.orange, borderColor: GLASS.accent.orange, borderRadius: GLASS.radius.button }}
                 >
                   Voltar
                 </Button>
@@ -878,7 +898,6 @@ const CreateStory: React.FC = () => {
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   <Button
                     variant="outlined"
-                    color="primary"
                     size="large"
                     startIcon={<SendIcon />}
                     onClick={handlePostNow}
@@ -886,12 +905,12 @@ const CreateStory: React.FC = () => {
                     sx={{ 
                       px: 4, 
                       py: 1.5, 
-                      borderRadius: 2,
-                      borderColor: '#121212',
-                      color: '#121212',
+                      borderRadius: GLASS.radius.button,
+                      borderColor: GLASS.accent.orange,
+                      color: GLASS.accent.orange,
                       '&:hover': {
-                        backgroundColor: 'rgba(18,18,18,0.04)',
-                        borderColor: '#000'
+                        backgroundColor: 'rgba(247, 66, 17, 0.06)',
+                        borderColor: GLASS.accent.orangeDark,
                       },
                       '&.Mui-disabled': {
                         color: 'rgba(0, 0, 0, 0.26)'
@@ -903,7 +922,6 @@ const CreateStory: React.FC = () => {
 
                   <Button
                     variant="contained"
-                    color="primary"
                     size="large"
                     startIcon={<ScheduleIcon />}
                     onClick={handleSubmit}
@@ -911,11 +929,13 @@ const CreateStory: React.FC = () => {
                     sx={{ 
                       px: 4, 
                       py: 1.5, 
-                      borderRadius: 2,
-                      backgroundColor: '#121212',
+                      borderRadius: GLASS.radius.button,
+                      backgroundColor: GLASS.accent.orange,
                       color: '#ffffff',
+                      boxShadow: GLASS.shadow.button,
                       '&:hover': {
-                        backgroundColor: '#333'
+                        backgroundColor: GLASS.accent.orangeDark,
+                        boxShadow: GLASS.shadow.buttonHover,
                       },
                       '&.Mui-disabled': {
                         color: 'rgba(255, 255, 255, 0.3)'
@@ -949,9 +969,19 @@ const CreateStory: React.FC = () => {
     onClose={() => setPreviewOpen(false)}
     maxWidth="xs"
     fullWidth
+    PaperProps={{
+      sx: {
+        background: GLASS.surface.bgStrong,
+        backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+        WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+        borderRadius: GLASS.radius.card,
+        border: `1px solid ${GLASS.border.outer}`,
+        boxShadow: GLASS.shadow.card,
+      }
+    }}
   >
     <DialogTitle sx={{ display: 'flex', alignItems: 'center' }}>
-      <StoryIcon sx={{ mr: 1, color: theme.palette.primary.main }} />
+      <StoryIcon sx={{ mr: 1, color: GLASS.accent.orange }} />
       Prévia do Story
       {selectedClient && (
         <Chip
@@ -986,11 +1016,21 @@ const CreateStory: React.FC = () => {
     onClose={() => setClientDialogOpen(false)}
     fullWidth 
     maxWidth="md"
+    PaperProps={{
+      sx: {
+        background: GLASS.surface.bgStrong,
+        backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+        WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+        borderRadius: GLASS.radius.card,
+        border: `1px solid ${GLASS.border.outer}`,
+        boxShadow: GLASS.shadow.card,
+      }
+    }}
   >
     <DialogTitle sx={{ 
-      borderBottom: '1px solid rgba(0,0,0,0.08)',
+      borderBottom: `1px solid ${GLASS.border.outer}`,
       fontWeight: 'bold',
-      backgroundColor: '#f9f9f9'
+      color: GLASS.text.heading,
     }}>
       Gerenciar Clientes
     </DialogTitle>
@@ -1006,16 +1046,17 @@ const CreateStory: React.FC = () => {
 
   {isMobile && (
     <Fab 
-      color="primary" 
       aria-label="add-client" 
       sx={{ 
         position: 'fixed', 
         bottom: 16, 
         right: 16,
-        backgroundColor: '#121212',
+        backgroundColor: GLASS.accent.orange,
         color: '#ffffff',
+        boxShadow: GLASS.shadow.button,
         '&:hover': {
-          backgroundColor: '#333'
+          backgroundColor: GLASS.accent.orangeDark,
+          boxShadow: GLASS.shadow.buttonHover,
         }
       }}
       onClick={() => setClientDialogOpen(true)}

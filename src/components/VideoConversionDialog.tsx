@@ -21,6 +21,7 @@ import {
   ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { VideoFormatInfo } from '../services/videoFormatValidator';
+import { GLASS } from '../theme/glassTokens';
 
 interface VideoConversionDialogProps {
   open: boolean;
@@ -60,7 +61,18 @@ const VideoConversionDialog: React.FC<VideoConversionDialogProps> = ({
   }, [onClose]);
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: GLASS.radius.card,
+          bgcolor: GLASS.surface.bgStrong,
+          backdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          WebkitBackdropFilter: `blur(${GLASS.surface.blurStrong})`,
+          border: `1px solid ${GLASS.border.outer}`,
+          boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+        }
+      }}
+    >
       <DialogTitle
         sx={{
           display: 'flex',
