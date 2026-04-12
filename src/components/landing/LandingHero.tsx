@@ -72,7 +72,7 @@ const LandingHero: React.FC<LandingHeroProps> = ({ onGetStarted, onViewDemo }) =
             >
               <Chip
                 icon={<CodeIcon sx={{ color: `${INSYT_COLORS.primaryLight} !important` }} />}
-                label="Agência · Multi-conta · No horário"
+                label="Agendamento · Aprovação · Dashboard compartilhável"
                 sx={{
                   background: alpha(INSYT_COLORS.primary, 0.2),
                   color: INSYT_COLORS.primaryLight,
@@ -98,7 +98,7 @@ const LandingHero: React.FC<LandingHeroProps> = ({ onGetStarted, onViewDemo }) =
                 color: INSYT_COLORS.gray100,
               }}
             >
-              Escale clientes no Instagram{' '}
+              Operação de conteúdo no Instagram{' '}
               <Box
                 component="span"
                 sx={{
@@ -108,7 +108,7 @@ const LandingHero: React.FC<LandingHeroProps> = ({ onGetStarted, onViewDemo }) =
                   backgroundClip: 'text',
                 }}
               >
-                sem perder o controle
+                com governança de ponta a ponta
               </Box>
             </Typography>
 
@@ -123,8 +123,8 @@ const LandingHero: React.FC<LandingHeroProps> = ({ onGetStarted, onViewDemo }) =
                 fontSize: { xs: '1.05rem', md: '1.125rem' },
               }}
             >
-              Agende posts, reels e stories para várias contas, com analytics em tempo real e publicação confiável — a
-              sua marca, em todo lugar.
+              Centralize agendamento de posts, carrosséis, reels e stories, aprovação interna e do cliente, e
+              compartilhamento de métricas por link. Um fluxo único para escalar contas sem perder previsibilidade.
             </Typography>
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 4 }}>
@@ -153,7 +153,7 @@ const LandingHero: React.FC<LandingHeroProps> = ({ onGetStarted, onViewDemo }) =
                     transition: `all ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
                   }}
                 >
-                  Começar grátis
+                  Iniciar operação
                 </Button>
               </motion.div>
               <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
@@ -179,7 +179,7 @@ const LandingHero: React.FC<LandingHeroProps> = ({ onGetStarted, onViewDemo }) =
                     },
                   }}
                 >
-                  Ver planos
+                  Ver planos e recursos
                 </Button>
               </motion.div>
             </Stack>
@@ -197,7 +197,7 @@ const LandingHero: React.FC<LandingHeroProps> = ({ onGetStarted, onViewDemo }) =
                   mb: 1.5,
                 }}
               >
-                Sua presença, em todo feed
+                Criado para times e agências
               </Typography>
               <AvatarGroup
                 max={6}

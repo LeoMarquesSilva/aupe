@@ -58,10 +58,10 @@ const LandingPricing: React.FC<LandingPricingProps> = ({ plans, loadingPlans, on
             backgroundClip: 'text',
           }}
         >
-          Planos e preços
+          Planos para sua operação
         </Typography>
         <Typography variant="h6" sx={{ color: INSYT_COLORS.gray400, maxWidth: 560, mx: 'auto', fontWeight: 400 }}>
-          Escolha o plano ideal para suas necessidades. Todos incluem teste gratuito.
+          Compare capacidade por contas, volume de posts e gestão de equipe para escalar com previsibilidade.
         </Typography>
       </Box>
 
@@ -200,7 +200,7 @@ const LandingPricing: React.FC<LandingPricingProps> = ({ plans, loadingPlans, on
                       transition: `all ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
                     }}
                   >
-                    Começar agora
+                    Escolher plano
                   </Button>
                 </Card>
               </motion.div>

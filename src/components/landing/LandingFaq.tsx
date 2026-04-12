@@ -29,10 +29,10 @@ const LandingFaq: React.FC = () => (
             backgroundClip: 'text',
           }}
         >
-          Perguntas frequentes
+          Dúvidas sobre a operação
         </Typography>
         <Typography variant="h6" sx={{ color: INSYT_COLORS.gray400, maxWidth: 560, mx: 'auto', fontWeight: 400 }}>
-          Tire suas dúvidas sobre o INSYT
+          Entenda como funcionam agendamento, aprovação e compartilhamento com o cliente
         </Typography>
       </Box>
 

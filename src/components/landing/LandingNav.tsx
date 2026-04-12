@@ -84,7 +84,7 @@ const LandingNav: React.FC<LandingNavProps> = ({
                 '&:hover': { color: INSYT_COLORS.primaryLight },
               }}
             >
-              Funcionalidades
+              Recursos
             </Button>
             <Button
               color="inherit"
@@ -95,7 +95,7 @@ const LandingNav: React.FC<LandingNavProps> = ({
                 '&:hover': { color: INSYT_COLORS.primaryLight },
               }}
             >
-              Preços
+              Planos
             </Button>
             <Button
               color="inherit"
@@ -106,7 +106,7 @@ const LandingNav: React.FC<LandingNavProps> = ({
                 '&:hover': { color: INSYT_COLORS.primaryLight },
               }}
             >
-              FAQ
+              Dúvidas
             </Button>
             <Button
               variant="contained"
@@ -128,7 +128,7 @@ const LandingNav: React.FC<LandingNavProps> = ({
                 transition: `all ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
               }}
             >
-              Começar Agora
+              Iniciar operação
             </Button>
           </Box>
         )}
@@ -168,7 +168,7 @@ const LandingNav: React.FC<LandingNavProps> = ({
                 setTimeout(() => scrollToId('features'), 100);
               }}
             >
-              <ListItemText primary="Funcionalidades" sx={{ color: INSYT_COLORS.gray300 }} />
+              <ListItemText primary="Recursos" sx={{ color: INSYT_COLORS.gray300 }} />
             </ListItemButton>
           </ListItem>
           <ListItem disablePadding>
@@ -178,7 +178,7 @@ const LandingNav: React.FC<LandingNavProps> = ({
                 setTimeout(() => scrollToId('precos'), 100);
               }}
             >
-              <ListItemText primary="Preços" sx={{ color: INSYT_COLORS.gray300 }} />
+              <ListItemText primary="Planos" sx={{ color: INSYT_COLORS.gray300 }} />
             </ListItemButton>
           </ListItem>
           <ListItem disablePadding>
@@ -188,7 +188,7 @@ const LandingNav: React.FC<LandingNavProps> = ({
                 setTimeout(() => scrollToId('faq'), 100);
               }}
             >
-              <ListItemText primary="FAQ" sx={{ color: INSYT_COLORS.gray300 }} />
+              <ListItemText primary="Dúvidas" sx={{ color: INSYT_COLORS.gray300 }} />
             </ListItemButton>
           </ListItem>
           <Divider sx={{ my: 2, bgcolor: alpha(INSYT_COLORS.primary, 0.2) }} />
@@ -206,7 +206,7 @@ const LandingNav: React.FC<LandingNavProps> = ({
                 fontWeight: 600,
               }}
             >
-              Começar Agora
+              Iniciar operação
             </Button>
           </ListItem>
         </List>

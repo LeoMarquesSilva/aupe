@@ -65,45 +65,45 @@ export const performanceData = [
 export const features = [
   {
     icon: React.createElement(DataObjectIcon, { sx: icon48 }),
-    title: 'Inteligência de Dados',
+    title: 'Agendamento automático no Instagram',
     description:
-      'Analytics avançados com machine learning para otimizar cada post. Decisões baseadas em dados reais, não em suposições.',
+      'Agende post, carrossel, reels e stories em uma operação única. O sistema dispara no horário programado e acompanha o status até a publicação.',
     gradient: `linear-gradient(135deg, ${GLASS.accent.orange} 0%, #06B6D4 100%)`,
   },
   {
     icon: React.createElement(SpeedIcon, { sx: icon48 }),
-    title: 'Automação Inteligente',
+    title: 'Aprovação interna e aprovação do cliente',
     description:
-      'Sistema de agendamento 24/7 com retry automático e cache inteligente. Publicação garantida no horário exato.',
+      'Centralize revisão do time e aprovação externa no mesmo fluxo. Gere links com validade para gestor e cliente, com histórico de aprovações e pedidos de ajuste.',
     gradient: `linear-gradient(135deg, ${GLASS.accent.orangeDark} 0%, ${GLASS.accent.orangeLight} 100%)`,
   },
   {
     icon: React.createElement(AnalyticsIcon, { sx: icon48 }),
-    title: 'Analytics em Tempo Real',
+    title: 'Dashboard compartilhável por link',
     description:
-      'Métricas detalhadas de alcance, engajamento, conversão e ROI. Dashboards interativos com visualizações avançadas.',
+      'Compartilhe métricas com o cliente sem criar usuário. Links temporários podem ser revogados a qualquer momento e mostram apenas dados do dashboard.',
     gradient: `linear-gradient(135deg, #06B6D4 0%, ${GLASS.accent.orange} 100%)`,
   },
   {
     icon: React.createElement(SecurityIcon, { sx: icon48 }),
-    title: 'Infraestrutura Robusta',
+    title: 'Operação multi-conta com governança',
     description:
-      'Arquitetura escalável com Supabase, N8N e APIs oficiais. Segurança e confiabilidade enterprise-grade.',
+      'Gerencie múltiplos clientes com previsibilidade: calendário, aprovação e publicação no mesmo sistema, com regras de acesso e rastreabilidade por organização.',
     gradient: `linear-gradient(135deg, ${GLASS.accent.orange} 0%, #06B6D4 100%)`,
   },
 ];
 
 export const stats = [
-  { value: 100, suffix: '%', label: 'Automação', icon: React.createElement(AutoAwesomeIcon) },
-  { value: 24, suffix: '/7', label: 'Disponibilidade', icon: React.createElement(CloudIcon) },
-  { value: 1000, suffix: '+', label: 'Posts Agendados', icon: React.createElement(ScheduleIcon) },
-  { value: 99, suffix: '.9%', label: 'Uptime', icon: React.createElement(SecurityIcon) },
+  { value: 4, suffix: '', label: 'Formatos de conteúdo', icon: React.createElement(AutoAwesomeIcon) },
+  { value: 2, suffix: '', label: 'Níveis de aprovação', icon: React.createElement(SecurityIcon) },
+  { value: 1, suffix: '', label: 'Fluxo único de operação', icon: React.createElement(ScheduleIcon) },
+  { value: 24, suffix: '/7', label: 'Motor de agendamento', icon: React.createElement(CloudIcon) },
 ];
 
 export const postTypes = [
   {
     icon: React.createElement(ImageIcon),
-    name: 'Posts',
+    name: 'Post',
     color: GLASS.accent.orange,
     gradient: `linear-gradient(135deg, ${GLASS.accent.orange} 0%, ${GLASS.accent.orangeLight} 100%)`,
   },
@@ -131,41 +131,41 @@ export const faqs = [
   {
     question: 'O que é o INSYT?',
     answer:
-      'INSYT é uma plataforma completa de agendamento e analytics para Instagram. Com tecnologia de ponta, oferecemos automação inteligente, análise de dados em tempo real e gestão multi-cliente para transformar sua presença nas redes sociais.',
+      'INSYT é uma plataforma para operação de conteúdo no Instagram. Você agenda publicações, controla aprovação interna e do cliente e compartilha dashboard por link em um único fluxo.',
   },
   {
     question: 'Como funciona o agendamento?',
     answer:
-      'O INSYT utiliza integração direta com a Instagram Graph API através de automação N8N. Você agenda seus posts, carrosséis, reels ou stories com data e hora, e nossa plataforma publica automaticamente no horário exato, 24/7.',
+      'Você define cliente, formato, legenda e horário. O sistema envia o conteúdo para a fila de publicação e executa automaticamente no Instagram, com acompanhamento de status em cada etapa.',
   },
   {
     question: 'Quais tipos de conteúdo posso agendar?',
     answer:
-      'Você pode agendar posts simples (1 imagem), carrosséis (2-10 imagens), reels (vídeos) e stories. Todos os tipos de conteúdo são suportados com a mesma facilidade e precisão.',
+      'A plataforma suporta post, carrossel, reels e stories. Todos os formatos entram no mesmo calendário e seguem o mesmo fluxo de aprovação e agendamento.',
   },
   {
-    question: 'Os dados são seguros?',
+    question: 'Como funciona a aprovação de conteúdo?',
     answer:
-      'Sim! Utilizamos Supabase (PostgreSQL) com criptografia de ponta a ponta, autenticação segura e infraestrutura enterprise-grade. Seus dados e tokens do Instagram são protegidos com os mais altos padrões de segurança.',
+      'Você pode revisar internamente com o gestor e, depois, enviar para aprovação do cliente. Cada etapa usa links com token e validade, permitindo aprovar ou solicitar ajustes sem login adicional.',
+  },
+  {
+    question: 'Posso compartilhar métricas com o cliente?',
+    answer:
+      'Sim. O sistema gera links de dashboard somente leitura para o cliente acompanhar desempenho. Esses links têm expiração e podem ser revogados pelo time quando necessário.',
   },
   {
     question: 'Posso gerenciar múltiplas contas?',
     answer:
-      'Sim! O INSYT foi desenvolvido para gestão multi-cliente. Você pode gerenciar múltiplas contas Instagram em um só lugar, cada uma com seu próprio dashboard, analytics e configurações.',
+      'Sim. O INSYT foi projetado para operação multi-cliente, com organização por conta, histórico de conteúdo, aprovações e visão centralizada de links ativos.',
   },
   {
-    question: 'Como funcionam os analytics?',
+    question: 'Os dados e links são seguros?',
     answer:
-      'Nossos analytics são atualizados em tempo real através da Instagram Graph API. Você tem acesso a métricas detalhadas de alcance, engajamento, likes, comentários, salvamentos e muito mais, com visualizações interativas e relatórios personalizados.',
-  },
-  {
-    question: 'Posso cancelar a qualquer momento?',
-    answer:
-      'Sim! Você pode cancelar sua assinatura a qualquer momento sem taxas ou multas. Seu acesso permanece ativo até o final do período pago.',
+      'Os links de aprovação e dashboard usam token aleatório e validade definida. O compartilhamento expõe apenas dados necessários para visualização e pode ser revogado a qualquer momento.',
   },
   {
     question: 'Há limite de posts agendados?',
     answer:
-      'Depende do plano. O plano Starter permite 50 posts/mês, Professional e Enterprise têm posts ilimitados. Todos os planos permitem agendamento com semanas ou meses de antecedência.',
+      'O limite depende do plano contratado. A capacidade mensal e os recursos disponíveis aparecem na seção de planos para facilitar a escolha da operação ideal.',
   },
 ];

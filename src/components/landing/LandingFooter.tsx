@@ -33,7 +33,7 @@ const LandingFooter: React.FC = () => {
               sx={{ height: 48, width: 'auto', mb: 2, display: 'block' }}
             />
             <Typography variant="body2" sx={{ color: INSYT_COLORS.gray400, lineHeight: 1.75, mb: 2 }}>
-              Sua inteligência para o Instagram. Agende, analise e cresça com tecnologia de ponta.
+              Plataforma de operação para Instagram: agendamento automático, aprovação em fluxo e dashboard compartilhável com clientes.
             </Typography>
             <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ opacity: 0.85 }}>
               {LOGO_ALT_MARKS.map((src) => (
@@ -70,7 +70,7 @@ const LandingFooter: React.FC = () => {
                       '&:hover': { color: INSYT_COLORS.primaryLight },
                     }}
                   >
-                    Funcionalidades
+                    Recursos
                   </Typography>
                   <Typography
                     variant="body2"
@@ -88,7 +88,7 @@ const LandingFooter: React.FC = () => {
                       '&:hover': { color: INSYT_COLORS.primaryLight },
                     }}
                   >
-                    Preços
+                    Planos
                   </Typography>
                 </Stack>
               </Grid>
@@ -113,7 +113,7 @@ const LandingFooter: React.FC = () => {
                       '&:hover': { color: INSYT_COLORS.primaryLight },
                     }}
                   >
-                    FAQ
+                    Dúvidas
                   </Typography>
                   <Typography
                     variant="body2"
@@ -158,7 +158,7 @@ const LandingFooter: React.FC = () => {
         </Grid>
         <Divider sx={{ my: 4, bgcolor: alpha(INSYT_COLORS.primary, 0.2) }} />
         <Typography variant="body2" sx={{ textAlign: 'center', color: INSYT_COLORS.gray500 }}>
-          © {new Date().getFullYear()} INSYT. Todos os direitos reservados. Tecnologia e dados.
+          © {new Date().getFullYear()} INSYT. Todos os direitos reservados. Operação de conteúdo com governança.
         </Typography>
       </Container>
     </Box>

@@ -45,7 +45,7 @@ const LandingCta: React.FC<LandingCtaProps> = ({ onGetStarted }) => (
             color: INSYT_COLORS.white,
           }}
         >
-          Pronto para transformar seu Instagram?
+          Pronto para profissionalizar sua operação de conteúdo?
         </Typography>
         <Typography
           variant="h5"
@@ -56,7 +56,7 @@ const LandingCta: React.FC<LandingCtaProps> = ({ onGetStarted }) => (
             fontSize: { xs: '1.05rem', md: '1.25rem' },
           }}
         >
-          Comece hoje e veja a diferença que a automação inteligente faz
+          Agende, aprove e compartilhe resultados com o cliente em um fluxo único
         </Typography>
         <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
           <Button
@@ -82,7 +82,7 @@ const LandingCta: React.FC<LandingCtaProps> = ({ onGetStarted }) => (
               transition: `all ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
             }}
           >
-            Começar agora — é grátis
+            Iniciar operação
           </Button>
         </motion.div>
       </Box>

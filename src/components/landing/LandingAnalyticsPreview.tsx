@@ -50,13 +50,13 @@ const LandingAnalyticsPreview: React.FC = () => (
               backgroundClip: 'text',
             }}
           >
-            Analytics em tempo real
+            Dashboard para decisões rápidas
           </Typography>
           <Typography
             variant="h6"
             sx={{ color: INSYT_COLORS.gray400, maxWidth: 560, mx: 'auto', fontWeight: 400 }}
           >
-            Visualize dados, identifique tendências e otimize sua estratégia com insights poderosos
+            Acompanhe desempenho, compartilhe resultados com o cliente e ajuste o calendário com base em dados
           </Typography>
         </Box>
 
@@ -80,7 +80,7 @@ const LandingAnalyticsPreview: React.FC = () => (
                   fontWeight: 600,
                 }}
               >
-                Performance semanal
+                Alcance e cadência semanal
               </Typography>
               <Box sx={{ height: 280, width: '100%' }}>
                 <ResponsiveContainer>
@@ -120,7 +120,7 @@ const LandingAnalyticsPreview: React.FC = () => (
                   fontWeight: 600,
                 }}
               >
-                Crescimento mensal
+                Evolução mensal
               </Typography>
               <Box sx={{ height: 280, width: '100%' }}>
                 <ResponsiveContainer>

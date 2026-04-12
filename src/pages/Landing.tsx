@@ -40,9 +40,9 @@ const Landing: React.FC = () => {
               `Até ${plan.max_clients} contas Instagram`,
               `${plan.max_posts_per_month.toLocaleString('pt-BR')} posts agendados/mês`,
               `Até ${plan.max_profiles} pessoas com acesso`,
-              'Analytics avançados',
-              'Suporte por email',
-              'Agendamento de posts e stories',
+              'Aprovação interna e aprovação do cliente',
+              'Links de dashboard para cliente',
+              'Agendamento de post, carrossel, reels e stories',
             ];
 
             if (plan.features && typeof plan.features === 'object') {
@@ -58,12 +58,12 @@ const Landing: React.FC = () => {
               period: '/mês',
               description:
                 plan.name === 'starter'
-                  ? 'Perfeito para começar'
+                  ? 'Para estruturar a operação'
                   : plan.name === 'professional'
-                    ? 'Para profissionais e agências'
+                    ? 'Para times e agências em escala'
                     : plan.name === 'business'
-                      ? 'Para empresas em crescimento'
-                      : 'Plano completo',
+                      ? 'Para operação avançada multi-conta'
+                      : 'Operação completa',
               features: featuresList,
               popular: plan.name === 'professional',
               gradient:
@@ -88,8 +88,13 @@ const Landing: React.FC = () => {
             name: 'Starter',
             price: 'R$ 87,90',
             period: '/mês',
-            description: 'Perfeito para começar',
-            features: ['Até 3 contas Instagram', '900 posts agendados/mês', 'Analytics básicos', 'Suporte por email'],
+            description: 'Para estruturar a operação',
+            features: [
+              'Até 3 contas Instagram',
+              '900 posts agendados/mês',
+              'Aprovação interna e cliente',
+              'Links de dashboard para cliente',
+            ],
             popular: false,
             gradient: `linear-gradient(135deg, ${GLASS.accent.orange} 0%, ${GLASS.accent.orangeLight} 100%)`,
           },

@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useDropzone } from 'react-dropzone';
 import { Box, Typography, CircularProgress, Alert, IconButton, useTheme } from '@mui/material';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -526,119 +527,125 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                     >
                       {images.map((image, index) => (
                         <Draggable key={image.id} draggableId={image.id} index={index}>
-                          {(provided, snapshot) => (
-                            <Box 
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              sx={{ 
-                                opacity: snapshot.isDragging ? 0.8 : 1
-                              }}
-                            >
-                              <Box
-                                sx={{
-                                  position: 'relative',
-                                  width: 120, // ✅ Tamanho fixo menor
-                                  height: 120, // ✅ Tamanho fixo menor
-                                  borderRadius: 1,
-                                  overflow: 'hidden',
-                                  boxShadow: snapshot.isDragging 
-                                    ? '0 8px 16px rgba(0,0,0,0.2)' 
-                                    : '0 2px 4px rgba(0,0,0,0.1)',
-                                  transition: 'transform 0.2s, box-shadow 0.2s',
-                                  '&:hover': {
-                                    transform: 'scale(1.03)',
-                                    boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
-                                  },
-                                  border: index === currentPreviewIndex 
-                                    ? '2px solid #3897f0' 
-                                    : '1px solid #dbdbdb',
-                                  cursor: 'pointer'
+                          {(provided, snapshot) => {
+                            const draggableNode = (
+                              <Box 
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                sx={{ 
+                                  opacity: snapshot.isDragging ? 0.8 : 1
                                 }}
-                                onClick={() => setCurrentPreviewIndex(index)}
                               >
-                                {image.url && (
-                                  <Box
-                                    component="img"
-                                    src={image.url}
-                                    alt={`Imagem ${index + 1}`}
-                                    sx={{
-                                      width: '100%',
-                                      height: '100%',
-                                      objectFit: 'cover'
-                                    }}
-                                    onError={(e) => {
-                                      console.error("Erro ao carregar imagem:", image.url);
-                                      e.currentTarget.src = "https://via.placeholder.com/120x120?text=Erro";
-                                    }}
-                                  />
-                                )}
-                                
-                                {/* ✅ Drag Handle melhor posicionado */}
-                                <Box 
-                                  {...provided.dragHandleProps}
-                                  sx={{
-                                    position: 'absolute',
-                                    top: 4,
-                                    left: 4,
-                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                    color: 'white',
-                                    width: '24px',
-                                    height: '24px',
-                                    borderRadius: '4px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    cursor: 'grab',
-                                    zIndex: 1
-                                  }}
-                                >
-                                  <DragIndicatorIcon sx={{ fontSize: 16 }} />
-                                </Box>
-                                
-                                {/* ✅ Delete Button melhor posicionado */}
-                                <IconButton
-                                  size="small"
-                                  sx={{
-                                    position: 'absolute',
-                                    top: 4,
-                                    right: 4,
-                                    backgroundColor: 'rgba(220,0,0,0.8)',
-                                    color: 'white',
-                                    width: '24px',
-                                    height: '24px',
-                                    '&:hover': {
-                                      backgroundColor: 'rgba(220,0,0,0.9)',
-                                    },
-                                    zIndex: 1
-                                  }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeImage(index);
-                                  }}
-                                >
-                                  <DeleteOutlineIcon sx={{ fontSize: 16 }} />
-                                </IconButton>
-                                
-                                {/* ✅ Image Number melhor posicionado */}
                                 <Box
                                   sx={{
-                                    position: 'absolute',
-                                    bottom: 4,
-                                    left: 4,
-                                    backgroundColor: 'rgba(0,0,0,0.7)',
-                                    color: 'white',
-                                    padding: '2px 6px',
-                                    fontSize: '11px',
-                                    borderRadius: '4px',
-                                    fontWeight: 'bold',
-                                    zIndex: 1
+                                    position: 'relative',
+                                    width: 120, // ✅ Tamanho fixo menor
+                                    height: 120, // ✅ Tamanho fixo menor
+                                    borderRadius: 1,
+                                    overflow: 'hidden',
+                                    boxShadow: snapshot.isDragging 
+                                      ? '0 8px 16px rgba(0,0,0,0.2)' 
+                                      : '0 2px 4px rgba(0,0,0,0.1)',
+                                    transition: 'transform 0.2s, box-shadow 0.2s',
+                                    '&:hover': {
+                                      transform: 'scale(1.03)',
+                                      boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
+                                    },
+                                    border: index === currentPreviewIndex 
+                                      ? '2px solid #3897f0' 
+                                      : '1px solid #dbdbdb',
+                                    cursor: 'pointer'
                                   }}
+                                  onClick={() => setCurrentPreviewIndex(index)}
                                 >
-                                  {index + 1}
+                                  {image.url && (
+                                    <Box
+                                      component="img"
+                                      src={image.url}
+                                      alt={`Imagem ${index + 1}`}
+                                      sx={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover'
+                                      }}
+                                      onError={(e) => {
+                                        console.error("Erro ao carregar imagem:", image.url);
+                                        e.currentTarget.src = "https://via.placeholder.com/120x120?text=Erro";
+                                      }}
+                                    />
+                                  )}
+                                  
+                                  {/* ✅ Drag Handle melhor posicionado */}
+                                  <Box 
+                                    {...provided.dragHandleProps}
+                                    sx={{
+                                      position: 'absolute',
+                                      top: 4,
+                                      left: 4,
+                                      backgroundColor: 'rgba(0,0,0,0.7)',
+                                      color: 'white',
+                                      width: '24px',
+                                      height: '24px',
+                                      borderRadius: '4px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'grab',
+                                      zIndex: 1
+                                    }}
+                                  >
+                                    <DragIndicatorIcon sx={{ fontSize: 16 }} />
+                                  </Box>
+                                  
+                                  {/* ✅ Delete Button melhor posicionado */}
+                                  <IconButton
+                                    size="small"
+                                    sx={{
+                                      position: 'absolute',
+                                      top: 4,
+                                      right: 4,
+                                      backgroundColor: 'rgba(220,0,0,0.8)',
+                                      color: 'white',
+                                      width: '24px',
+                                      height: '24px',
+                                      '&:hover': {
+                                        backgroundColor: 'rgba(220,0,0,0.9)',
+                                      },
+                                      zIndex: 1
+                                    }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeImage(index);
+                                    }}
+                                  >
+                                    <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                  
+                                  {/* ✅ Image Number melhor posicionado */}
+                                  <Box
+                                    sx={{
+                                      position: 'absolute',
+                                      bottom: 4,
+                                      left: 4,
+                                      backgroundColor: 'rgba(0,0,0,0.7)',
+                                      color: 'white',
+                                      padding: '2px 6px',
+                                      fontSize: '11px',
+                                      borderRadius: '4px',
+                                      fontWeight: 'bold',
+                                      zIndex: 1
+                                    }}
+                                  >
+                                    {index + 1}
+                                  </Box>
                                 </Box>
                               </Box>
-                            </Box>
-                          )}
+                            );
+
+                            return snapshot.isDragging
+                              ? createPortal(draggableNode, document.body)
+                              : draggableNode;
+                          }}
                         </Draggable>
                       ))}
                       {provided.placeholder}

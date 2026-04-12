@@ -28,10 +28,10 @@ const LandingPostTypes: React.FC = () => (
             backgroundClip: 'text',
           }}
         >
-          Todos os tipos de conteúdo
+          Formatos que sua operação precisa
         </Typography>
         <Typography variant="h6" sx={{ color: INSYT_COLORS.gray400, maxWidth: 560, mx: 'auto', fontWeight: 400 }}>
-          Agende qualquer tipo de conteúdo com a mesma facilidade e precisão
+          Um único fluxo para planejar, aprovar e publicar post, carrossel, reels e stories
         </Typography>
       </Box>
 

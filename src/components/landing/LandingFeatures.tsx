@@ -29,10 +29,10 @@ const LandingFeatures: React.FC = () => (
             backgroundClip: 'text',
           }}
         >
-          Tecnologia e dados
+          Controle operacional com escala
         </Typography>
         <Typography variant="h6" sx={{ color: INSYT_COLORS.gray400, maxWidth: 640, mx: 'auto', fontWeight: 400 }}>
-          Funcionalidades poderosas construídas com as melhores tecnologias do mercado
+          Do planejamento ao publish, cada etapa do conteúdo fica no mesmo sistema
         </Typography>
       </Box>
 
