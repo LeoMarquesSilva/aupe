@@ -21,6 +21,17 @@ export function getUserFriendlyMessage(error: unknown, context?: string): string
   if (lower.includes('upload') || lower.includes('storage') || lower.includes('supabase') || lower.includes('bucket'))
     return 'Não foi possível enviar as mídias. Tente novamente ou use outros arquivos.';
 
+  // Instagram media constraints
+  if (
+    lower.includes('2207004') ||
+    lower.includes('8 mib') ||
+    lower.includes('less than 8') ||
+    lower.includes('image is too large') ||
+    (lower.includes('imagem') && lower.includes('8 mb'))
+  ) {
+    return 'Uma ou mais imagens excedem o limite do Instagram (8 MB por imagem). Compacte ou substitua os arquivos e tente novamente.';
+  }
+
   // Rede / servidor
   if (lower.includes('network') || lower.includes('fetch') || lower.includes('failed to fetch'))
     return 'Problema de conexão. Verifique sua internet e tente novamente.';

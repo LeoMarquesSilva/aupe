@@ -1,7 +1,20 @@
 import React, { useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useDropzone } from 'react-dropzone';
-import { Box, Typography, CircularProgress, Alert, IconButton, useTheme } from '@mui/material';
+import {
+  Box,
+  Typography,
+  CircularProgress,
+  Alert,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  FormControlLabel,
+  Checkbox
+} from '@mui/material';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { PostImage } from '../types';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -12,6 +25,7 @@ import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import SendIcon from '@mui/icons-material/Send';
 import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import { GLASS } from '../theme/glassTokens';
+import { INSTAGRAM_MAX_IMAGE_BYTES, supabaseStorageService } from '../services/supabaseStorageService';
 
 interface ImageUploaderProps {
   images: PostImage[];
@@ -25,6 +39,20 @@ interface ImageUploaderProps {
   disabled?: boolean;
 }
 
+function formatFileSizeMb(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+interface CompressionPreviewState {
+  originalDataUrl: string;
+  compressedObjectUrl: string;
+  originalSize: number;
+  compressedSize: number;
+  displayName: string;
+  totalOversized: number;
+  totalFiles: number;
+}
+
 const ImageUploader: React.FC<ImageUploaderProps> = ({ 
   images, 
   onChange, 
@@ -36,10 +64,59 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   helperText = '',
   disabled = false
 }) => {
-  const _theme = useTheme();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
+
+  const [compressionModalOpen, setCompressionModalOpen] = useState(false);
+  const [pendingFilesForCompression, setPendingFilesForCompression] = useState<File[] | null>(null);
+  const [compressionPreview, setCompressionPreview] = useState<CompressionPreviewState | null>(null);
+  const [compressionPreviewLoading, setCompressionPreviewLoading] = useState(false);
+  const [compressionAgreed, setCompressionAgreed] = useState(false);
+
+  const clearCompressionPreviewUrls = useCallback(() => {
+    setCompressionPreview((prev) => {
+      if (prev?.compressedObjectUrl) {
+        URL.revokeObjectURL(prev.compressedObjectUrl);
+      }
+      return null;
+    });
+  }, []);
+
+  const buildCompressionPreview = useCallback(async (filesToHandle: File[]): Promise<CompressionPreviewState | null> => {
+    const firstOversized = filesToHandle.find((f) => f.size > INSTAGRAM_MAX_IMAGE_BYTES);
+    if (!firstOversized) return null;
+
+    const originalDataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Não foi possível ler a imagem para prévia.'));
+      reader.readAsDataURL(firstOversized);
+    });
+
+    const prepared = await supabaseStorageService.prepareImageForInstagram(firstOversized, {
+      oversizeStrategy: 'auto_compress',
+    });
+
+    if (prepared.skipped || !prepared.file) {
+      throw new Error(
+        prepared.reason || 'Não foi possível gerar uma versão dentro do limite de 8 MB para pré-visualização.'
+      );
+    }
+
+    const compressedObjectUrl = URL.createObjectURL(prepared.file);
+
+    return {
+      originalDataUrl,
+      compressedObjectUrl,
+      originalSize: firstOversized.size,
+      compressedSize: prepared.file.size,
+      displayName: firstOversized.name,
+      totalOversized: filesToHandle.filter((f) => f.size > INSTAGRAM_MAX_IMAGE_BYTES).length,
+      totalFiles: filesToHandle.length,
+    };
+  }, []);
 
   // ✅ Calcular proporção para o preview
   const getAspectRatioPadding = (ratio: string): string => {
@@ -56,60 +133,86 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     });
   };
 
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+  const processDroppedFiles = useCallback(async (acceptedFiles: File[]) => {
     if (disabled) return;
     if (acceptedFiles.length === 0) return;
-    
+
     const remainingSlots = maxImages - images.length;
     if (remainingSlots <= 0) {
       setError(`Máximo de ${maxImages} imagem${maxImages > 1 ? 'ns' : ''} permitida${maxImages > 1 ? 's' : ''}.`);
       return;
     }
-    
-    const filesToProcess = acceptedFiles.slice(0, remainingSlots);
+
+    let warningMessage: string | null = null;
+    const filesWithinLimit = acceptedFiles.slice(0, remainingSlots);
     if (acceptedFiles.length > remainingSlots) {
-      setError(`Apenas ${remainingSlots} imagem${remainingSlots > 1 ? 'ns' : ''} foi${remainingSlots > 1 ? 'ram' : ''} adicionada${remainingSlots > 1 ? 's' : ''} devido ao limite de ${maxImages}.`);
+      warningMessage = `Apenas ${remainingSlots} imagem${remainingSlots > 1 ? 'ns' : ''} foi${remainingSlots > 1 ? 'ram' : ''} adicionada${remainingSlots > 1 ? 's' : ''} devido ao limite de ${maxImages}.`;
     }
-    
+
+    const filesToProcess: File[] = filesWithinLimit;
+
     setUploading(true);
     setError(null);
-    
+
     try {
       const newImages: PostImage[] = [];
-      
-      for (const file of filesToProcess) {
+      const failedCompression: string[] = [];
+
+      for (const originalFile of filesToProcess) {
         try {
-          console.log("Processando arquivo:", file.name, file.type, file.size);
-          
-          if (!file.type.startsWith('image/')) {
-            console.error("Arquivo não é uma imagem:", file.type);
+          console.log('Processando arquivo:', originalFile.name, originalFile.type, originalFile.size);
+
+          if (!originalFile.type.startsWith('image/')) {
+            console.error('Arquivo não é uma imagem:', originalFile.type);
             continue;
           }
-          
-          const localPreview = await createLocalImagePreview(file);
-          console.log("Preview local criado com tamanho:", localPreview.length);
-          
+
+          let finalFile = originalFile;
+          if (originalFile.size > INSTAGRAM_MAX_IMAGE_BYTES) {
+            const prepared = await supabaseStorageService.prepareImageForInstagram(originalFile, {
+              oversizeStrategy: 'auto_compress'
+            });
+
+            if (prepared.skipped || !prepared.file) {
+              failedCompression.push(originalFile.name);
+              continue;
+            }
+
+            finalFile = prepared.file;
+          }
+
+          const localPreview = await createLocalImagePreview(finalFile);
+          console.log('Preview local criado com tamanho:', localPreview.length);
+
           const newImage: PostImage = {
             id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             url: localPreview,
             order: images.length + newImages.length,
-            file: file
+            file: finalFile
           };
-          
+
           newImages.push(newImage);
         } catch (err) {
           console.error('Erro ao criar preview local:', err);
         }
       }
-      
-      console.log("Novas imagens criadas:", newImages.length);
-      
+
+      if (failedCompression.length > 0) {
+        const failedMsg = `${failedCompression.length} imagem${failedCompression.length > 1 ? 'ns' : ''} não pôde ser comprimida para menos de 8 MB: ${failedCompression.join(', ')}.`;
+        warningMessage = warningMessage ? `${warningMessage} ${failedMsg}` : failedMsg;
+      }
+
+      console.log('Novas imagens criadas:', newImages.length);
+
       if (newImages.length > 0) {
         const updatedImages = [...images, ...newImages];
-        console.log("Atualizando imagens:", updatedImages.length);
+        console.log('Atualizando imagens:', updatedImages.length);
         onChange(updatedImages);
       }
-      
+
+      if (warningMessage) {
+        setNotice((prev) => (prev ? `${prev} ${warningMessage}` : warningMessage));
+      }
     } catch (err) {
       console.error('Erro ao processar imagens:', err);
       setError('Erro ao processar imagens. Tente novamente.');
@@ -118,12 +221,82 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   }, [images, onChange, maxImages, disabled]);
 
+  const handleCancelCompressionModal = useCallback(() => {
+    clearCompressionPreviewUrls();
+    setPendingFilesForCompression(null);
+    setCompressionModalOpen(false);
+    setCompressionAgreed(false);
+    setCompressionPreviewLoading(false);
+  }, [clearCompressionPreviewUrls]);
+
+  const handleConfirmCompressionModal = useCallback(async () => {
+    if (!compressionAgreed || !pendingFilesForCompression) return;
+    const files = pendingFilesForCompression;
+    clearCompressionPreviewUrls();
+    setPendingFilesForCompression(null);
+    setCompressionModalOpen(false);
+    setCompressionAgreed(false);
+    await processDroppedFiles(files);
+  }, [compressionAgreed, pendingFilesForCompression, clearCompressionPreviewUrls, processDroppedFiles]);
+
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      if (disabled) return;
+      if (acceptedFiles.length === 0) return;
+
+      const remainingSlots = maxImages - images.length;
+      if (remainingSlots <= 0) {
+        setError(`Máximo de ${maxImages} imagem${maxImages > 1 ? 'ns' : ''} permitida${maxImages > 1 ? 's' : ''}.`);
+        return;
+      }
+
+      const filesToHandle = acceptedFiles.slice(0, remainingSlots);
+      const hasOversized = filesToHandle.some((f) => f.size > INSTAGRAM_MAX_IMAGE_BYTES);
+
+      if (!hasOversized) {
+        await processDroppedFiles(filesToHandle);
+        return;
+      }
+
+      setError(null);
+      setPendingFilesForCompression(filesToHandle);
+      setCompressionAgreed(false);
+      clearCompressionPreviewUrls();
+      setCompressionModalOpen(true);
+      setCompressionPreviewLoading(true);
+
+      try {
+        const preview = await buildCompressionPreview(filesToHandle);
+        setCompressionPreview(preview);
+      } catch (e) {
+        console.error(e);
+        setError(
+          e instanceof Error
+            ? e.message
+            : 'Não foi possível preparar a pré-visualização. Tente outra imagem ou tamanho menor.'
+        );
+        setCompressionModalOpen(false);
+        setPendingFilesForCompression(null);
+      } finally {
+        setCompressionPreviewLoading(false);
+      }
+    },
+    [
+      disabled,
+      maxImages,
+      images.length,
+      processDroppedFiles,
+      buildCompressionPreview,
+      clearCompressionPreviewUrls,
+    ]
+  );
+
   const { getRootProps, getInputProps } = useDropzone({
     onDrop,
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png']
     },
-    disabled: disabled || uploading || images.length >= maxImages
+    disabled: disabled || uploading || images.length >= maxImages || compressionPreviewLoading
   });
 
   const removeImage = (index: number) => {
@@ -245,6 +418,169 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           {error}
         </Alert>
       )}
+      {notice && (
+        <Alert severity="warning" sx={{ mb: 2 }} onClose={() => setNotice(null)}>
+          {notice}
+        </Alert>
+      )}
+
+      <Dialog
+        open={compressionModalOpen}
+        onClose={() => {
+          if (!compressionPreviewLoading) handleCancelCompressionModal();
+        }}
+        disableEscapeKeyDown={compressionPreviewLoading}
+        maxWidth="xl"
+        fullWidth
+        aria-labelledby="compression-dialog-title"
+        PaperProps={{
+          sx: {
+            maxHeight: '92vh',
+          },
+        }}
+      >
+        <DialogTitle id="compression-dialog-title">Compactação para o Instagram</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            O Instagram aceita até <strong>8 MB</strong> por imagem. Abaixo você vê uma prévia de como a
+            primeira imagem acima do limite ficará após a compactação (JPEG otimizado). Você precisa
+            concordar para adicionar ao carrossel.
+          </Typography>
+
+          {compressionPreview && compressionPreview.totalOversized > 1 && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              {compressionPreview.totalOversized} imagens excedem 8 MB. A comparação mostra a{' '}
+              <strong>primeira</strong> delas ({compressionPreview.displayName}); as demais seguem o
+              mesmo processo.
+            </Alert>
+          )}
+
+          {compressionPreviewLoading && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          )}
+
+          {!compressionPreviewLoading && compressionPreview && (
+            <>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                {compressionPreview.displayName}
+              </Typography>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                  gap: { xs: 2, md: 2.5 },
+                  alignItems: 'stretch',
+                }}
+              >
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
+                    Original
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '100%',
+                      minHeight: { xs: 280, sm: 360 },
+                      height: { xs: '48vh', md: '58vh' },
+                      maxHeight: { xs: 420, md: 620 },
+                      bgcolor: 'grey.100',
+                      borderRadius: 1,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Box
+                      component="img"
+                      src={compressionPreview.originalDataUrl}
+                      alt="Original"
+                      sx={{
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        width: 'auto',
+                        height: 'auto',
+                        objectFit: 'contain',
+                        display: 'block',
+                      }}
+                    />
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                    {formatFileSizeMb(compressionPreview.originalSize)}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
+                    Após compactação (prévia)
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '100%',
+                      minHeight: { xs: 280, sm: 360 },
+                      height: { xs: '48vh', md: '58vh' },
+                      maxHeight: { xs: 420, md: 620 },
+                      bgcolor: 'grey.100',
+                      borderRadius: 1,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Box
+                      component="img"
+                      src={compressionPreview.compressedObjectUrl}
+                      alt="Após compactação"
+                      sx={{
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        width: 'auto',
+                        height: 'auto',
+                        objectFit: 'contain',
+                        display: 'block',
+                      }}
+                    />
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                    {formatFileSizeMb(compressionPreview.compressedSize)} — dentro do limite do Instagram
+                  </Typography>
+                </Box>
+              </Box>
+
+              <FormControlLabel
+                sx={{ mt: 2 }}
+                control={
+                  <Checkbox
+                    checked={compressionAgreed}
+                    onChange={(_, checked) => setCompressionAgreed(checked)}
+                    color="primary"
+                  />
+                }
+                label="Li a prévia e concordo em aplicar esta compactação às imagens acima do limite."
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleCancelCompressionModal} disabled={compressionPreviewLoading}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void handleConfirmCompressionModal()}
+            disabled={
+              compressionPreviewLoading || !compressionPreview || !compressionAgreed || !pendingFilesForCompression
+            }
+          >
+            Adicionar imagens
+          </Button>
+        </DialogActions>
+      </Dialog>
       
       {images.length < maxImages && (
         <Box

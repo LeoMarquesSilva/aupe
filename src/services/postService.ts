@@ -3,10 +3,27 @@ import { supabaseStorageService, UploadResult } from './supabaseStorageService';
 import { supabaseVideoStorageService } from './supabaseVideoStorageService';
 import { postService } from './supabaseClient';
 import { authService } from './supabaseClient';
+import type {
+  InstagramImagePreparationResult,
+  InstagramOversizeStrategy,
+} from './supabaseStorageService';
+
+export interface UploadImagesToSupabaseOptions {
+  oversizeStrategy?: InstagramOversizeStrategy;
+  onImagePrepared?: (payload: {
+    imageId: string;
+    fileName: string;
+    result: InstagramImagePreparationResult;
+  }) => void;
+}
 
 // ✅ FUNÇÃO PRINCIPAL: Upload de imagens para Supabase Storage
-export const uploadImagesToSupabaseStorage = async (images: PostImage[]): Promise<string[]> => {
+export const uploadImagesToSupabaseStorage = async (
+  images: PostImage[],
+  options: UploadImagesToSupabaseOptions = {}
+): Promise<string[]> => {
   console.log(`🚀 Iniciando upload de ${images.length} imagens para Supabase Storage`);
+  const oversizeStrategy = options.oversizeStrategy ?? 'auto_compress';
   
   try {
     // Obter usuário atual
@@ -36,14 +53,33 @@ export const uploadImagesToSupabaseStorage = async (images: PostImage[]): Promis
         // Preferir o arquivo original, se disponível
         if (image.file) {
           console.log(`📁 Enviando arquivo original da imagem ${i + 1}`);
-          uploadResult = await supabaseStorageService.uploadImage(image.file, user.id);
+          const preparation = await supabaseStorageService.prepareImageForInstagram(image.file, {
+            oversizeStrategy
+          });
+
+          options.onImagePrepared?.({
+            imageId: image.id,
+            fileName: image.file.name,
+            result: preparation
+          });
+
+          if (preparation.skipped || !preparation.file) {
+            throw new Error(preparation.reason || `A imagem "${image.file.name}" nao pode ser processada para o Instagram.`);
+          }
+
+          uploadResult = await supabaseStorageService.uploadImage(
+            preparation.file,
+            user.id,
+            { oversizeStrategy: 'reject' }
+          );
         } else {
           // Caso contrário, usar a URL (que pode ser uma data URL)
           console.log(`🔗 Enviando URL da imagem ${i + 1}`);
           uploadResult = await supabaseStorageService.uploadImageFromUrl(
             image.url, 
             user.id, 
-            `image-${i + 1}.jpg`
+            `image-${i + 1}.jpg`,
+            { oversizeStrategy }
           );
         }
         
