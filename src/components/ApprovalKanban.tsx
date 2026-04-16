@@ -14,6 +14,7 @@ import {
   EventAvailable as ScheduledIcon,
   Build as AdjustmentsIcon,
   FactCheck as InternalIcon,
+  TaskAlt as CompletedIcon,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { GLASS } from '../theme/glassTokens';
@@ -36,6 +37,10 @@ export interface ApprovalKanbanPostInput extends ApprovalKanbanPost {
   updatedAt?: string;
   userId?: string;
   approvalRespondedAt?: string | null;
+  /** Fila operacional (ex.: posted = já publicado) */
+  status?: string;
+  postedAt?: string | null;
+  posted_at?: string | null;
 }
 
 interface ApprovalKanbanProps {
@@ -62,6 +67,12 @@ const COLUMNS: { id: ApprovalKanbanColumn; title: string; icon: React.ReactNode;
   { id: 'approved', title: 'Aprovados', icon: <ApprovedIcon /> },
   { id: 'scheduled', title: 'Aprovados/Agendados', icon: <ScheduledIcon /> },
   { id: 'adjustments', title: 'Ajustes', icon: <AdjustmentsIcon /> },
+  {
+    id: 'completed',
+    title: 'Publicados',
+    icon: <CompletedIcon />,
+    hint: 'Conteúdo já publicado no canal. Cartões compactos para não poluir o funil.',
+  },
 ];
 
 function CardSkeleton() {
@@ -96,12 +107,15 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
     approved: theme.palette.success.main,
     scheduled: theme.palette.primary.main,
     adjustments: theme.palette.text.secondary,
+    completed: theme.palette.success.dark,
   } as const;
   const getPostColumn = (post: ApprovalKanbanPostInput): ApprovalKanbanColumn | null => {
     const normalizedStatus = normalizeApprovalStatus(post.approvalStatus);
     const isRoteiro = (post.postType ?? post.post_type) === 'roteiro';
     const reqInt = post.requiresInternalApproval === true;
     const intOk = post.internalApprovalStatus === 'approved';
+    const pub = String(post.status ?? '').toLowerCase();
+    const isPublished = pub === 'posted' || pub === 'published';
 
     if (reqInt && !intOk) {
       return 'internal';
@@ -110,6 +124,7 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
     if (normalizedStatus === 'pending') return 'awaiting';
     if (normalizedStatus === 'rejected') return 'adjustments';
     if (normalizedStatus === 'approved') {
+      if (isPublished) return 'completed';
       if (isRoteiro) return 'approved';
       return post.forApprovalOnly === false ? 'scheduled' : 'approved';
     }
@@ -132,7 +147,7 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0, 1fr))',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))',
           gap: 2,
           alignItems: 'flex-start',
         }}
@@ -186,7 +201,7 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0, 1fr))',
+        gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))',
         gap: 2,
         alignItems: 'flex-start',
       }}
@@ -315,6 +330,7 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
                     {col.id === 'approved' && 'Nenhum item aprovado.'}
                     {col.id === 'scheduled' && 'Nenhum item aprovado e agendado.'}
                     {col.id === 'adjustments' && 'Nenhum item com ajuste solicitado.'}
+                    {col.id === 'completed' && 'Nenhum item publicado ainda neste filtro.'}
                   </Typography>
                 </Box>
               ) : (

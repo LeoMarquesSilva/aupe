@@ -25,6 +25,8 @@ import {
   Select,
   MenuItem,
   Checkbox,
+  FormControlLabel,
+  Switch,
   Card,
   CardContent,
   CardMedia,
@@ -57,7 +59,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { supabase, clientService, postService } from '../services/supabaseClient';
-import { Client, isApprovalStatus } from '../types';
+import { Client, isApprovalStatus, normalizeApprovalStatus } from '../types';
 import {
   listAllActiveApprovalLinks,
   listAllActiveInternalApprovalLinks,
@@ -121,6 +123,12 @@ function needsInternalReview(post: ScheduledPostRow): boolean {
   return st === 'pending' || st === null || st === '';
 }
 
+function isKanbanPublishedCompletedPost(p: ApprovalKanbanPostInput): boolean {
+  if (normalizeApprovalStatus(p.approvalStatus) !== 'approved') return false;
+  const s = String(p.status ?? '').toLowerCase();
+  return s === 'posted' || s === 'published';
+}
+
 const ApprovalsPage: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -151,6 +159,21 @@ const ApprovalsPage: React.FC = () => {
   const [kanbanSearch, setKanbanSearch] = useState('');
   const [kanbanTypeFilter, setKanbanTypeFilter] = useState<string>('all');
   const [kanbanDateFilter, setKanbanDateFilter] = useState<string>('all');
+  const [kanbanHidePublished, setKanbanHidePublished] = useState(() => {
+    try {
+      return localStorage.getItem('approvalsKanbanHidePublished') !== 'false';
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('approvalsKanbanHidePublished', kanbanHidePublished ? 'true' : 'false');
+    } catch {
+      /* ignore */
+    }
+  }, [kanbanHidePublished]);
 
   const refreshActiveLinkPostIds = useCallback(async () => {
     if (!selectedClientId) {
@@ -317,6 +340,11 @@ const ApprovalsPage: React.FC = () => {
       return matchesType && matchesDate && matchesSearch;
     });
   }, [kanbanPosts, kanbanSearch, kanbanTypeFilter, kanbanDateFilter]);
+
+  const kanbanPostsForBoard = useMemo(() => {
+    if (!kanbanHidePublished) return filteredKanbanPosts;
+    return filteredKanbanPosts.filter((p) => !isKanbanPublishedCompletedPost(p));
+  }, [filteredKanbanPosts, kanbanHidePublished]);
 
   const fetchClientPosts = useCallback(() => {
     if (!selectedClientId) return;
@@ -1066,6 +1094,17 @@ const ApprovalsPage: React.FC = () => {
                 <MenuItem value="no_date">Sem data</MenuItem>
               </Select>
             </FormControl>
+            <FormControlLabel
+              control={
+                <Switch
+                  size="small"
+                  checked={kanbanHidePublished}
+                  onChange={(_, v) => setKanbanHidePublished(v)}
+                />
+              }
+              label={<Typography variant="body2">Ocultar publicados</Typography>}
+              sx={{ mr: 0, ml: 0 }}
+            />
             <Button
               size="small"
               variant="text"
@@ -1081,13 +1120,13 @@ const ApprovalsPage: React.FC = () => {
             </Button>
             <Chip
               size="small"
-              label={`Exibindo ${filteredKanbanPosts.length} de ${kanbanPosts.length}`}
+              label={`Exibindo ${kanbanPostsForBoard.length} de ${kanbanPosts.length}`}
               sx={{ fontWeight: 510 }}
             />
           </Box>
         </Paper>
         <ApprovalKanban
-          posts={filteredKanbanPosts}
+          posts={kanbanPostsForBoard}
           onCardClick={(post) => setSelectedPostForModal(post)}
           loading={kanbanLoading}
         />

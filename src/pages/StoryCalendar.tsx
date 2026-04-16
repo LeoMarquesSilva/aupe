@@ -58,7 +58,7 @@ import {
   Clear as ClearIcon,
   FactCheck as FactCheckIcon
 } from '@mui/icons-material';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link as RouterLink } from 'react-router-dom';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, parseISO, isValid, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { postService, clientService, supabase } from '../services/supabaseClient';
@@ -70,6 +70,15 @@ import { imageUrlService } from '../services/imageUrlService';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GLASS } from '../theme/glassTokens';
 import { appShellContainerSx } from '../theme/appShellLayout';
+import DateTimePicker from '../components/DateTimePicker';
+import {
+  getCalendarStatusDisplay,
+  isOverdueUnapproved,
+  isOperationalPendingOnly,
+  isWaitingClient,
+  isWaitingInternal,
+  isPublishedStatus,
+} from '../utils/calendarPostDisplay';
 
 const StoryCalendar: React.FC = () => {
   const navigate = useNavigate();
@@ -103,6 +112,10 @@ const StoryCalendar: React.FC = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleDateIso, setRescheduleDateIso] = useState('');
+  const [rescheduleSaving, setRescheduleSaving] = useState(false);
+  const [rescheduleError, setRescheduleError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -114,12 +127,16 @@ const StoryCalendar: React.FC = () => {
         postService.getScheduledPostsWithClient(),
         clientService.getClients()
       ]);
-      
-      setContent(postsData || []);
+
+      // Roteiros são apenas fluxo de aprovação de texto; não entram no calendário de publicações
+      const calendarPosts = (postsData || []).filter(
+        (p) => (p.postType ?? '').toLowerCase() !== 'roteiro'
+      );
+
+      setContent(calendarPosts);
       setClients(clientsData || []);
-      
-      // Buscar lista de usuários únicos dos posts
-      await loadUsersFromPosts(postsData || []);
+
+      await loadUsersFromPosts(calendarPosts);
     } catch (err) {
       console.error('❌ Erro ao carregar dados:', err);
       setError('Erro ao carregar dados do calendário');
@@ -347,33 +364,37 @@ const StoryCalendar: React.FC = () => {
     }
   };
 
-  // Função para obter label do status
-  const getStatusLabel = (status: PostStatus | string): string => {
-    switch (status) {
-      case 'pending': return 'Pendente';
-      case 'sent_to_n8n': return 'Enviado';
-      case 'processing': return 'Processando';
-      case 'posted':
-      case 'published': return 'Publicado';
-      case 'failed': return 'Falhou';
-      case 'cancelled': return 'Cancelado';
-      default: return status;
+  const getStatusIconForPost = (post: ScheduledPost) => {
+    const disp = getCalendarStatusDisplay(post);
+    if (disp.preferApprovalIcon) {
+      return <FactCheckIcon sx={{ fontSize: 12, color: GLASS.accent.blue }} />;
     }
+    return getStatusIcon(post.status);
   };
 
-  // Função para obter cor do status
-  const getStatusColor = (status: PostStatus | string): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
-    switch (status) {
-      case 'pending': return 'warning';
-      case 'sent_to_n8n': return 'info';
-      case 'processing': return 'primary';
-      case 'posted':
-      case 'published': return 'success';
-      case 'failed': return 'error';
-      case 'cancelled': return 'default';
-      default: return 'default';
+  const openRescheduleDialog = useCallback(() => {
+    if (!selectedContent) return;
+    setRescheduleDateIso(selectedContent.scheduledDate || '');
+    setRescheduleError(null);
+    setRescheduleOpen(true);
+  }, [selectedContent]);
+
+  const handleSaveReschedule = useCallback(async () => {
+    if (!selectedContent || !rescheduleDateIso) return;
+    setRescheduleSaving(true);
+    setRescheduleError(null);
+    try {
+      await postService.updateScheduledPost(selectedContent.id, { scheduledDate: rescheduleDateIso });
+      setRescheduleOpen(false);
+      setPreviewOpen(false);
+      setSelectedContent(null);
+      await loadData();
+    } catch (e) {
+      setRescheduleError(e instanceof Error ? e.message : 'Não foi possível salvar a nova data.');
+    } finally {
+      setRescheduleSaving(false);
     }
-  };
+  }, [selectedContent, rescheduleDateIso, loadData]);
 
   // Resetar página quando filtros mudarem
   useEffect(() => {
@@ -423,13 +444,17 @@ const StoryCalendar: React.FC = () => {
   });
 
   const contentSummary = useMemo(() => {
-    const pending = filteredContent.filter((item) => item.status === 'pending').length;
+    const pendingPipeline = filteredContent.filter((item) => isOperationalPendingOnly(item)).length;
+    const awaitingClient = filteredContent.filter((item) => isWaitingClient(item)).length;
+    const awaitingInternal = filteredContent.filter((item) => isWaitingInternal(item)).length;
     const sent = filteredContent.filter((item) => item.status === 'sent_to_n8n' || item.status === 'processing').length;
-    const published = filteredContent.filter((item) => item.status === 'posted').length;
+    const published = filteredContent.filter((item) => isPublishedStatus(item.status)).length;
     const failed = filteredContent.filter((item) => item.status === 'failed').length;
     return {
       total: filteredContent.length,
-      pending,
+      pending: pendingPipeline,
+      awaitingClient,
+      awaitingInternal,
       sent,
       published,
       failed,
@@ -706,13 +731,30 @@ const StoryCalendar: React.FC = () => {
               </Box>
               
               <Box sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}>
-                <Chip 
-                  icon={selectedContent.status === 'failed' ? <ErrorIcon /> : <CheckCircleIcon />} 
-                  label={getStatusLabel(selectedContent.status)}
-                  size="small"
-                  color={getStatusColor(selectedContent.status)}
-                  sx={{ fontWeight: 700, borderRadius: GLASS.radius.badge }}
-                />
+                {(() => {
+                  const disp = getCalendarStatusDisplay(selectedContent);
+                  const icon =
+                    disp.preferApprovalIcon ? (
+                      <FactCheckIcon />
+                    ) : selectedContent.status === 'failed' ? (
+                      <ErrorIcon />
+                    ) : isPublishedStatus(selectedContent.status) ? (
+                      <CheckCircleIcon />
+                    ) : (
+                      <ScheduleIcon />
+                    );
+                  return (
+                    <Tooltip title={disp.tooltip}>
+                      <Chip
+                        icon={icon}
+                        label={disp.label}
+                        size="small"
+                        color={disp.chipColor}
+                        sx={{ fontWeight: 700, borderRadius: GLASS.radius.badge }}
+                      />
+                    </Tooltip>
+                  );
+                })()}
               </Box>
             </Box>
             
@@ -1048,8 +1090,36 @@ const StoryCalendar: React.FC = () => {
               borderRadius: GLASS.radius.badge 
             }}>
               <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#f59e0b' }} />
-              <Typography variant="caption" sx={{ color: '#b45309', fontWeight: 600 }}>Pendentes</Typography>
+              <Typography variant="caption" sx={{ color: '#b45309', fontWeight: 600 }}>Fila de publicação</Typography>
               <Typography variant="caption" sx={{ color: '#92400e', fontWeight: 800, fontSize: '0.85rem' }}>{contentSummary.pending}</Typography>
+            </Box>
+          )}
+
+          {contentSummary.awaitingClient > 0 && (
+            <Box sx={{ 
+              display: 'flex', alignItems: 'center', gap: 1, 
+              px: 2, py: 0.75, 
+              bgcolor: 'rgba(59, 130, 246, 0.08)', 
+              border: '1px solid rgba(59, 130, 246, 0.22)',
+              borderRadius: GLASS.radius.badge 
+            }}>
+              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#3b82f6' }} />
+              <Typography variant="caption" sx={{ color: '#1d4ed8', fontWeight: 600 }}>Aguardando cliente</Typography>
+              <Typography variant="caption" sx={{ color: '#1e3a8a', fontWeight: 800, fontSize: '0.85rem' }}>{contentSummary.awaitingClient}</Typography>
+            </Box>
+          )}
+
+          {contentSummary.awaitingInternal > 0 && (
+            <Box sx={{ 
+              display: 'flex', alignItems: 'center', gap: 1, 
+              px: 2, py: 0.75, 
+              bgcolor: 'rgba(124, 58, 237, 0.08)', 
+              border: '1px solid rgba(124, 58, 237, 0.2)',
+              borderRadius: GLASS.radius.badge 
+            }}>
+              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#7c3aed' }} />
+              <Typography variant="caption" sx={{ color: '#5b21b6', fontWeight: 600 }}>Pré-aprovação interna</Typography>
+              <Typography variant="caption" sx={{ color: '#4c1d95', fontWeight: 800, fontSize: '0.85rem' }}>{contentSummary.awaitingInternal}</Typography>
             </Box>
           )}
           
@@ -1318,6 +1388,9 @@ const StoryCalendar: React.FC = () => {
             backdropFilter: `blur(${GLASS.surface.blur})`,
             border: `1px solid ${GLASS.border.outer}`,
             boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+            maxWidth: '100%',
+            minWidth: 0,
+            overflowX: 'hidden',
           }}>
             <Typography variant="h6" sx={{ mb: 3, color: GLASS.text.heading }}>
               {format(selectedMonth, 'MMMM yyyy', { locale: ptBR })}
@@ -1339,7 +1412,7 @@ const StoryCalendar: React.FC = () => {
             </Grid>
             
             {/* Dias do calendário */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 1, width: '100%', minWidth: 0 }}>
               {calendarDays.map((day, index) => {
                 // Se for célula vazia (null), renderizar célula vazia
                 if (day === null) {
@@ -1351,11 +1424,14 @@ const StoryCalendar: React.FC = () => {
                         p: 1, 
                         height: '100%', 
                         minHeight: 120,
+                        minWidth: 0,
+                        maxWidth: '100%',
                         bgcolor: 'transparent',
                         border: 'none',
                         borderRadius: GLASS.radius.inner,
                         display: 'flex',
-                        flexDirection: 'column'
+                        flexDirection: 'column',
+                        overflow: 'hidden',
                       }}
                     />
                   );
@@ -1373,6 +1449,8 @@ const StoryCalendar: React.FC = () => {
                       p: 1, 
                       height: '100%', 
                       minHeight: 120,
+                      minWidth: 0,
+                      maxWidth: '100%',
                       bgcolor: isDayToday ? 'rgba(247, 66, 17, 0.10)' :
                                !isCurrentMonth ? 'rgba(0, 0, 0, 0.02)' : GLASS.surface.bg,
                       backdropFilter: `blur(${GLASS.surface.blur})`,
@@ -1381,6 +1459,7 @@ const StoryCalendar: React.FC = () => {
                       display: 'flex',
                       flexDirection: 'column',
                       opacity: isCurrentMonth ? 1 : 0.6,
+                      overflow: 'hidden',
                       transition: `all ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
                       '&:hover': {
                         bgcolor: isDayToday ? 'rgba(247, 66, 17, 0.14)' : GLASS.surface.bgHover,
@@ -1400,10 +1479,11 @@ const StoryCalendar: React.FC = () => {
                     </Typography>
                     
                     {dayContent.length > 0 ? (
-                      <Box sx={{ overflowY: 'auto', flex: 1 }}>
+                      <Box sx={{ overflowY: 'auto', overflowX: 'hidden', flex: 1, minWidth: 0, width: '100%', maxWidth: '100%' }}>
                         {dayContent.map((content) => {
                           const client = content.clients || getClientById(content.clientId);
                           const contentDate = safeParseDateISO(content.scheduledDate);
+                          const calendarDisp = getCalendarStatusDisplay(content);
                           
                           if (!contentDate) return null;
                           
@@ -1413,6 +1493,8 @@ const StoryCalendar: React.FC = () => {
                               sx={{ 
                                 p: 1,
                                 mb: 0.75, 
+                                minWidth: 0,
+                                maxWidth: '100%',
                                 bgcolor: GLASS.surface.bg,
                                 border: `1px solid ${GLASS.border.subtle}`,
                                 borderRadius: GLASS.radius.buttonSm,
@@ -1420,6 +1502,7 @@ const StoryCalendar: React.FC = () => {
                                 flexDirection: 'column',
                                 gap: 0.5,
                                 cursor: 'pointer',
+                                overflow: 'hidden',
                                 transition: `all ${GLASS.motion.duration.fast} ${GLASS.motion.easing}`,
                                 '&:hover': { 
                                   bgcolor: GLASS.surface.bgHover,
@@ -1472,10 +1555,10 @@ const StoryCalendar: React.FC = () => {
                                 </IconButton>
                               </Box>
 
-                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5, gap: 0.25, minWidth: 0, flexWrap: 'wrap' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, flex: '1 1 auto' }}>
                                   <Tooltip title={content.postType.toUpperCase()}>
-                                    <Box component="span" sx={{ display: 'flex', alignItems: 'center', color: getContentTypeColor(content.postType) }}>
+                                    <Box component="span" sx={{ display: 'flex', alignItems: 'center', flexShrink: 0, color: getContentTypeColor(content.postType) }}>
                                       {getContentTypeIcon(content.postType)}
                                     </Box>
                                   </Tooltip>
@@ -1484,30 +1567,34 @@ const StoryCalendar: React.FC = () => {
                                     sx={{ 
                                       fontWeight: 600,
                                       color: GLASS.text.muted,
-                                      fontSize: '0.75rem',
+                                      fontSize: '0.7rem',
+                                      flexShrink: 0,
                                     }}
                                   >
                                     {safeFormatDate(content.scheduledDate, 'HH:mm')}
                                   </Typography>
                                 </Box>
-                                <Tooltip title={getStatusLabel(content.status)}>
-                                  <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
-                                    {getStatusIcon(content.status)}
-                                  </Box>
-                                </Tooltip>
-                                {(() => {
-                                  const raw = content as unknown as Record<string, unknown>;
-                                  const requiresApproval = (content.requiresApproval ?? raw.requires_approval) as boolean | undefined;
-                                  const approvalStatus = (content.approvalStatus ?? raw.approval_status) as string | undefined;
-                                  const isApprovalFlow = requiresApproval || approvalStatus;
-                                  return isApprovalFlow ? (
-                                    <Tooltip title="Fluxo de Aprovação do Cliente">
-                                      <Box component="span" sx={{ display: 'flex', alignItems: 'center', color: GLASS.accent.blue, ml: 0.5 }}>
-                                        <FactCheckIcon sx={{ fontSize: 14 }} />
-                                      </Box>
-                                    </Tooltip>
-                                  ) : null;
-                                })()}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, flexShrink: 0 }}>
+                                  <Tooltip title={calendarDisp.tooltip}>
+                                    <Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>
+                                      {getStatusIconForPost(content)}
+                                    </Box>
+                                  </Tooltip>
+                                  {(() => {
+                                    const raw = content as unknown as Record<string, unknown>;
+                                    const requiresApproval = (content.requiresApproval ?? raw.requires_approval) as boolean | undefined;
+                                    const approvalStatus = (content.approvalStatus ?? raw.approval_status) as string | undefined;
+                                    const isApprovalFlow = requiresApproval || approvalStatus;
+                                    if (!isApprovalFlow || calendarDisp.preferApprovalIcon) return null;
+                                    return (
+                                      <Tooltip title="Fluxo de Aprovação do Cliente">
+                                        <Box component="span" sx={{ display: 'flex', alignItems: 'center', color: GLASS.accent.blue }}>
+                                          <FactCheckIcon sx={{ fontSize: 14 }} />
+                                        </Box>
+                                      </Tooltip>
+                                    );
+                                  })()}
+                                </Box>
                               </Box>
                             </Box>
                           );
@@ -1548,7 +1635,9 @@ const StoryCalendar: React.FC = () => {
               </Box>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: GLASS.text.muted, mr: 0.5 }}>Status:</Typography>
-                <Chip label="Pendente" size="small" color="warning" sx={{ height: 20, fontSize: '0.65rem' }} />
+                <Chip label="Fila de publicação" size="small" color="warning" sx={{ height: 20, fontSize: '0.65rem' }} />
+                <Chip label="Aguardando cliente" size="small" color="info" sx={{ height: 20, fontSize: '0.65rem' }} />
+                <Chip label="Pré-aprovação interna" size="small" color="secondary" sx={{ height: 20, fontSize: '0.65rem' }} />
                 <Chip label="Enviado" size="small" color="info" sx={{ height: 20, fontSize: '0.65rem' }} />
                 <Chip label="Publicado" size="small" color="success" sx={{ height: 20, fontSize: '0.65rem' }} />
                 <Chip label="Falhou" size="small" color="error" sx={{ height: 20, fontSize: '0.65rem' }} />
@@ -1868,28 +1957,23 @@ const StoryCalendar: React.FC = () => {
                                     size="small"
                                     variant="outlined"
                                   />
-                                  <Chip 
-                                    icon={content.status === 'failed' ? <ErrorIcon /> : <CheckCircleIcon />}
-                                    label={getStatusLabel(content.status)}
-                                    size="small"
-                                    color={getStatusColor(content.status)}
-                                  />
                                   {(() => {
-                                    const raw = content as unknown as Record<string, unknown>;
-                                    const requiresApproval = (content.requiresApproval ?? raw.requires_approval) as boolean | undefined;
-                                    const approvalStatus = (content.approvalStatus ?? raw.approval_status) as string | undefined;
-                                    if (requiresApproval || approvalStatus) {
-                                      return (
-                                        <Chip 
-                                          icon={<FactCheckIcon />}
-                                          label="Aprovação"
-                                          size="small"
-                                          variant="outlined"
-                                          color="info"
-                                        />
+                                    const disp = getCalendarStatusDisplay(content);
+                                    const icon =
+                                      disp.preferApprovalIcon ? (
+                                        <FactCheckIcon />
+                                      ) : content.status === 'failed' ? (
+                                        <ErrorIcon />
+                                      ) : isPublishedStatus(content.status) ? (
+                                        <CheckCircleIcon />
+                                      ) : (
+                                        <ScheduleIcon />
                                       );
-                                    }
-                                    return null;
+                                    return (
+                                      <Tooltip title={disp.tooltip}>
+                                        <Chip icon={icon} label={disp.label} size="small" color={disp.chipColor} />
+                                      </Tooltip>
+                                    );
                                   })()}
                                   {(() => {
                                     const creatorUser = getCreatorUser(content.userId);
@@ -2003,6 +2087,19 @@ const StoryCalendar: React.FC = () => {
             <ListItemText>Editar</ListItemText>
           </MenuItem>
         )}
+        {selectedContent && isOverdueUnapproved(selectedContent) && (
+          <MenuItem
+            onClick={() => {
+              handleMenuClose();
+              openRescheduleDialog();
+            }}
+          >
+            <ListItemIcon>
+              <CalendarIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Nova data (aprovação)</ListItemText>
+          </MenuItem>
+        )}
         <MenuItem onClick={handleDeleteConfirm} sx={{ color: 'error.main' }}>
           <ListItemIcon>
             <DeleteIcon fontSize="small" color="error" />
@@ -2054,9 +2151,18 @@ const StoryCalendar: React.FC = () => {
           )}
         </DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
+          {selectedContent && isOverdueUnapproved(selectedContent) && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              A data e hora já passaram e o cliente ainda não aprovou. Defina uma nova data abaixo ou gere um novo link na{' '}
+              <Box component={RouterLink} to="/approvals" sx={{ fontWeight: 700, color: 'inherit' }}>
+                página de Aprovações
+              </Box>
+              .
+            </Alert>
+          )}
           {renderPreviewContent()}
         </DialogContent>
-        <DialogActions sx={{ borderTop: `1px solid ${GLASS.border.subtle}`, pt: 2 }}>
+        <DialogActions sx={{ borderTop: `1px solid ${GLASS.border.subtle}`, pt: 2, flexWrap: 'wrap', gap: 1 }}>
           <Button
             onClick={() => {
               setPreviewOpen(false);
@@ -2066,6 +2172,16 @@ const StoryCalendar: React.FC = () => {
           >
             Fechar
           </Button>
+          {selectedContent && isOverdueUnapproved(selectedContent) && (
+            <Button
+              variant="outlined"
+              onClick={openRescheduleDialog}
+              startIcon={<CalendarIcon />}
+              sx={{ borderRadius: GLASS.radius.button }}
+            >
+              Nova data (manter na aprovação)
+            </Button>
+          )}
           {selectedContent && canEditPost(selectedContent.status) && (
             <Button 
               variant="contained" 
@@ -2080,6 +2196,46 @@ const StoryCalendar: React.FC = () => {
               Editar
             </Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={rescheduleOpen}
+        onClose={() => !rescheduleSaving && setRescheduleOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: GLASS.radius.card,
+            bgcolor: GLASS.surface.bgStrong,
+            border: `1px solid ${GLASS.border.outer}`,
+          },
+        }}
+      >
+        <DialogTitle sx={{ color: GLASS.text.heading }}>Nova data de referência</DialogTitle>
+        <DialogContent>
+          {rescheduleError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {rescheduleError}
+            </Alert>
+          )}
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            A aprovação do cliente permanece pendente. Se o link expirou, crie um novo na página de Aprovações.
+          </Typography>
+          <DateTimePicker scheduledDate={rescheduleDateIso} onChange={setRescheduleDateIso} disabled={rescheduleSaving} />
+        </DialogContent>
+        <DialogActions sx={{ borderTop: `1px solid ${GLASS.border.subtle}`, pt: 2 }}>
+          <Button onClick={() => setRescheduleOpen(false)} disabled={rescheduleSaving} sx={{ color: GLASS.text.muted }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveReschedule}
+            disabled={rescheduleSaving || !rescheduleDateIso}
+            sx={{ bgcolor: GLASS.accent.orange, borderRadius: GLASS.radius.button }}
+          >
+            {rescheduleSaving ? 'Salvando…' : 'Salvar data'}
+          </Button>
         </DialogActions>
       </Dialog>
 

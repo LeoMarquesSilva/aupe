@@ -28,7 +28,7 @@ import type { Client } from '../types';
 import { imageUrlService } from '../services/imageUrlService';
 import { GLASS } from '../theme/glassTokens';
 
-export type ApprovalKanbanColumn = 'internal' | 'awaiting' | 'approved' | 'scheduled' | 'adjustments';
+export type ApprovalKanbanColumn = 'internal' | 'awaiting' | 'approved' | 'scheduled' | 'adjustments' | 'completed';
 
 export interface ApprovalKanbanPost {
   id: string;
@@ -49,6 +49,9 @@ export interface ApprovalKanbanPost {
   createdAt?: string;
   approvalRespondedAt?: string | null;
   approvalStatus?: string;
+  status?: string;
+  postedAt?: string | null;
+  posted_at?: string | null;
 }
 
 interface ApprovalKanbanCardProps {
@@ -117,6 +120,8 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
   const typeLabel = getTypeLabel(post);
   const dateRaw = post.scheduledDate ?? post.scheduled_date;
   const scheduledStr = formatDate(dateRaw ?? undefined);
+  const postedRaw = post.postedAt ?? post.posted_at;
+  const postedStr = formatDate(postedRaw ?? undefined);
   const commentCount = post.approvalFeedback ? 1 : 0;
   const client = post.client;
   const scheduledDate = dateRaw ? new Date(dateRaw) : null;
@@ -124,6 +129,63 @@ const ApprovalKanbanCard: React.FC<ApprovalKanbanCardProps> = ({ post, column, o
   const cardTitle = getCardTitle(post, typeLabel);
   const platform = post.postingPlatform ?? 'instagram';
   const isLinkedInPlatform = platform === 'linkedin';
+
+  if (column === 'completed') {
+    return (
+      <Card
+        elevation={0}
+        onClick={onClick}
+        sx={{
+          borderRadius: GLASS.radius.inner,
+          border: `1px solid ${GLASS.border.subtle}`,
+          bgcolor: alpha(theme.palette.success.main, 0.06),
+          py: 1,
+          px: 1.25,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.25,
+          cursor: onClick ? 'pointer' : undefined,
+          '&:hover': { bgcolor: alpha(theme.palette.success.main, 0.1) },
+        }}
+      >
+        {thumbnailUrl ? (
+          <Box
+            component="img"
+            src={imageUrlService.getPublicUrl(thumbnailUrl) || thumbnailUrl}
+            alt=""
+            sx={{ width: 48, height: 48, borderRadius: 1, objectFit: 'cover', flexShrink: 0 }}
+          />
+        ) : (
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: alpha(theme.palette.text.secondary, 0.08),
+              flexShrink: 0,
+            }}
+          >
+            {getTypeIcon(post)}
+          </Box>
+        )}
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }}>
+            {client?.name ?? 'Cliente'}
+          </Typography>
+          <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {cardTitle}
+          </Typography>
+          <Typography variant="caption" color="success.dark" sx={{ fontWeight: 600 }}>
+            Publicado{postedStr ? ` · ${postedStr}` : scheduledStr ? ` · agend. ${scheduledStr}` : ''}
+          </Typography>
+        </Box>
+        <Chip label={typeLabel} size="small" sx={{ height: 22, fontSize: '0.65rem', flexShrink: 0 }} />
+      </Card>
+    );
+  }
 
   return (
     <Card
