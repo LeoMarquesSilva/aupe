@@ -13,7 +13,13 @@
 const axios = require('axios');
 const { rateLimit, clientIpFromReq } = require('./rate-limit-ip');
 
-const DEBUG_TAG = 'ig-business-oauth-2026-04-17b';
+const DEBUG_TAG = 'ig-business-oauth-2026-04-17c';
+
+/**
+ * While we are debugging the Meta App Review flow, keep verbose logging and
+ * debug responses enabled in production. Flip back to `false` after approval.
+ */
+const IG_BUSINESS_DEBUG = true;
 
 function maskId(id) {
   if (!id) return '(empty)';
@@ -23,7 +29,7 @@ function maskId(id) {
 }
 
 function log(step, payload) {
-  if (process.env.NODE_ENV === 'production') return;
+  if (!IG_BUSINESS_DEBUG && process.env.NODE_ENV === 'production') return;
   if (payload === undefined) {
     console.info(`[IG_BUSINESS_OAUTH] ${DEBUG_TAG} ${step}`);
     return;
@@ -110,15 +116,38 @@ async function handleInstagramBusinessOAuthToken(req, res) {
 
   const code = String(body.code || '').trim();
   const redirectUri = String(body.redirect_uri || '').trim();
+  const clientIdAtAuthorize = String(body.client_id_used_at_authorize || '').trim();
   log('payload-check', {
     hasCode: Boolean(code),
     codeLength: code.length,
     codeFirst8: code.slice(0, 8),
     codeLast8: code.slice(-8),
     redirectUri,
+    clientIdAtAuthorizeMasked: maskId(clientIdAtAuthorize),
+    clientIdConfiguredMasked: maskId(appId),
+    clientIdsMatch: clientIdAtAuthorize && clientIdAtAuthorize === appId,
   });
   if (!code) return res.status(400).json({ message: 'code is required' });
   if (!redirectUri) return res.status(400).json({ message: 'redirect_uri is required' });
+
+  if (clientIdAtAuthorize && clientIdAtAuthorize !== appId) {
+    // Fail fast with a clear message — otherwise Instagram returns the
+    // misleading "redirect_uri doesn't match" error for this case.
+    return res.status(400).json({
+      message:
+        'client_id mismatch: the Instagram App ID used at authorize is different ' +
+        'from the one configured on the server (INSTAGRAM_BUSINESS_APP_ID). Update ' +
+        'REACT_APP_INSTAGRAM_BUSINESS_APP_ID and INSTAGRAM_BUSINESS_APP_ID to the ' +
+        'SAME value — the "Instagram app ID" from Products > Instagram > API setup ' +
+        'with Instagram business login.',
+      debug: IG_BUSINESS_DEBUG
+        ? {
+            clientIdAtAuthorizeMasked: maskId(clientIdAtAuthorize),
+            clientIdConfiguredMasked: maskId(appId),
+          }
+        : undefined,
+    });
+  }
 
   // Instagram appends `#_` to the authorization code for legacy browser flows.
   const cleanCode = code.replace(/#_$/, '').replace(/#$/, '');
@@ -233,10 +262,14 @@ async function handleInstagramBusinessOAuthToken(req, res) {
     const clientStatus = statusFromUpstream >= 400 && statusFromUpstream < 500 ? 400 : 502;
     return res.status(clientStatus).json({
       message,
-      debug: process.env.NODE_ENV === 'production' ? undefined : {
-        redirectUriSent: redirectUri,
-        graphError,
-      },
+      debug: (IG_BUSINESS_DEBUG || process.env.NODE_ENV !== 'production')
+        ? {
+            redirectUriSent: redirectUri,
+            appIdMasked: maskId(appId),
+            appSecretMasked: maskId(appSecret),
+            graphError,
+          }
+        : undefined,
     });
   }
 }

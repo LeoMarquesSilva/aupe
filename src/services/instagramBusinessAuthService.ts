@@ -88,6 +88,7 @@ export function getInstagramBusinessAuthUrl(state?: string): string {
   // could theoretically differ if the user lands on a different host or port.
   try {
     window.sessionStorage.setItem('ig_business_oauth_redirect_uri', redirectUri);
+    window.sessionStorage.setItem('ig_business_oauth_client_id', appId);
   } catch {
     /* sessionStorage can be unavailable in some privacy modes */
   }
@@ -96,6 +97,8 @@ export function getInstagramBusinessAuthUrl(state?: string): string {
   console.info(
     '[IG_BUSINESS_OAUTH] authorize step — redirect_uri:',
     JSON.stringify(redirectUri),
+    'client_id:',
+    `***${appId.slice(-4)}`,
   );
 
   return `https://www.instagram.com/oauth/authorize?${params.toString()}`;
@@ -116,17 +119,32 @@ export async function exchangeInstagramBusinessCode(
       : null;
   const redirectUri = storedRedirectUri || getInstagramBusinessRedirectUri();
 
+  // Also forward the client_id we used at authorize so the server can assert
+  // it matches the INSTAGRAM_BUSINESS_APP_ID configured in its environment.
+  // A mismatch here produces the same "Error validating verification code"
+  // message Instagram shows for redirect_uri drift.
+  const clientIdUsedAtAuthorize =
+    typeof window !== 'undefined'
+      ? window.sessionStorage.getItem('ig_business_oauth_client_id') || undefined
+      : undefined;
+
   // eslint-disable-next-line no-console
   console.info(
     '[IG_BUSINESS_OAUTH] token exchange — redirect_uri:',
     JSON.stringify(redirectUri),
     storedRedirectUri ? '(from sessionStorage)' : '(freshly computed)',
+    'client_id:',
+    clientIdUsedAtAuthorize ? `***${clientIdUsedAtAuthorize.slice(-4)}` : '(missing)',
   );
 
   const response = await fetch('/api/instagram-business-oauth-token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code, redirect_uri: redirectUri }),
+    body: JSON.stringify({
+      code,
+      redirect_uri: redirectUri,
+      client_id_used_at_authorize: clientIdUsedAtAuthorize,
+    }),
   });
 
   const raw = await response.text();
