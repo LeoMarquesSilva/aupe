@@ -632,3 +632,43 @@ export async function persistInstagramBusinessAuthToClient(
 
   return profile;
 }
+
+/**
+ * Remove the Instagram Business credentials from a `clients` row so the user
+ * can re-run the OAuth flow from scratch (e.g. to record the App Review
+ * screencast from a clean state, or to switch to a different Instagram
+ * account).
+ *
+ * What it does NOT do: revoke the OAuth grant on Meta's side. Meta caches the
+ * user's consent so our `force_reauth=true` on the authorize URL is what
+ * forces the consent dialog to show up again. If the user also wants to wipe
+ * Meta's side, they need to visit
+ * Instagram → Settings → Apps and Websites and remove the app manually.
+ */
+export async function disconnectInstagramBusinessFromClient(
+  clientId: string,
+): Promise<void> {
+  const { supabase } = await import('./supabaseClient');
+
+  const { error } = await supabase
+    .from('clients')
+    .update({
+      access_token: null,
+      instagram_account_id: null,
+      instagram_username: null,
+      profile_picture: null,
+      token_expiry: null,
+      page_id: null,
+      page_name: null,
+      instagram_long_lived_issued_at: null,
+      token_type: null,
+      // `instagram` is NOT NULL in the schema, so fall back to the placeholder
+      // used by `ensureMetaAppReviewClient` on first insert.
+      instagram: 'meta_app_review',
+    })
+    .eq('id', clientId);
+
+  if (error) {
+    throw new Error(`Failed to disconnect Instagram from client: ${error.message}`);
+  }
+}

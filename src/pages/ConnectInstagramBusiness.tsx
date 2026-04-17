@@ -19,11 +19,14 @@ import {
   PublishOutlined as PublishIcon,
   InsightsOutlined as InsightsIcon,
   CheckCircleOutline as CheckIcon,
+  LinkOffOutlined as LinkOffIcon,
+  OpenInNew as OpenInNewIcon,
 } from '@mui/icons-material';
 import {
   getInstagramBusinessAuthUrl,
   getInstagramBusinessAppId,
   getInstagramBusinessRedirectUri,
+  disconnectInstagramBusinessFromClient,
 } from '../services/instagramBusinessAuthService';
 import { supabase } from '../services/supabaseClient';
 import { isMetaAppReviewEmail } from '../config/metaAppReview';
@@ -53,6 +56,16 @@ const ConnectInstagramBusiness: React.FC = () => {
     clientIdFromUrl,
   );
   const [reviewerEnsuring, setReviewerEnsuring] = useState<boolean>(false);
+  // When the reviewer already finished OAuth in a previous session, we surface
+  // that state here so they can either jump back into the demo or disconnect
+  // and start over (useful when the screencast is being re-recorded from a
+  // different machine and the consent has already been granted).
+  const [connectedInfo, setConnectedInfo] = useState<{
+    clientId: string;
+    username?: string;
+    instagramAccountId?: string;
+  } | null>(null);
+  const [disconnecting, setDisconnecting] = useState<boolean>(false);
 
   useEffect(() => {
     // Reviewer auto-provisioning: when the dedicated App Review reviewer lands
@@ -73,18 +86,21 @@ const ConnectInstagramBusiness: React.FC = () => {
         setReviewerEnsuring(true);
         const client = await ensureMetaAppReviewClient();
         if (cancelled) return;
+        setEffectiveClientId(client.id);
         // If the reviewer has already connected Instagram in a previous
-        // session (the `clients` row already has credentials), skip the OAuth
-        // step and jump straight to the demo. This keeps the screencast tidy
-        // on refreshes and makes the "already connected" case obvious.
+        // session (the `clients` row already has credentials), surface that
+        // state so they can either continue to the demo or disconnect and
+        // redo the OAuth flow. We no longer auto-redirect, because in that
+        // case there was no way to disconnect from the UI.
         if (client.accessToken && client.instagramAccountId) {
-          navigate(
-            `/connect/instagram-business/demo?clientId=${client.id}`,
-            { replace: true },
-          );
+          setConnectedInfo({
+            clientId: client.id,
+            username: client.username,
+            instagramAccountId: client.instagramAccountId,
+          });
           return;
         }
-        setEffectiveClientId(client.id);
+        setConnectedInfo(null);
       } catch (e) {
         if (!cancelled) {
           setError(
@@ -119,6 +135,34 @@ const ConnectInstagramBusiness: React.FC = () => {
   const maskedAppId = resolvedAppId
     ? `***${resolvedAppId.slice(-4)} (len=${resolvedAppId.length})`
     : '(missing)';
+
+  const handleDisconnect = async () => {
+    if (!connectedInfo?.clientId) return;
+    const confirmed = window.confirm(
+      'Disconnect Instagram from this test client?\n\n' +
+        'This clears the access token and Instagram account id from our ' +
+        "database so you can go through the consent dialog again. It does " +
+        "NOT revoke the app on Instagram's side — to force Meta to show the " +
+        'full consent screen, also remove "Insyt" at ' +
+        'instagram.com → Settings → Apps and Websites.',
+    );
+    if (!confirmed) return;
+    setDisconnecting(true);
+    setError(null);
+    try {
+      await disconnectInstagramBusinessFromClient(connectedInfo.clientId);
+      setConnectedInfo(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to disconnect Instagram.');
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  const handleContinueToDemo = () => {
+    if (!connectedInfo?.clientId) return;
+    navigate(`/connect/instagram-business/demo?clientId=${connectedInfo.clientId}`);
+  };
 
   const handleConnect = () => {
     try {
@@ -181,6 +225,95 @@ const ConnectInstagramBusiness: React.FC = () => {
                 monitor performance for your Instagram professional account.
               </Typography>
             </Box>
+
+            {connectedInfo && (
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  bgcolor: 'rgba(34, 197, 94, 0.08)',
+                  border: '1px solid rgba(34, 197, 94, 0.25)',
+                  borderRadius: GLASS.radius.inner,
+                }}
+              >
+                <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ mb: 1.5 }}>
+                  <CheckIcon sx={{ color: GLASS.accent.green, mt: '2px' }} />
+                  <Box sx={{ flex: 1 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: GLASS.text.heading, fontWeight: 600 }}
+                    >
+                      Instagram already connected
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: GLASS.text.muted }}>
+                      {connectedInfo.username
+                        ? `@${connectedInfo.username.replace(/^@+/, '')}`
+                        : `Account id ${connectedInfo.instagramAccountId}`}
+                    </Typography>
+                  </Box>
+                </Stack>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<OpenInNewIcon />}
+                    onClick={handleContinueToDemo}
+                    disabled={disconnecting}
+                    sx={{
+                      bgcolor: GLASS.accent.green,
+                      color: '#ffffff',
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      borderRadius: GLASS.radius.button,
+                      '&:hover': { bgcolor: GLASS.accent.green, opacity: 0.9 },
+                    }}
+                  >
+                    Open demo page
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<LinkOffIcon />}
+                    onClick={handleDisconnect}
+                    disabled={disconnecting}
+                    sx={{
+                      color: '#b91c1c',
+                      borderColor: 'rgba(220, 38, 38, 0.4)',
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      borderRadius: GLASS.radius.button,
+                      '&:hover': {
+                        borderColor: '#b91c1c',
+                        bgcolor: 'rgba(220, 38, 38, 0.05)',
+                      },
+                    }}
+                  >
+                    {disconnecting ? 'Disconnecting…' : 'Disconnect and reconnect'}
+                  </Button>
+                </Stack>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: GLASS.text.muted,
+                    display: 'block',
+                    mt: 1.5,
+                  }}
+                >
+                  Disconnecting only clears our stored token. To see the full
+                  Meta consent dialog again (with all three permissions listed),
+                  also remove &ldquo;Insyt&rdquo; at{' '}
+                  <a
+                    href="https://www.instagram.com/accounts/manage_access/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: GLASS.accent.orange }}
+                  >
+                    instagram.com → Apps and Websites
+                  </a>
+                  .
+                </Typography>
+              </Paper>
+            )}
 
             <Box>
               <Typography
@@ -304,7 +437,11 @@ const ConnectInstagramBusiness: React.FC = () => {
                 },
               }}
             >
-              {reviewerEnsuring ? 'Preparing…' : 'Continue with Instagram'}
+              {reviewerEnsuring
+                ? 'Preparing…'
+                : connectedInfo
+                  ? 'Reconnect with a different account'
+                  : 'Continue with Instagram'}
             </Button>
 
             <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
