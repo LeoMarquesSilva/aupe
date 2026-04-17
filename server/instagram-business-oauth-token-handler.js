@@ -13,7 +13,7 @@
 const axios = require('axios');
 const { rateLimit, clientIpFromReq } = require('./rate-limit-ip');
 
-const DEBUG_TAG = 'ig-business-oauth-2026-04-17d';
+const DEBUG_TAG = 'ig-business-oauth-2026-04-17e-no-slash-5scopes';
 
 /**
  * While we are debugging the Meta App Review flow, keep verbose logging and

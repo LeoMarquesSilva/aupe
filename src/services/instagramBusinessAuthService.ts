@@ -24,9 +24,23 @@ export interface InstagramBusinessProfile {
   name?: string;
 }
 
-/** Scopes requested in App Review. Update this list if you request more/fewer. */
+/**
+ * Scopes requested at the authorize step.
+ *
+ * IMPORTANT: this list MUST match the scopes shown in the Meta App Dashboard
+ * "Embedded URL" preview (Products > Instagram > API setup with Instagram
+ * business login > Business login configuration). If they differ Instagram
+ * sometimes returns the famously misleading "Error validating verification
+ * code. Please make sure your redirect_uri is identical..." even though the
+ * redirect_uri itself is fine.
+ *
+ * Order matters — keep it identical to the embedded URL so byte comparisons
+ * cannot drift.
+ */
 export const INSTAGRAM_BUSINESS_SCOPES = [
   'instagram_business_basic',
+  'instagram_business_manage_messages',
+  'instagram_business_manage_comments',
   'instagram_business_content_publish',
   'instagram_business_manage_insights',
 ] as const;
@@ -58,37 +72,38 @@ export function getInstagramBusinessAppId(): string {
 }
 
 /**
- * Returns the redirect URI WITH a trailing slash.
+ * Returns the redirect URI WITHOUT a trailing slash.
  *
- * The Meta App Dashboard documents that it "may have added a trailing slash
- * to your URIs" when it stores them — meaning a URI you typed as
- *   https://example.com/callback/instagram-business
- * may have been canonicalized internally to
- *   https://example.com/callback/instagram-business/
+ * IMPORTANT: this MUST be byte-identical to the value listed under
+ *   Products > Instagram > API setup with Instagram business login >
+ *   Business login configuration > "OAuth redirect URIs"
+ * AND to the `redirect_uri` shown in that page's "Embedded URL" preview.
  *
- * If we then send the no-slash version at token exchange, Instagram fails
- * the byte-equality check and returns the famously misleading
+ * The embedded URL preview Meta generates uses NO trailing slash, e.g.:
+ *   https://www.insyt.com.br/callback/instagram-business
+ *
+ * That is the canonical form the dashboard stores. Sending a trailing-slash
+ * variant from our app will be rejected with the famously misleading
  * "Error validating verification code. Please make sure your redirect_uri
  *  is identical to the one you used in the OAuth dialog request."
- *
- * Always sending the trailing-slash version sidesteps this normalization
- * bug. Make sure the trailing-slash variant is also present in the
- * "OAuth redirect URIs" list in Products > Instagram > API setup with
- * Instagram business login > Business login configuration.
- *
- * React Router v6 treats `/x` and `/x/` as the same route, so this does
- * not break our callback page routing.
  */
 export function getInstagramBusinessRedirectUri(): string {
   if (typeof window === 'undefined') return '';
-  return `${window.location.origin}/callback/instagram-business/`;
+  return `${window.location.origin}/callback/instagram-business`;
 }
 
 /**
  * Build the authorization URL for Instagram Business Login.
  *
- * Reviewers will see exactly the scopes listed here on the consent screen —
- * make sure they match what you requested in App Review.
+ * This is constructed to be byte-identical (modulo `state`) to the
+ * "Embedded URL" preview shown by the Meta App Dashboard under
+ *   Products > Instagram > API setup with Instagram business login >
+ *   Business login configuration.
+ *
+ * Parameter order, scope list and `force_reauth=true` are preserved
+ * intentionally — Instagram occasionally rejects requests whose scope list
+ * does not match the dashboard preview with a misleading
+ * "Error validating verification code" message.
  */
 export function getInstagramBusinessAuthUrl(state?: string): string {
   const appId = getInstagramBusinessAppId();
@@ -97,12 +112,15 @@ export function getInstagramBusinessAuthUrl(state?: string): string {
     throw new Error('window.location.origin is required to build redirect URI.');
   }
   const scope = INSTAGRAM_BUSINESS_SCOPES.join(',');
-  const params = new URLSearchParams({
-    client_id: appId,
-    redirect_uri: redirectUri,
-    response_type: 'code',
-    scope,
-  });
+
+  // Preserve insertion order so the resulting URL matches the dashboard preview:
+  // force_reauth, client_id, redirect_uri, response_type, scope, [state]
+  const params = new URLSearchParams();
+  params.set('force_reauth', 'true');
+  params.set('client_id', appId);
+  params.set('redirect_uri', redirectUri);
+  params.set('response_type', 'code');
+  params.set('scope', scope);
   if (state) params.set('state', state);
 
   // Persist the EXACT redirect_uri used for the authorize request so we can
@@ -122,6 +140,8 @@ export function getInstagramBusinessAuthUrl(state?: string): string {
     JSON.stringify(redirectUri),
     'client_id:',
     `***${appId.slice(-4)}`,
+    'scopes:',
+    scope,
   );
 
   return `https://www.instagram.com/oauth/authorize?${params.toString()}`;
