@@ -12,6 +12,7 @@ import {
 import { ErrorOutline as ErrorIcon } from '@mui/icons-material';
 import {
   exchangeInstagramBusinessCode,
+  persistInstagramBusinessAuthToClient,
   saveInstagramBusinessToken,
 } from '../services/instagramBusinessAuthService';
 import { GLASS } from '../theme/glassTokens';
@@ -62,6 +63,31 @@ const InstagramBusinessCallback: React.FC = () => {
         const token = await exchangeInstagramBusinessCode(code);
         saveInstagramBusinessToken(token);
         window.sessionStorage.removeItem('ig_business_oauth_state');
+
+        // If we started from an authenticated "connect this client" flow,
+        // persist the token onto the chosen client row so the n8n scheduler
+        // can publish posts for it. Otherwise fall back to the public App
+        // Review demo page (sessionStorage-only).
+        const pendingClientId = window.sessionStorage.getItem(
+          'ig_business_oauth_client_id',
+        );
+        if (pendingClientId) {
+          window.sessionStorage.removeItem('ig_business_oauth_client_id');
+          try {
+            await persistInstagramBusinessAuthToClient(pendingClientId, token);
+            navigate(`/clients/${pendingClientId}`, { replace: true });
+            return;
+          } catch (persistErr) {
+            setStatus('error');
+            setErrorMessage(
+              persistErr instanceof Error
+                ? `Instagram signed in, but we couldn't save it to your client: ${persistErr.message}`
+                : "Instagram signed in, but we couldn't save it to your client.",
+            );
+            return;
+          }
+        }
+
         navigate('/connect/instagram-business/demo', { replace: true });
       } catch (e) {
         setStatus('error');

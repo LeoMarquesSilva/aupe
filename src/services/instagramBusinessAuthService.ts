@@ -300,17 +300,93 @@ export interface PublishMediaArgs {
   imageUrl: string;
   caption?: string;
   accessToken: string;
+  /**
+   * Optional status callback fired between retries. Lets the UI show
+   * "Retrying... (Instagram asked us to try again)" for transient failures.
+   */
+  onStatusUpdate?: (status: string) => void;
+}
+
+/**
+ * Instagram's Graph API routinely returns transient errors like:
+ *   { code: 1, is_transient: true, message: "Please reduce the amount..." }
+ *   { code: 2, is_transient: true, message: "An unexpected error..." }
+ *   { code: 4, is_transient: true, message: "Application request limit..." }
+ *
+ * These are documented as retryable: Meta itself says "Please retry your
+ * request later." The n8n pipeline already retries automatically, which is
+ * why the production scheduler rarely surfaces these. We replicate that
+ * behaviour here with exponential backoff so the App Review demo matches
+ * the reliability of the production flow.
+ */
+interface GraphErrorShape {
+  message?: string;
+  type?: string;
+  code?: number;
+  error_subcode?: number;
+  is_transient?: boolean;
+  fbtrace_id?: string;
+}
+
+function isTransientGraphError(raw: string): boolean {
+  try {
+    const parsed = JSON.parse(raw) as { error?: GraphErrorShape };
+    const err = parsed?.error;
+    if (!err) return false;
+    if (err.is_transient === true) return true;
+    const transientCodes = new Set([1, 2, 4, 17, 341, 368]);
+    if (typeof err.code === 'number' && transientCodes.has(err.code)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+async function graphFetchWithRetry(
+  input: RequestInfo,
+  init: RequestInit,
+  label: string,
+  opts: { maxAttempts?: number; onStatusUpdate?: (s: string) => void } = {},
+): Promise<Response> {
+  const maxAttempts = opts.maxAttempts ?? 4;
+  let lastErrorText = '';
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const res = await fetch(input, init);
+    if (res.ok) return res;
+
+    lastErrorText = await res.text();
+    const transient = isTransientGraphError(lastErrorText);
+    const isLastAttempt = attempt === maxAttempts;
+    if (!transient || isLastAttempt) break;
+
+    const backoffMs = Math.min(2000 * 2 ** (attempt - 1), 10_000);
+    opts.onStatusUpdate?.(
+      `Instagram returned a transient error on "${label}". Retrying in ${Math.round(
+        backoffMs / 1000,
+      )}s (attempt ${attempt + 1}/${maxAttempts})...`,
+    );
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[IG_BUSINESS_PUBLISH] transient error on "${label}", retry ${attempt}/${maxAttempts - 1} in ${backoffMs}ms`,
+      lastErrorText.slice(0, 300),
+    );
+    await new Promise((r) => setTimeout(r, backoffMs));
+  }
+  throw new Error(`${label} failed: ${lastErrorText.slice(0, 500)}`);
 }
 
 /**
  * Two-step publish flow for `instagram_business_content_publish`:
  *  1. Create a media container with `image_url` + optional `caption`.
  *  2. Publish the container to get the final media id / permalink.
+ *
+ * Both steps are wrapped in `graphFetchWithRetry` to handle Instagram's
+ * transient OAuthException errors (code 2, is_transient=true).
  */
 export async function publishInstagramImage(
   args: PublishMediaArgs,
 ): Promise<{ id: string; permalink?: string }> {
-  const { userId, imageUrl, caption, accessToken } = args;
+  const { userId, imageUrl, caption, accessToken, onStatusUpdate } = args;
 
   const createBody = new URLSearchParams({
     image_url: imageUrl,
@@ -318,18 +394,19 @@ export async function publishInstagramImage(
   });
   if (caption) createBody.set('caption', caption);
 
-  const createRes = await fetch(`${GRAPH_IG_BASE}/${userId}/media`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: createBody.toString(),
-  });
-  if (!createRes.ok) {
-    const text = await createRes.text();
-    throw new Error(`Media container creation failed: ${text.slice(0, 400)}`);
-  }
+  const createRes = await graphFetchWithRetry(
+    `${GRAPH_IG_BASE}/${userId}/media`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: createBody.toString(),
+    },
+    'Media container creation',
+    { onStatusUpdate },
+  );
   const { id: creationId } = (await createRes.json()) as { id: string };
 
-  return publishContainer(userId, creationId, accessToken);
+  return publishContainer(userId, creationId, accessToken, onStatusUpdate);
 }
 
 export interface PublishVideoArgs {
@@ -369,15 +446,16 @@ export async function publishInstagramVideo(
   });
   if (caption) createBody.set('caption', caption);
 
-  const createRes = await fetch(`${GRAPH_IG_BASE}/${userId}/media`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: createBody.toString(),
-  });
-  if (!createRes.ok) {
-    const text = await createRes.text();
-    throw new Error(`Reel container creation failed: ${text.slice(0, 400)}`);
-  }
+  const createRes = await graphFetchWithRetry(
+    `${GRAPH_IG_BASE}/${userId}/media`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: createBody.toString(),
+    },
+    'Reel container creation',
+    { onStatusUpdate },
+  );
   const { id: creationId } = (await createRes.json()) as { id: string };
 
   // Poll status_code until FINISHED (or fail). Reels typically take 10-60s
@@ -386,15 +464,14 @@ export async function publishInstagramVideo(
   const pollIntervalMs = 4000;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     await new Promise((r) => setTimeout(r, pollIntervalMs));
-    const statusRes = await fetch(
+    const statusRes = await graphFetchWithRetry(
       `${GRAPH_IG_BASE}/${creationId}?fields=status_code,status&access_token=${encodeURIComponent(
         accessToken,
       )}`,
+      { method: 'GET' },
+      'Reel status check',
+      { onStatusUpdate, maxAttempts: 2 },
     );
-    if (!statusRes.ok) {
-      const text = await statusRes.text();
-      throw new Error(`Reel status check failed: ${text.slice(0, 400)}`);
-    }
     const statusJson = (await statusRes.json()) as { status_code?: string; status?: string };
     const code = statusJson.status_code || statusJson.status || 'UNKNOWN';
     onStatusUpdate?.(code);
@@ -404,7 +481,7 @@ export async function publishInstagramVideo(
     }
   }
 
-  return publishContainer(userId, creationId, accessToken);
+  return publishContainer(userId, creationId, accessToken, onStatusUpdate);
 }
 
 /**
@@ -415,20 +492,22 @@ async function publishContainer(
   userId: string,
   creationId: string,
   accessToken: string,
+  onStatusUpdate?: (s: string) => void,
 ): Promise<{ id: string; permalink?: string }> {
   const publishBody = new URLSearchParams({
     creation_id: creationId,
     access_token: accessToken,
   });
-  const publishRes = await fetch(`${GRAPH_IG_BASE}/${userId}/media_publish`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: publishBody.toString(),
-  });
-  if (!publishRes.ok) {
-    const text = await publishRes.text();
-    throw new Error(`Media publish failed: ${text.slice(0, 400)}`);
-  }
+  const publishRes = await graphFetchWithRetry(
+    `${GRAPH_IG_BASE}/${userId}/media_publish`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: publishBody.toString(),
+    },
+    'Media publish',
+    { onStatusUpdate },
+  );
   const publishJson = (await publishRes.json()) as { id: string };
 
   const permalinkUrl =
@@ -479,4 +558,54 @@ export function readInstagramBusinessToken(): StoredInstagramBusinessToken | nul
 export function clearInstagramBusinessToken(): void {
   if (typeof window === 'undefined') return;
   window.sessionStorage.removeItem(STORAGE_KEY);
+}
+
+/**
+ * Persist the Instagram Business token to an existing `clients` row so the
+ * n8n scheduler pipeline (which reads `access_token` + `instagram_account_id`
+ * from `clients`) can publish posts for this client.
+ *
+ * Uses the same shape as the legacy Facebook Login flow to stay compatible
+ * with `clientService.saveInstagramAuth` and the rest of the app.
+ */
+export async function persistInstagramBusinessAuthToClient(
+  clientId: string,
+  token: InstagramBusinessTokenResponse,
+): Promise<InstagramBusinessProfile> {
+  const { clientService, supabase } = await import('./supabaseClient');
+
+  const profile = await getInstagramBusinessProfile(token.access_token);
+
+  const expiresInSec = Number(token.expires_in) || 60 * 24 * 60 * 60;
+  const tokenExpiry = new Date(Date.now() + expiresInSec * 1000);
+
+  await clientService.saveInstagramAuth(clientId, {
+    instagramAccountId: profile.id,
+    accessToken: token.access_token,
+    username: profile.username,
+    profilePicture: profile.profile_picture_url || '',
+    tokenExpiry,
+    pageId: null,
+    pageName: null,
+    issuedAt: new Date().toISOString(),
+    profileName: profile.name || profile.username,
+  });
+
+  // Mark the token as belonging to the Instagram Business Login flow so the
+  // n8n pipeline knows to call graph.instagram.com instead of
+  // graph.facebook.com. `token_type` is ignored by saveInstagramAuth so we
+  // write it directly here.
+  const { error: tokenTypeError } = await supabase
+    .from('clients')
+    .update({ token_type: 'instagram_business' })
+    .eq('id', clientId);
+  if (tokenTypeError) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[IG_BUSINESS_OAUTH] Failed to set token_type on client — n8n may route this client through the legacy Facebook endpoints.',
+      tokenTypeError.message,
+    );
+  }
+
+  return profile;
 }

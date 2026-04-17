@@ -279,6 +279,14 @@ const router = createBrowserRouter([
     path: "/connect/instagram-business/demo",
     element: <PublicLayout><InstagramBusinessDemo /></PublicLayout>,
   },
+  // Authenticated flow: connect a specific client via Instagram Business Login.
+  // Re-uses the same English landing + callback, but the callback detects the
+  // client id stored in sessionStorage and persists the token onto the client
+  // row so the n8n scheduler pipeline can publish posts for it.
+  {
+    path: "/clients/:clientId/connect-instagram-business",
+    element: <ProtectedPageLayout><ConnectInstagramBusiness /></ProtectedPageLayout>,
+  },
   
   // Rotas protegidas - Checkout Stripe
   {

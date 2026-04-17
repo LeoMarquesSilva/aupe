@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -35,6 +36,13 @@ import { GLASS } from '../theme/glassTokens';
  */
 const ConnectInstagramBusiness: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
+  const { clientId: clientIdFromPath } = useParams<{ clientId?: string }>();
+  const [searchParams] = useSearchParams();
+  // Accept clientId from either the path (/clients/:clientId/connect-instagram-business)
+  // or a query string (?clientId=...). When set, the callback will persist the
+  // resulting token onto this client and route into the scheduler dashboard
+  // instead of the public App Review demo page.
+  const clientId = clientIdFromPath || searchParams.get('clientId') || undefined;
 
   // Resolve config eagerly so config errors (missing env var) surface on
   // mount instead of after the user clicks Continue. We also expose the
@@ -57,6 +65,11 @@ const ConnectInstagramBusiness: React.FC = () => {
     try {
       const state = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
       window.sessionStorage.setItem('ig_business_oauth_state', state);
+      if (clientId) {
+        window.sessionStorage.setItem('ig_business_oauth_client_id', clientId);
+      } else {
+        window.sessionStorage.removeItem('ig_business_oauth_client_id');
+      }
       const url = getInstagramBusinessAuthUrl(state);
       window.location.href = url;
     } catch (e) {

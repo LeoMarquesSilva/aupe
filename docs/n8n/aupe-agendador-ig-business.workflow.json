@@ -1,0 +1,153 @@
+{
+  "name": "AUPE Agendador - Instagram Business Login",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aupe-agendador-ig-business",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "9b5c2a10-0001-4000-8000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 320],
+      "webhookId": "aupe-agendador-ig-business-v1"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// ==========================================================================\n// AUPE Agendador - Instagram Business Login\n// Publishes a scheduled_posts row to Instagram via graph.instagram.com\n// (the Instagram Business Login flow - distinct from Facebook Login).\n//\n// Input (from Supabase webhook):\n//   { type, table, record: { ...scheduled_posts row..., client_data: {...} } }\n//\n// Output: { scheduled_post_id, status, instagram_post_id?, posted_at?, error_message?, last_retry_at? }\n// ==========================================================================\n\nconst payload = $input.first().json;\nconst record  = payload?.record || {};\nconst client  = record?.client_data || {};\n\nconst igUserId    = client.instagram_account_id;\nconst accessToken = client.access_token;\nconst GRAPH       = 'https://graph.instagram.com/v21.0';\n\nfunction isTransient(errBody) {\n  try {\n    const e = JSON.parse(errBody)?.error;\n    if (e?.is_transient === true) return true;\n    if ([1, 2, 4, 17, 341, 368].includes(e?.code)) return true;\n  } catch { /* not JSON */ }\n  return false;\n}\n\nasync function graphCall(method, path, params = {}) {\n  let lastErr = '';\n  for (let attempt = 1; attempt <= 4; attempt += 1) {\n    const qs = new URLSearchParams(params).toString();\n    const init = { method, headers: {} };\n    let url = `${GRAPH}${path}`;\n    if (method === 'GET') {\n      url += `?${qs}`;\n    } else {\n      init.headers['Content-Type'] = 'application/x-www-form-urlencoded';\n      init.body = qs;\n    }\n    const r = await fetch(url, init);\n    const text = await r.text();\n    if (r.ok) return JSON.parse(text);\n    lastErr = text;\n    if (attempt < 4 && isTransient(text)) {\n      await new Promise(res => setTimeout(res, 2000 * Math.pow(2, attempt - 1)));\n      continue;\n    }\n    break;\n  }\n  throw new Error(`Graph API ${method} ${path} failed: ${lastErr.slice(0, 400)}`);\n}\n\nfunction extractImageUrls(images) {\n  if (!Array.isArray(images)) return [];\n  return images\n    .map(img => (typeof img === 'string' ? img : img?.url || null))\n    .filter(Boolean);\n}\n\nconst scheduledPostId = record.id;\nconst postType        = String(record.post_type || 'post').toLowerCase();\nconst caption         = record.caption || '';\nconst imageUrls       = extractImageUrls(record.images);\nconst videoUrl        = record.video || null;\nconst shareToFeed     = record.share_to_feed !== false;\n\nasync function publish() {\n  if (!igUserId || !accessToken) {\n    throw new Error('Missing instagram_account_id or access_token in client_data');\n  }\n\n  let creationId;\n\n  // -------- Reels flow ----------------------------------------------------\n  if (postType === 'reels' || (videoUrl && imageUrls.length === 0)) {\n    if (!videoUrl) throw new Error('Reels post requires a video URL');\n\n    const created = await graphCall('POST', `/${igUserId}/media`, {\n      media_type: 'REELS',\n      video_url: videoUrl,\n      share_to_feed: String(shareToFeed),\n      caption,\n      access_token: accessToken,\n    });\n    creationId = created.id;\n\n    // Poll container status until FINISHED (up to 5 minutes).\n    const maxPolls = 75;\n    for (let i = 0; i < maxPolls; i += 1) {\n      await new Promise(r => setTimeout(r, 4000));\n      const s = await graphCall('GET', `/${creationId}`, {\n        fields: 'status_code',\n        access_token: accessToken,\n      });\n      if (s.status_code === 'FINISHED') break;\n      if (s.status_code === 'ERROR' || s.status_code === 'EXPIRED') {\n        throw new Error(`Reel processing ${s.status_code}`);\n      }\n      if (i === maxPolls - 1) throw new Error('Reel processing timed out (>5min)');\n    }\n\n  // -------- Carousel flow (multiple images) -------------------------------\n  } else if (imageUrls.length > 1) {\n    const childIds = [];\n    for (const url of imageUrls) {\n      const child = await graphCall('POST', `/${igUserId}/media`, {\n        image_url: url,\n        is_carousel_item: 'true',\n        access_token: accessToken,\n      });\n      childIds.push(child.id);\n    }\n    const created = await graphCall('POST', `/${igUserId}/media`, {\n      media_type: 'CAROUSEL',\n      children: childIds.join(','),\n      caption,\n      access_token: accessToken,\n    });\n    creationId = created.id;\n\n  // -------- Single image flow --------------------------------------------\n  } else {\n    if (imageUrls.length === 0) throw new Error('Photo post requires at least one image');\n    const created = await graphCall('POST', `/${igUserId}/media`, {\n      image_url: imageUrls[0],\n      caption,\n      access_token: accessToken,\n    });\n    creationId = created.id;\n  }\n\n  const published = await graphCall('POST', `/${igUserId}/media_publish`, {\n    creation_id: creationId,\n    access_token: accessToken,\n  });\n\n  return published.id;\n}\n\ntry {\n  const instagramPostId = await publish();\n  return [{\n    json: {\n      scheduled_post_id: scheduledPostId,\n      status: 'posted',\n      instagram_post_id: instagramPostId,\n      posted_at: new Date().toISOString(),\n    }\n  }];\n} catch (err) {\n  return [{\n    json: {\n      scheduled_post_id: scheduledPostId,\n      status: 'failed',\n      error_message: String(err?.message || err).slice(0, 800),\n      last_retry_at: new Date().toISOString(),\n    }\n  }];\n}\n"
+      },
+      "id": "9b5c2a10-0001-4000-8000-000000000002",
+      "name": "Publish to Instagram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 320]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "9b5c2a10-0001-4000-8000-000000000010",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "posted",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9b5c2a10-0001-4000-8000-000000000003",
+      "name": "Posted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 320]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "scheduled_posts",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.scheduled_post_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "status", "fieldValue": "posted" },
+            { "fieldId": "instagram_post_id", "fieldValue": "={{ $json.instagram_post_id }}" },
+            { "fieldId": "posted_at", "fieldValue": "={{ $json.posted_at }}" },
+            { "fieldId": "error_message", "fieldValue": "={{ null }}" }
+          ]
+        }
+      },
+      "id": "9b5c2a10-0001-4000-8000-000000000004",
+      "name": "Mark as posted",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [960, 220],
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CRED_ID",
+          "name": "Supabase AUPE (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "scheduled_posts",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.scheduled_post_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldId": "status", "fieldValue": "failed" },
+            { "fieldId": "error_message", "fieldValue": "={{ $json.error_message }}" },
+            { "fieldId": "last_retry_at", "fieldValue": "={{ $json.last_retry_at }}" }
+          ]
+        }
+      },
+      "id": "9b5c2a10-0001-4000-8000-000000000005",
+      "name": "Mark as failed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [960, 420],
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CRED_ID",
+          "name": "Supabase AUPE (service_role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Publish to Instagram", "type": "main", "index": 0 }]]
+    },
+    "Publish to Instagram": {
+      "main": [[{ "node": "Posted?", "type": "main", "index": 0 }]]
+    },
+    "Posted?": {
+      "main": [
+        [{ "node": "Mark as posted", "type": "main", "index": 0 }],
+        [{ "node": "Mark as failed", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "1.1.0",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "aupe"
+  },
+  "tags": [
+    { "name": "aupe" },
+    { "name": "instagram-business" },
+    { "name": "app-review" }
+  ]
+}

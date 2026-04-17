@@ -424,6 +424,13 @@ const SingleClientDashboard: React.FC = () => {
   const handleConnectInstagram = () => {
     navigate(`/clients/${clientId}/connect-instagram`);
   };
+
+  // Instagram Business Login (new App Review flow). Routes through the
+  // English-language consent page and the Meta `instagram_business_*`
+  // scopes instead of the legacy Facebook Login + Pages flow.
+  const handleConnectInstagramBusiness = () => {
+    navigate(`/clients/${clientId}/connect-instagram-business`);
+  };
   
   const handleDisconnectInstagram = async () => {
     if (!client) return;
@@ -1259,6 +1266,33 @@ const SingleClientDashboard: React.FC = () => {
               >
                 <InstagramIcon sx={{ fontSize: 18 }} />
                 Conectar Instagram
+              </Box>
+              <Box
+                component="button"
+                onClick={handleConnectInstagramBusiness}
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  mt: 1.5,
+                  ml: 1,
+                  px: 2.5,
+                  py: 1.1,
+                  border: '1px solid #f74211',
+                  borderRadius: '10px',
+                  bgcolor: 'transparent',
+                  color: '#f74211',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  fontWeight: 650,
+                  fontFamily: 'inherit',
+                  transition: 'all 0.2s ease',
+                  '&:hover': { bgcolor: 'rgba(247, 66, 17, 0.08)' },
+                  '&:focus-visible': { outline: 'none', boxShadow: '0 0 0 3px rgba(247, 66, 17, 0.3)' },
+                }}
+              >
+                <InstagramIcon sx={{ fontSize: 18 }} />
+                Connect via Instagram Business Login
               </Box>
             </Box>
           </motion.div>
