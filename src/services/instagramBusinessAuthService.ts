@@ -57,9 +57,31 @@ export function getInstagramBusinessAppId(): string {
   return id;
 }
 
+/**
+ * Returns the redirect URI WITH a trailing slash.
+ *
+ * The Meta App Dashboard documents that it "may have added a trailing slash
+ * to your URIs" when it stores them — meaning a URI you typed as
+ *   https://example.com/callback/instagram-business
+ * may have been canonicalized internally to
+ *   https://example.com/callback/instagram-business/
+ *
+ * If we then send the no-slash version at token exchange, Instagram fails
+ * the byte-equality check and returns the famously misleading
+ * "Error validating verification code. Please make sure your redirect_uri
+ *  is identical to the one you used in the OAuth dialog request."
+ *
+ * Always sending the trailing-slash version sidesteps this normalization
+ * bug. Make sure the trailing-slash variant is also present in the
+ * "OAuth redirect URIs" list in Products > Instagram > API setup with
+ * Instagram business login > Business login configuration.
+ *
+ * React Router v6 treats `/x` and `/x/` as the same route, so this does
+ * not break our callback page routing.
+ */
 export function getInstagramBusinessRedirectUri(): string {
   if (typeof window === 'undefined') return '';
-  return `${window.location.origin}/callback/instagram-business`;
+  return `${window.location.origin}/callback/instagram-business/`;
 }
 
 /**
