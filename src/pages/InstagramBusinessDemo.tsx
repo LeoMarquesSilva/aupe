@@ -61,13 +61,16 @@ type PublishMode = 'image' | 'video';
 
 /**
  * Sample assets used by the App Review reviewer when they don't have a public
- * URL handy. They live on stable, public CDNs so we don't need to keep our own
- * copy on disk. Both meet the official Instagram constraints (image < 8 MiB,
- * MP4 < 1 GB, < 90s for Reels).
+ * URL handy. Instagram fetches these URLs server-side: they must be HTTPS,
+ * directly reachable, and avoid redirect chains (picsum.photos often 302s and
+ * caused flaky container creation with OAuthException code 2).
+ *
+ * Wikimedia + Google sample bucket = stable for Meta's crawler.
  */
-const SAMPLE_IMAGE_URL = 'https://picsum.photos/id/1015/1080/1080';
+const SAMPLE_IMAGE_URL =
+  'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Fronalpstock_big.jpg/1024px-Fronalpstock_big.jpg';
 const SAMPLE_VIDEO_URL =
-  'https://download.samplelib.com/mp4/sample-15s.mp4';
+  'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4';
 
 const SectionHeader: React.FC<{
   icon: React.ReactNode;

@@ -349,13 +349,21 @@ function isTransientGraphError(raw: string): boolean {
   }
 }
 
+type GraphRetryOpts = {
+  maxAttempts?: number;
+  /** Cap for exponential backoff (default 10_000; container creation uses 25_000). */
+  maxBackoffMs?: number;
+  onStatusUpdate?: (s: string) => void;
+};
+
 async function graphFetchWithRetry(
   input: RequestInfo,
   init: RequestInit,
   label: string,
-  opts: { maxAttempts?: number; onStatusUpdate?: (s: string) => void } = {},
+  opts: GraphRetryOpts = {},
 ): Promise<Response> {
   const maxAttempts = opts.maxAttempts ?? 4;
+  const maxBackoffMs = opts.maxBackoffMs ?? 10_000;
   let lastErrorText = '';
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const res = await fetch(input, init);
@@ -366,7 +374,7 @@ async function graphFetchWithRetry(
     const isLastAttempt = attempt === maxAttempts;
     if (!transient || isLastAttempt) break;
 
-    const backoffMs = Math.min(2000 * 2 ** (attempt - 1), 10_000);
+    const backoffMs = Math.min(2000 * 2 ** (attempt - 1), maxBackoffMs);
     opts.onStatusUpdate?.(
       `Instagram returned a transient error on "${label}". Retrying in ${Math.round(
         backoffMs / 1000,
@@ -374,7 +382,7 @@ async function graphFetchWithRetry(
     );
     // eslint-disable-next-line no-console
     console.warn(
-      `[IG_BUSINESS_PUBLISH] transient error on "${label}", retry ${attempt}/${maxAttempts - 1} in ${backoffMs}ms`,
+      `[IG_BUSINESS_PUBLISH] transient error on "${label}", attempt ${attempt}/${maxAttempts} next in ${backoffMs}ms`,
       lastErrorText.slice(0, 300),
     );
     await new Promise((r) => setTimeout(r, backoffMs));
@@ -409,7 +417,11 @@ export async function publishInstagramImage(
       body: createBody.toString(),
     },
     'Media container creation',
-    { onStatusUpdate },
+    {
+      onStatusUpdate,
+      maxAttempts: 8,
+      maxBackoffMs: 25_000,
+    },
   );
   const { id: creationId } = (await createRes.json()) as { id: string };
 
@@ -461,7 +473,11 @@ export async function publishInstagramVideo(
       body: createBody.toString(),
     },
     'Reel container creation',
-    { onStatusUpdate },
+    {
+      onStatusUpdate,
+      maxAttempts: 8,
+      maxBackoffMs: 25_000,
+    },
   );
   const { id: creationId } = (await createRes.json()) as { id: string };
 
@@ -513,7 +529,7 @@ async function publishContainer(
       body: publishBody.toString(),
     },
     'Media publish',
-    { onStatusUpdate },
+    { onStatusUpdate, maxAttempts: 6, maxBackoffMs: 20_000 },
   );
   const publishJson = (await publishRes.json()) as { id: string };
 
