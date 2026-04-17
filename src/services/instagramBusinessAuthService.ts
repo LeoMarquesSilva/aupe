@@ -127,9 +127,15 @@ export function getInstagramBusinessAuthUrl(state?: string): string {
   // send the same one back during code-for-token exchange. Anything computed
   // dynamically later (e.g. via window.location.origin on the callback page)
   // could theoretically differ if the user lands on a different host or port.
+  //
+  // IMPORTANT: use a dedicated key for the Meta **Instagram App ID** — do NOT
+  // reuse `ig_business_oauth_client_id`, which is reserved for our Supabase
+  // `clients.id` UUID (set by ConnectInstagramBusiness before redirect).
+  // Overwriting that key with the numeric app id caused "invalid input syntax
+  // for type uuid" when persisting the token to a client row.
   try {
     window.sessionStorage.setItem('ig_business_oauth_redirect_uri', redirectUri);
-    window.sessionStorage.setItem('ig_business_oauth_client_id', appId);
+    window.sessionStorage.setItem('ig_business_oauth_instagram_app_id', appId);
   } catch {
     /* sessionStorage can be unavailable in some privacy modes */
   }
@@ -168,7 +174,8 @@ export async function exchangeInstagramBusinessCode(
   // message Instagram shows for redirect_uri drift.
   const clientIdUsedAtAuthorize =
     typeof window !== 'undefined'
-      ? window.sessionStorage.getItem('ig_business_oauth_client_id') || undefined
+      ? window.sessionStorage.getItem('ig_business_oauth_instagram_app_id') ||
+          undefined
       : undefined;
 
   // eslint-disable-next-line no-console
