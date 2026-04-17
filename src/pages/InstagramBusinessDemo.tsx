@@ -52,6 +52,47 @@ import { supabaseStorageService } from '../services/supabaseStorageService';
 import { supabaseVideoStorageService } from '../services/supabaseVideoStorageService';
 import { GLASS } from '../theme/glassTokens';
 
+/** Same public URL pattern as `scheduleInstagramPost` / n8n (Supabase Storage). */
+function isSupabasePostImagesPublicUrl(url: string): boolean {
+  return /\/storage\/v1\/object\/public\/post-images\//i.test(url.trim());
+}
+
+/**
+ * Main app always stores media on Supabase and passes that HTTPS URL to Instagram.
+ * Mirror any external URL into `post-images` before publishing so Meta fetches our bucket.
+ */
+async function mirrorImageToSupabaseIfNeeded(
+  rawUrl: string,
+  folder: string,
+): Promise<string> {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) throw new Error('Image URL is empty');
+  if (isSupabasePostImagesPublicUrl(trimmed)) return trimmed;
+  const { url } = await supabaseStorageService.uploadImageFromUrl(
+    trimmed,
+    folder,
+    'ig-business-demo.jpg',
+  );
+  return url;
+}
+
+async function mirrorVideoToSupabaseIfNeeded(
+  rawUrl: string,
+  folder: string,
+): Promise<string> {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) throw new Error('Video URL is empty');
+  if (isSupabasePostImagesPublicUrl(trimmed)) return trimmed;
+  const res = await fetch(trimmed);
+  if (!res.ok) throw new Error(`Could not download video (${res.status})`);
+  const blob = await res.blob();
+  const file = new File([blob], `ig-business-demo-${Date.now()}.mp4`, {
+    type: blob.type || 'video/mp4',
+  });
+  const result = await supabaseVideoStorageService.uploadVideo(file, folder);
+  return result.publicUrl || result.url;
+}
+
 interface MediaWithInsights extends InstagramBusinessMedia {
   insights?: InstagramMediaInsight[];
   insightsError?: string;
@@ -60,17 +101,14 @@ interface MediaWithInsights extends InstagramBusinessMedia {
 type PublishMode = 'image' | 'video';
 
 /**
- * Sample assets used by the App Review reviewer when they don't have a public
- * URL handy. Instagram fetches these URLs server-side: they must be HTTPS,
- * directly reachable, and avoid redirect chains (picsum.photos often 302s and
- * caused flaky container creation with OAuthException code 2).
- *
- * Wikimedia + Google sample bucket = stable for Meta's crawler.
+ * Sample sources downloaded in the browser, then uploaded to Supabase Storage
+ * (same pipeline as Create Post / n8n). Instagram only sees the public
+ * `post-images` URL — not the original host.
  */
 const SAMPLE_IMAGE_URL =
   'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Fronalpstock_big.jpg/1024px-Fronalpstock_big.jpg';
-const SAMPLE_VIDEO_URL =
-  'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4';
+/** Short MP4 keeps “Use sample” fast; still mirrored to Storage before Graph. */
+const SAMPLE_VIDEO_URL = 'https://download.samplelib.com/mp4/sample-15s.mp4';
 
 const SectionHeader: React.FC<{
   icon: React.ReactNode;
@@ -215,16 +253,24 @@ const InstagramBusinessDemo: React.FC = () => {
     if (!accessToken || !userId) return;
     resetPublishFeedback();
 
+    const folder = userId || 'instagram-business-demo';
+
     if (publishMode === 'image') {
       if (!imageUrl.trim()) {
         setPublishError('Please provide a public image URL or upload a file.');
         return;
       }
       setPublishing(true);
+      setPublishStatus('Uploading to Supabase Storage (same as scheduled posts)…');
       try {
+        const resolvedImageUrl = await mirrorImageToSupabaseIfNeeded(imageUrl, folder);
+        if (resolvedImageUrl !== imageUrl.trim()) {
+          setImageUrl(resolvedImageUrl);
+        }
+        setPublishStatus(null);
         const result = await publishInstagramImage({
           userId,
-          imageUrl: imageUrl.trim(),
+          imageUrl: resolvedImageUrl,
           caption: caption.trim() || undefined,
           accessToken,
         });
@@ -236,6 +282,7 @@ const InstagramBusinessDemo: React.FC = () => {
         setPublishError(e instanceof Error ? e.message : 'Publish failed');
       } finally {
         setPublishing(false);
+        setPublishStatus(null);
       }
       return;
     }
@@ -245,10 +292,16 @@ const InstagramBusinessDemo: React.FC = () => {
       return;
     }
     setPublishing(true);
+    setPublishStatus('Uploading video to Supabase Storage (same as scheduled posts)…');
     try {
+      const resolvedVideoUrl = await mirrorVideoToSupabaseIfNeeded(videoUrl, folder);
+      if (resolvedVideoUrl !== videoUrl.trim()) {
+        setVideoUrl(resolvedVideoUrl);
+      }
+      setPublishStatus(null);
       const result = await publishInstagramVideo({
         userId,
-        videoUrl: videoUrl.trim(),
+        videoUrl: resolvedVideoUrl,
         caption: caption.trim() || undefined,
         accessToken,
         onStatusUpdate: (status) => setPublishStatus(status),
@@ -265,18 +318,34 @@ const InstagramBusinessDemo: React.FC = () => {
     }
   };
 
-  const handleUseSample = () => {
+  const handleUseSample = async () => {
     resetPublishFeedback();
-    if (publishMode === 'image') {
-      setImageUrl(SAMPLE_IMAGE_URL);
-      if (!caption) {
-        setCaption('Posted from the Instagram Business Login demo (sample image).');
+    if (!accessToken) return;
+    const folder = userId || 'instagram-business-demo';
+    setUploading(true);
+    setUploadError(null);
+    try {
+      if (publishMode === 'image') {
+        const url = await mirrorImageToSupabaseIfNeeded(SAMPLE_IMAGE_URL, folder);
+        setImageUrl(url);
+        if (!caption) {
+          setCaption('Posted from the Instagram Business Login demo (sample image).');
+        }
+      } else {
+        const url = await mirrorVideoToSupabaseIfNeeded(SAMPLE_VIDEO_URL, folder);
+        setVideoUrl(url);
+        if (!caption) {
+          setCaption('Posted from the Instagram Business Login demo (sample reel).');
+        }
       }
-    } else {
-      setVideoUrl(SAMPLE_VIDEO_URL);
-      if (!caption) {
-        setCaption('Posted from the Instagram Business Login demo (sample reel).');
-      }
+    } catch (e) {
+      setUploadError(
+        e instanceof Error
+          ? `${e.message} Try uploading a file from your device instead.`
+          : 'Sample upload failed. Try uploading from your device.',
+      );
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -462,7 +531,7 @@ const InstagramBusinessDemo: React.FC = () => {
               icon={<PublishIcon />}
               title="B. Publish a photo or a Reel"
               scope="instagram_business_content_publish"
-              description="Pick how you want to provide the media: upload a file, paste a public URL, or click 'Use sample' to fill an example automatically."
+              description="Same pipeline as the main scheduler: media is stored on Supabase (public URL in the post-images bucket), then Instagram loads that URL — upload a file, paste any HTTPS URL (we mirror it to Storage), or use the sample."
             />
 
             <Tabs
@@ -569,7 +638,7 @@ const InstagramBusinessDemo: React.FC = () => {
                   onChange={(e) => setImageUrl(e.target.value)}
                   fullWidth
                   size="small"
-                  helperText="Instagram requires the URL to be publicly reachable. Max 8 MiB."
+                  helperText="External URLs are copied to Supabase Storage first (same as Create Post). Instagram then fetches from your project’s public bucket. Max 8 MiB."
                 />
               ) : (
                 <TextField
@@ -579,7 +648,7 @@ const InstagramBusinessDemo: React.FC = () => {
                   onChange={(e) => setVideoUrl(e.target.value)}
                   fullWidth
                   size="small"
-                  helperText="Reels: MP4, < 90 seconds, < 1 GB. Vertical 9:16 recommended."
+                  helperText="Videos are uploaded to Supabase Storage first (same as Reels in the app), then published. MP4, &lt; 90s, &lt; 1 GB recommended."
                 />
               )}
 
@@ -599,10 +668,13 @@ const InstagramBusinessDemo: React.FC = () => {
               {publishStatus && (
                 <Alert
                   severity="info"
-                  icon={<CircularProgress size={16} sx={{ color: GLASS.accent.blue }} />}
+                  icon={
+                    publishStatus.includes('Uploading') ? (
+                      <CircularProgress size={16} sx={{ color: GLASS.accent.blue }} />
+                    ) : undefined
+                  }
                 >
-                  Reel processing on Instagram (status: <code>{publishStatus}</code>). Reels
-                  usually take 10-60 seconds to transcode.
+                  {publishStatus}
                 </Alert>
               )}
 
