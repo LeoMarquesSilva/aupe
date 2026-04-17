@@ -43,6 +43,10 @@ import ClientApprovalView from './pages/ClientApprovalView';
 import ManagerInternalApprovalView from './pages/ManagerInternalApprovalView';
 import ShareLinksPage from './pages/ShareLinksPage';
 import ApprovalsPage from './pages/ApprovalsPage';
+import PlansPage from './pages/PlansPage';
+import ConnectInstagramBusiness from './pages/ConnectInstagramBusiness';
+import InstagramBusinessCallback from './pages/InstagramBusinessCallback';
+import InstagramBusinessDemo from './pages/InstagramBusinessDemo';
 
 // Layout compartilhado para todas as páginas protegidas
 const PageLayout = ({ children }: { children: React.ReactNode }) => (
@@ -232,6 +236,12 @@ const router = createBrowserRouter([
     path: "/settings",
     element: <ProtectedPageLayout><Settings /></ProtectedPageLayout>,
   },
+
+  // Rota protegida - Planos (para usuários logados verem/trocarem planos)
+  {
+    path: "/plans",
+    element: <ProtectedPageLayout><PlansPage /></ProtectedPageLayout>,
+  },
   
   // Rota administrativa - APENAS ADMINS
   {
@@ -253,6 +263,21 @@ const router = createBrowserRouter([
   {
     path: "/callback",
     element: <PublicCallbackLayout><Callback /></PublicCallbackLayout>,
+  },
+
+  // Instagram Business Login — App Review demo flow (public, English UI).
+  // Kept isolated from the legacy Facebook Login flow on purpose.
+  {
+    path: "/connect/instagram-business",
+    element: <PublicLayout><ConnectInstagramBusiness /></PublicLayout>,
+  },
+  {
+    path: "/callback/instagram-business",
+    element: <PublicCallbackLayout><InstagramBusinessCallback /></PublicCallbackLayout>,
+  },
+  {
+    path: "/connect/instagram-business/demo",
+    element: <PublicLayout><InstagramBusinessDemo /></PublicLayout>,
   },
   
   // Rotas protegidas - Checkout Stripe
