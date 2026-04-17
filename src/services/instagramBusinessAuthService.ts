@@ -38,19 +38,20 @@ export const INSTAGRAM_BUSINESS_SCOPES = [
  *
  * It is usually DIFFERENT from the Facebook App ID in Settings > Basic.
  * Using the Facebook App ID here causes the "Invalid platform app" error.
+ *
+ * We DO NOT fall back to REACT_APP_META_APP_ID / REACT_APP_FACEBOOK_APP_ID anymore.
+ * If REACT_APP_INSTAGRAM_BUSINESS_APP_ID is missing at build time we throw a
+ * clear, actionable error instead of silently sending the wrong client_id.
  */
 export function getInstagramBusinessAppId(): string {
-  const id = (
-    process.env.REACT_APP_INSTAGRAM_BUSINESS_APP_ID ||
-    process.env.REACT_APP_META_APP_ID ||
-    process.env.REACT_APP_INSTAGRAM_APP_ID ||
-    process.env.REACT_APP_FACEBOOK_APP_ID ||
-    ''
-  ).trim();
+  const id = (process.env.REACT_APP_INSTAGRAM_BUSINESS_APP_ID || '').trim();
   if (!id) {
     throw new Error(
-      'Missing Instagram Business App ID. Set REACT_APP_INSTAGRAM_BUSINESS_APP_ID with the ' +
-        '"Instagram app ID" shown under Products > Instagram > API setup with Instagram business login.',
+      'REACT_APP_INSTAGRAM_BUSINESS_APP_ID is not set in this build. ' +
+        'Add it to Vercel (Production + Preview) with the "Instagram app ID" ' +
+        'from Meta > Products > Instagram > API setup with Instagram business login, ' +
+        'then redeploy. Falling back to the Facebook App ID causes ' +
+        '"Invalid platform app" on the Instagram authorize page.',
     );
   }
   return id;

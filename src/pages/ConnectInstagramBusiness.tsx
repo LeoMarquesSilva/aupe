@@ -19,7 +19,11 @@ import {
   InsightsOutlined as InsightsIcon,
   CheckCircleOutline as CheckIcon,
 } from '@mui/icons-material';
-import { getInstagramBusinessAuthUrl } from '../services/instagramBusinessAuthService';
+import {
+  getInstagramBusinessAuthUrl,
+  getInstagramBusinessAppId,
+  getInstagramBusinessRedirectUri,
+} from '../services/instagramBusinessAuthService';
 import { GLASS } from '../theme/glassTokens';
 
 /**
@@ -31,6 +35,23 @@ import { GLASS } from '../theme/glassTokens';
  */
 const ConnectInstagramBusiness: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
+
+  // Resolve config eagerly so config errors (missing env var) surface on
+  // mount instead of after the user clicks Continue. We also expose the
+  // masked App ID + redirect URI in a small debug panel so we can verify
+  // — without opening DevTools — that the build picked up the right env.
+  let resolvedAppId = '';
+  let resolvedRedirectUri = '';
+  let configError: string | null = null;
+  try {
+    resolvedAppId = getInstagramBusinessAppId();
+    resolvedRedirectUri = getInstagramBusinessRedirectUri();
+  } catch (e) {
+    configError = e instanceof Error ? e.message : String(e);
+  }
+  const maskedAppId = resolvedAppId
+    ? `***${resolvedAppId.slice(-4)} (len=${resolvedAppId.length})`
+    : '(missing)';
 
   const handleConnect = () => {
     try {
@@ -151,7 +172,7 @@ const ConnectInstagramBusiness: React.FC = () => {
               </List>
             </Box>
 
-            {error && (
+            {(error || configError) && (
               <Paper
                 elevation={0}
                 sx={{
@@ -162,16 +183,39 @@ const ConnectInstagramBusiness: React.FC = () => {
                 }}
               >
                 <Typography variant="body2" sx={{ color: '#b91c1c' }}>
-                  {error}
+                  {error || configError}
                 </Typography>
               </Paper>
             )}
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.5,
+                bgcolor: 'rgba(0, 0, 0, 0.04)',
+                border: '1px dashed rgba(0, 0, 0, 0.12)',
+                borderRadius: GLASS.radius.inner,
+              }}
+            >
+              <Typography
+                variant="caption"
+                component="div"
+                sx={{ color: GLASS.text.muted, fontFamily: 'monospace', fontSize: '0.7rem' }}
+              >
+                Build config (debug)
+                <br />
+                client_id: {maskedAppId}
+                <br />
+                redirect_uri: {resolvedRedirectUri || '(no window.origin)'}
+              </Typography>
+            </Paper>
 
             <Button
               variant="contained"
               size="large"
               startIcon={<InstagramIcon />}
               onClick={handleConnect}
+              disabled={Boolean(configError)}
               fullWidth
               sx={{
                 bgcolor: GLASS.accent.orange,
