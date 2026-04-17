@@ -3,7 +3,8 @@ import { Box, useTheme, useMediaQuery } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { subscriptionService } from '../services/subscriptionService';
 import { supabase } from '../services/supabaseClient';
-import { GLASS } from '../theme/glassTokens';
+import { ENTERPRISE_CONTACT_URL } from '../config/stripeProducts';
+import { mapAndSortPlansFromDb } from '../config/planPresentation';
 import {
   LandingNav,
   LandingHero,
@@ -29,76 +30,10 @@ const Landing: React.FC = () => {
     const loadPlans = async () => {
       try {
         const dbPlans = await subscriptionService.getAllPlans();
-
-        const mappedPlans: LandingPlanCard[] = dbPlans
-          .filter((plan) => plan.active && plan.stripe_price_id)
-          .map((plan) => {
-            const priceInReais = (plan.amount / 100).toFixed(2);
-            const priceFormatted = `R$ ${priceInReais.replace('.', ',')}`;
-
-            const featuresList = [
-              `Até ${plan.max_clients} contas Instagram`,
-              `${plan.max_posts_per_month.toLocaleString('pt-BR')} posts agendados/mês`,
-              `Até ${plan.max_profiles} pessoas com acesso`,
-              'Aprovação interna e aprovação do cliente',
-              'Links de dashboard para cliente',
-              'Agendamento de post, carrossel, reels e stories',
-            ];
-
-            if (plan.features && typeof plan.features === 'object') {
-              if (plan.features.analytics) featuresList.push('Analytics em tempo real');
-              if (plan.features.api_access) featuresList.push('API access');
-              if (plan.features.support === 'priority') featuresList.push('Suporte prioritário');
-            }
-
-            return {
-              id: plan.id,
-              name: plan.name.charAt(0).toUpperCase() + plan.name.slice(1),
-              price: priceFormatted,
-              period: '/mês',
-              description:
-                plan.name === 'starter'
-                  ? 'Para estruturar a operação'
-                  : plan.name === 'professional'
-                    ? 'Para times e agências em escala'
-                    : plan.name === 'business'
-                      ? 'Para operação avançada multi-conta'
-                      : 'Operação completa',
-              features: featuresList,
-              popular: plan.name === 'professional',
-              gradient:
-                plan.name === 'starter'
-                  ? `linear-gradient(135deg, ${GLASS.accent.orange} 0%, ${GLASS.accent.orangeLight} 100%)`
-                  : plan.name === 'professional'
-                    ? `linear-gradient(135deg, ${GLASS.accent.orange} 0%, ${GLASS.accent.orangeDark} 50%, #8c2d0d 100%)`
-                    : `linear-gradient(135deg, ${GLASS.accent.orangeDark} 0%, #06B6D4 100%)`,
-            };
-          })
-          .sort((a, b) => {
-            const order: { [key: string]: number } = { Starter: 1, Professional: 2, Business: 3 };
-            return (order[a.name] || 99) - (order[b.name] || 99);
-          });
-
-        setPlans(mappedPlans);
+        setPlans(mapAndSortPlansFromDb(dbPlans as any));
       } catch (error) {
         console.error('Erro ao carregar planos:', error);
-        setPlans([
-          {
-            id: 'fallback-starter',
-            name: 'Starter',
-            price: 'R$ 87,90',
-            period: '/mês',
-            description: 'Para estruturar a operação',
-            features: [
-              'Até 3 contas Instagram',
-              '900 posts agendados/mês',
-              'Aprovação interna e cliente',
-              'Links de dashboard para cliente',
-            ],
-            popular: false,
-            gradient: `linear-gradient(135deg, ${GLASS.accent.orange} 0%, ${GLASS.accent.orangeLight} 100%)`,
-          },
-        ]);
+        setPlans([]);
       } finally {
         setLoadingPlans(false);
       }
@@ -112,6 +47,13 @@ const Landing: React.FC = () => {
   }, []);
 
   const handleGetStarted = async (planId?: string) => {
+    // Se for ENTERPRISE (A Consultar), redirecionar direto para WhatsApp
+    const selectedPlan = planId ? plans.find((p) => p.id === planId) : null;
+    if (selectedPlan?.isContactOnly) {
+      window.open(ENTERPRISE_CONTACT_URL, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
     const {
       data: { user },
     } = await supabase.auth.getUser();

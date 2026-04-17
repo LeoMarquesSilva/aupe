@@ -33,6 +33,7 @@ import {
 import { PanelLeft } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { AppShellLayoutContext } from '../contexts/AppShellLayoutContext';
 import { roleService } from '../services/roleService';
 import { subscriptionService } from '../services/subscriptionService';
 import { supabase } from '../services/supabaseClient';
@@ -596,7 +597,15 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
             WebkitOverflowScrolling: 'touch',
           }}
         >
-          {children}
+          <AppShellLayoutContext.Provider
+            value={{
+              isMobileShell: isMobile,
+              sidebarCollapsed: !isMobile && collapsed,
+              sidebarWidthPx: isMobile ? 0 : currentWidth,
+            }}
+          >
+            {children}
+          </AppShellLayoutContext.Provider>
         </Box>
       </Box>
 

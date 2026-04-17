@@ -15,28 +15,52 @@ export interface CheckoutSession {
   url: string | null;
 }
 
+export interface CheckoutLineItem {
+  priceId: string;
+  quantity?: number;
+}
+
 export class StripeService {
   /**
-   * Criar sessão de checkout para subscription
+   * Criar sessão de checkout para subscription.
+   * Aceita `priceIdOrItems` como string (legado, 1 linha) ou array de items.
    */
   async createCheckoutSession(
-    priceId: string,
+    priceIdOrItems: string | CheckoutLineItem[],
     organizationId: string,
     userId: string
   ): Promise<CheckoutSession> {
     try {
-      // Chamar Edge Function
+      const body: Record<string, unknown> = { organizationId, userId };
+      if (Array.isArray(priceIdOrItems)) {
+        body.items = priceIdOrItems;
+      } else {
+        body.priceId = priceIdOrItems;
+      }
+
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-        body: {
-          priceId,
-          organizationId,
-          userId,
-        },
+        body,
       });
 
       if (error) {
+        // Tentar extrair o body de erro da edge function (mensagem real do Stripe)
+        let serverMsg: string | undefined;
+        try {
+          const ctx: any = (error as any).context;
+          if (ctx && typeof ctx.json === 'function') {
+            const payload = await ctx.json();
+            serverMsg = payload?.details || payload?.message || payload?.error;
+            console.error('❌ Edge Function payload:', payload);
+          } else if (ctx && typeof ctx.text === 'function') {
+            const txt = await ctx.text();
+            console.error('❌ Edge Function text:', txt);
+            serverMsg = txt;
+          }
+        } catch (e) {
+          console.error('❌ Falha ao ler body do erro:', e);
+        }
         console.error('❌ Erro ao chamar Edge Function:', error);
-        throw new Error(error.message || 'Erro ao criar sessão de checkout');
+        throw new Error(serverMsg || error.message || 'Erro ao criar sessão de checkout');
       }
 
       if (!data || !data.sessionId) {
@@ -80,17 +104,20 @@ export class StripeService {
   }
 
   /**
-   * Criar checkout e redirecionar (método completo)
+   * Criar checkout e redirecionar (método completo).
+   * Aceita price único (legado) ou array de line items.
    */
-  async startCheckout(priceId: string, organizationId: string, userId: string): Promise<void> {
+  async startCheckout(
+    priceIdOrItems: string | CheckoutLineItem[],
+    organizationId: string,
+    userId: string
+  ): Promise<void> {
     try {
-      const session = await this.createCheckoutSession(priceId, organizationId, userId);
-      
+      const session = await this.createCheckoutSession(priceIdOrItems, organizationId, userId);
+
       if (session.url) {
-        // Se temos URL direta, redirecionar
         window.location.href = session.url;
       } else {
-        // Caso contrário, usar redirectToCheckout
         await this.redirectToCheckout(session.sessionId);
       }
     } catch (error: any) {

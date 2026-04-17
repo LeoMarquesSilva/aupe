@@ -264,12 +264,17 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
 }
 
 // Função auxiliar: Sincronizar subscription do Stripe para o banco
+// Processa TODOS os items: identifica o plano base (subscription_plans.stripe_price_id)
+// e os add-ons (subscription_addons.stripe_price_id) — popula subscription_addon_items.
 async function syncSubscriptionToDatabase(
   organizationId: string | null,
   stripeSubscription: Stripe.Subscription
 ) {
   try {
-    // Se não temos organization_id, buscar pelo stripe_subscription_id
+    // Se não temos organization_id, tentar do metadata da sub, depois do banco
+    if (!organizationId) {
+      organizationId = stripeSubscription.metadata?.organization_id || null;
+    }
     if (!organizationId) {
       const { data: existing } = await supabase
         .from('subscriptions')
@@ -285,28 +290,41 @@ async function syncSubscriptionToDatabase(
       }
     }
 
-    // Buscar plan_id pelo price_id do Stripe
-    const priceId = typeof stripeSubscription.items.data[0]?.price.id === 'string'
-      ? stripeSubscription.items.data[0].price.id
-      : stripeSubscription.items.data[0]?.price.id || null;
-
-    if (!priceId) {
-      console.error('❌ price_id não encontrado na subscription');
+    const items = stripeSubscription.items?.data || [];
+    if (items.length === 0) {
+      console.error('❌ Subscription sem items');
       return;
     }
 
-    const { data: plan } = await supabase
+    const priceIds = items.map((it) => it.price.id);
+
+    // Buscar planos que batem com algum price_id
+    const { data: matchingPlans } = await supabase
       .from('subscription_plans')
-      .select('id')
-      .eq('stripe_price_id', priceId)
-      .single();
+      .select('id, stripe_price_id, plan_code')
+      .in('stripe_price_id', priceIds);
 
-    if (!plan) {
-      console.error(`❌ Plano não encontrado para price_id: ${priceId}`);
+    // Buscar add-ons que batem com algum price_id
+    const { data: matchingAddons } = await supabase
+      .from('subscription_addons')
+      .select('id, stripe_price_id, code, type')
+      .in('stripe_price_id', priceIds);
+
+    const planByPrice = new Map<string, { id: string; plan_code: string | null }>();
+    (matchingPlans || []).forEach((p: any) => planByPrice.set(p.stripe_price_id, p));
+
+    const addonByPrice = new Map<string, { id: string; code: string }>();
+    (matchingAddons || []).forEach((a: any) => addonByPrice.set(a.stripe_price_id, a));
+
+    // Identificar item do plano base (primeiro item cujo price_id está em subscription_plans)
+    const baseItem = items.find((it) => planByPrice.has(it.price.id));
+    if (!baseItem) {
+      console.error(`❌ Nenhum item da sub ${stripeSubscription.id} corresponde a um plano (price_ids=${priceIds.join(',')})`);
       return;
     }
+    const plan = planByPrice.get(baseItem.price.id)!;
 
-    // Verificar se subscription já existe
+    // Upsert subscription (plano base)
     const { data: existingSub } = await supabase
       .from('subscriptions')
       .select('id')
@@ -320,15 +338,15 @@ async function syncSubscriptionToDatabase(
       stripe_customer_id: typeof stripeSubscription.customer === 'string'
         ? stripeSubscription.customer
         : stripeSubscription.customer.id,
-      status: stripeSubscription.status === 'active' ? 'active' : 
+      status: stripeSubscription.status === 'active' ? 'active' :
               stripeSubscription.status === 'canceled' ? 'canceled' :
               stripeSubscription.status === 'past_due' ? 'past_due' :
               stripeSubscription.status === 'trialing' ? 'trialing' : 'active',
       current_period_start: new Date(stripeSubscription.current_period_start * 1000).toISOString(),
       current_period_end: new Date(stripeSubscription.current_period_end * 1000).toISOString(),
       cancel_at_period_end: stripeSubscription.cancel_at_period_end || false,
-      canceled_at: stripeSubscription.canceled_at 
-        ? new Date(stripeSubscription.canceled_at * 1000).toISOString() 
+      canceled_at: stripeSubscription.canceled_at
+        ? new Date(stripeSubscription.canceled_at * 1000).toISOString()
         : null,
       trial_start: stripeSubscription.trial_start
         ? new Date(stripeSubscription.trial_start * 1000).toISOString()
@@ -339,20 +357,77 @@ async function syncSubscriptionToDatabase(
       updated_at: new Date().toISOString(),
     };
 
+    let localSubscriptionId: string;
     if (existingSub) {
-      // Atualizar subscription existente
-      await supabase
-        .from('subscriptions')
-        .update(subscriptionData)
-        .eq('id', existingSub.id);
+      await supabase.from('subscriptions').update(subscriptionData).eq('id', existingSub.id);
+      localSubscriptionId = existingSub.id;
     } else {
-      // Criar nova subscription
-      await supabase.from('subscriptions').insert(subscriptionData);
+      const { data: created, error: insertErr } = await supabase
+        .from('subscriptions')
+        .insert(subscriptionData)
+        .select('id')
+        .single();
+      if (insertErr || !created) {
+        console.error('❌ Erro ao inserir subscription:', insertErr);
+        return;
+      }
+      localSubscriptionId = created.id;
     }
 
     console.log(`✅ Subscription sincronizada: ${stripeSubscription.id}`);
+
+    // Sincronizar add-ons
+    await syncAddonItems(localSubscriptionId, items, addonByPrice);
   } catch (error: any) {
     console.error('❌ Erro ao sincronizar subscription:', error);
     throw error;
+  }
+}
+
+// Sincronizar subscription_addon_items a partir dos items do Stripe
+async function syncAddonItems(
+  localSubscriptionId: string,
+  stripeItems: Stripe.SubscriptionItem[],
+  addonByPrice: Map<string, { id: string; code: string }>,
+) {
+  try {
+    const addonItemsInStripe = stripeItems.filter((it) => addonByPrice.has(it.price.id));
+
+    // Upsert cada add-on presente no Stripe
+    for (const item of addonItemsInStripe) {
+      const addon = addonByPrice.get(item.price.id)!;
+      const payload = {
+        subscription_id: localSubscriptionId,
+        addon_id: addon.id,
+        stripe_subscription_item_id: item.id,
+        quantity: item.quantity || 1,
+        status: 'active',
+        updated_at: new Date().toISOString(),
+      };
+      const { error: upsertErr } = await supabase
+        .from('subscription_addon_items')
+        .upsert(payload, { onConflict: 'subscription_id,addon_id' });
+      if (upsertErr) {
+        console.error(`❌ Erro ao upsert addon_item (${addon.code}):`, upsertErr);
+      }
+    }
+
+    // Remover addon_items locais que não estão mais na sub do Stripe
+    const stripeAddonItemIds = new Set(addonItemsInStripe.map((it) => it.id));
+    const { data: localAddons } = await supabase
+      .from('subscription_addon_items')
+      .select('id, stripe_subscription_item_id')
+      .eq('subscription_id', localSubscriptionId);
+
+    const toDelete = (localAddons || []).filter(
+      (a: any) => !stripeAddonItemIds.has(a.stripe_subscription_item_id),
+    );
+    if (toDelete.length > 0) {
+      const ids = toDelete.map((a: any) => a.id);
+      await supabase.from('subscription_addon_items').delete().in('id', ids);
+      console.log(`🧹 Removidos ${ids.length} add-on items órfãos`);
+    }
+  } catch (err: any) {
+    console.error('❌ Erro ao sincronizar addon items:', err);
   }
 }

@@ -23,6 +23,10 @@ export interface SubscriptionPlan {
   id: string;
   name: string;
   stripe_price_id: string | null;
+  stripe_product_id?: string | null;
+  plan_code?: string | null;
+  is_enterprise_contact?: boolean;
+  tier_order?: number | null;
   amount: number; // em centavos
   currency: string;
   interval: string; // 'month' ou 'year'
@@ -33,6 +37,13 @@ export interface SubscriptionPlan {
   active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface SubscriptionAddOnItem {
+  productId?: string;
+  priceId: string;
+  name: string;
+  quantity: number;
 }
 
 export interface Subscription {
@@ -54,6 +65,7 @@ export interface Subscription {
   organization?: Organization;
   plan?: SubscriptionPlan;
   usage?: SubscriptionUsage; // Uso atual da subscription
+  addOns?: SubscriptionAddOnItem[]; // Add-ons ativos nesta subscription
 }
 
 export interface SubscriptionUsage {
@@ -179,6 +191,7 @@ class SubscriptionService {
     const { data, error } = await supabase
       .from('subscription_plans')
       .select('*')
+      .order('tier_order', { ascending: true, nullsFirst: false })
       .order('amount', { ascending: true });
 
     if (error) {

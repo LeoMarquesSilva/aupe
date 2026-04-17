@@ -36,12 +36,18 @@ import {
   Business as BusinessIcon,
   CreditCard as CreditCardIcon,
   WorkspacePremium as PlanIcon,
+  Extension as AddonsIcon,
+  LockOpen as LiberationIcon,
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Refresh as RefreshIcon,
   Logout as LogoutIcon
 } from '@mui/icons-material';
+import Switch from '@mui/material/Switch';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import AddonsCatalogTab from '../components/superadmin/AddonsCatalogTab';
+import LiberationsTab from '../components/superadmin/LiberationsTab';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { GLASS } from '../theme/glassTokens';
@@ -134,6 +140,11 @@ const SuperAdminDashboard: React.FC = () => {
 
   const [planForm, setPlanForm] = useState<Partial<SubscriptionPlan>>({
     name: '',
+    plan_code: '',
+    tier_order: 0,
+    stripe_price_id: '',
+    stripe_product_id: '',
+    is_enterprise_contact: false,
     amount: 0,
     currency: 'brl',
     interval: 'month',
@@ -352,6 +363,11 @@ const SuperAdminDashboard: React.FC = () => {
   const handleCreatePlan = () => {
     setPlanForm({
       name: '',
+      plan_code: '',
+      tier_order: (plans.length > 0 ? Math.max(...plans.map(p => p.tier_order || 0)) + 1 : 1),
+      stripe_price_id: '',
+      stripe_product_id: '',
+      is_enterprise_contact: false,
       amount: 0,
       currency: 'brl',
       interval: 'month',
@@ -484,6 +500,8 @@ const SuperAdminDashboard: React.FC = () => {
           <Tab icon={<BusinessIcon />} label="Organizações" />
           <Tab icon={<CreditCardIcon />} label="Subscriptions" />
           <Tab icon={<PlanIcon />} label="Planos" />
+          <Tab icon={<AddonsIcon />} label="Add-ons (Catálogo)" />
+          <Tab icon={<LiberationIcon />} label="Liberações" />
         </Tabs>
 
         {/* Tab 1: Organizations */}
@@ -746,28 +764,60 @@ const SuperAdminDashboard: React.FC = () => {
           </Box>
 
           <TableContainer sx={{ overflowX: "auto" }}>
-            <Table>
+            <Table size="small">
               <TableHead>
                 <TableRow>
+                  <TableCell>Tier</TableCell>
+                  <TableCell>Code</TableCell>
                   <TableCell>Nome</TableCell>
                   <TableCell>Preço</TableCell>
                   <TableCell>Profiles</TableCell>
                   <TableCell>Clients</TableCell>
                   <TableCell>Posts/mês</TableCell>
+                  <TableCell>Stripe Price ID</TableCell>
+                  <TableCell>Stripe Product ID</TableCell>
+                  <TableCell>Tipo</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell align="right">Ações</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {plans.map((plan) => (
-                  <TableRow key={plan.id}>
+                  <TableRow key={plan.id} hover>
+                    <TableCell>{plan.tier_order ?? '—'}</TableCell>
+                    <TableCell>
+                      <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                        {plan.plan_code || '—'}
+                      </Typography>
+                    </TableCell>
                     <TableCell>{plan.name}</TableCell>
                     <TableCell>
-                      R$ {(plan.amount / 100).toFixed(2).replace('.', ',')}
+                      {plan.is_enterprise_contact ? (
+                        <Chip label="A consultar" size="small" color="warning" variant="outlined" />
+                      ) : (
+                        <>R$ {(plan.amount / 100).toFixed(2).replace('.', ',')}</>
+                      )}
                     </TableCell>
                     <TableCell>{plan.max_profiles}</TableCell>
                     <TableCell>{plan.max_clients}</TableCell>
                     <TableCell>{plan.max_posts_per_month}</TableCell>
+                    <TableCell>
+                      <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                        {plan.stripe_price_id || '—'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                        {plan.stripe_product_id || '—'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      {plan.is_enterprise_contact ? (
+                        <Chip label="Contato" size="small" color="secondary" variant="outlined" />
+                      ) : (
+                        <Chip label="Self-service" size="small" variant="outlined" />
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Chip
                         label={plan.active ? 'Ativo' : 'Inativo'}
@@ -796,6 +846,20 @@ const SuperAdminDashboard: React.FC = () => {
               </TableBody>
             </Table>
           </TableContainer>
+        </TabPanel>
+
+        {/* Tab 4: Add-ons (Catálogo) */}
+        <TabPanel value={currentTab} index={3}>
+          <AddonsCatalogTab />
+        </TabPanel>
+
+        {/* Tab 5: Liberações */}
+        <TabPanel value={currentTab} index={4}>
+          <LiberationsTab
+            organizations={organizations}
+            plans={plans}
+            onAnyChange={loadAllData}
+          />
         </TabPanel>
       </Paper>
 
@@ -961,85 +1025,172 @@ const SuperAdminDashboard: React.FC = () => {
       </Dialog>
 
       {/* Dialog: Plan */}
-      <Dialog open={planDialog.open} onClose={() => setPlanDialog({ open: false, mode: 'create', plan: null })} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: GLASS.radius.card, background: GLASS.surface.bgStrong, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}` } }}>
+      <Dialog open={planDialog.open} onClose={() => setPlanDialog({ open: false, mode: 'create', plan: null })} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: GLASS.radius.card, background: GLASS.surface.bgStrong, backdropFilter: `blur(${GLASS.surface.blur})`, boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}` } }}>
         <DialogTitle>
           {planDialog.mode === 'create' ? 'Novo Plano' : 'Editar Plano'}
         </DialogTitle>
         <DialogContent>
-          <TextField
-            fullWidth
-            label="Nome"
-            value={planForm.name}
-            onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
-            margin="normal"
-            required
-          />
-          <TextField
-            fullWidth
-            label="Preço (em centavos)"
-            type="number"
-            value={planForm.amount}
-            onChange={(e) => setPlanForm({ ...planForm, amount: parseInt(e.target.value) })}
-            margin="normal"
-            required
-            helperText="Ex: 4900 = R$ 49,00"
-          />
-          <TextField
-            fullWidth
-            label="Stripe Price ID"
-            value={planForm.stripe_price_id || ''}
-            onChange={(e) => setPlanForm({ ...planForm, stripe_price_id: e.target.value })}
-            margin="normal"
-          />
-          <TextField
-            fullWidth
-            label="Máximo de Profiles"
-            type="number"
-            value={planForm.max_profiles}
-            onChange={(e) => setPlanForm({ ...planForm, max_profiles: parseInt(e.target.value) })}
-            margin="normal"
-            required
-          />
-          <TextField
-            fullWidth
-            label="Máximo de Clients"
-            type="number"
-            value={planForm.max_clients}
-            onChange={(e) => setPlanForm({ ...planForm, max_clients: parseInt(e.target.value) })}
-            margin="normal"
-            required
-          />
-          <TextField
-            fullWidth
-            label="Máximo de Posts por Mês"
-            type="number"
-            value={planForm.max_posts_per_month}
-            onChange={(e) => setPlanForm({ ...planForm, max_posts_per_month: parseInt(e.target.value) })}
-            margin="normal"
-            required
-          />
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Intervalo</InputLabel>
-            <Select
-              value={planForm.interval}
-              label="Intervalo"
-              onChange={(e) => setPlanForm({ ...planForm, interval: e.target.value })}
-            >
-              <MenuItem value="month">Mensal</MenuItem>
-              <MenuItem value="year">Anual</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Status</InputLabel>
-            <Select
-              value={planForm.active ? 'active' : 'inactive'}
-              label="Status"
-              onChange={(e) => setPlanForm({ ...planForm, active: e.target.value === 'active' })}
-            >
-              <MenuItem value="active">Ativo</MenuItem>
-              <MenuItem value="inactive">Inativo</MenuItem>
-            </Select>
-          </FormControl>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Code (plan_code)"
+                value={planForm.plan_code || ''}
+                onChange={(e) => setPlanForm({ ...planForm, plan_code: e.target.value.toUpperCase() })}
+                margin="normal"
+                required
+                helperText="STARTER, BASIC, PRO, BUSINESS, ENTERPRISE"
+                inputProps={{ style: { fontFamily: 'monospace' } }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={5}>
+              <TextField
+                fullWidth
+                label="Nome público"
+                value={planForm.name}
+                onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={6} sm={3}>
+              <TextField
+                fullWidth
+                label="Tier (ordem)"
+                type="number"
+                value={planForm.tier_order ?? 0}
+                onChange={(e) => setPlanForm({ ...planForm, tier_order: parseInt(e.target.value) || 0 })}
+                margin="normal"
+                helperText="Ordem crescente"
+              />
+            </Grid>
+          </Grid>
+
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Preço (em centavos)"
+                type="number"
+                value={planForm.amount}
+                onChange={(e) => setPlanForm({ ...planForm, amount: parseInt(e.target.value) || 0 })}
+                margin="normal"
+                required
+                disabled={!!planForm.is_enterprise_contact}
+                helperText={
+                  planForm.is_enterprise_contact
+                    ? 'Plano por contato — valor ignorado'
+                    : `Equivale a R$ ${((Number(planForm.amount) || 0) / 100).toFixed(2).replace('.', ',')}`
+                }
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Intervalo</InputLabel>
+                <Select
+                  value={planForm.interval}
+                  label="Intervalo"
+                  onChange={(e) => setPlanForm({ ...planForm, interval: e.target.value })}
+                >
+                  <MenuItem value="month">Mensal</MenuItem>
+                  <MenuItem value="year">Anual</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Stripe Price ID"
+                value={planForm.stripe_price_id || ''}
+                onChange={(e) => setPlanForm({ ...planForm, stripe_price_id: e.target.value })}
+                margin="normal"
+                inputProps={{ style: { fontFamily: 'monospace' } }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Stripe Product ID"
+                value={planForm.stripe_product_id || ''}
+                onChange={(e) => setPlanForm({ ...planForm, stripe_product_id: e.target.value })}
+                margin="normal"
+                inputProps={{ style: { fontFamily: 'monospace' } }}
+              />
+            </Grid>
+          </Grid>
+
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Máx. Profiles"
+                type="number"
+                value={planForm.max_profiles}
+                onChange={(e) => setPlanForm({ ...planForm, max_profiles: parseInt(e.target.value) || 0 })}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Máx. Clients"
+                type="number"
+                value={planForm.max_clients}
+                onChange={(e) => setPlanForm({ ...planForm, max_clients: parseInt(e.target.value) || 0 })}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Máx. Posts / mês"
+                type="number"
+                value={planForm.max_posts_per_month}
+                onChange={(e) => setPlanForm({ ...planForm, max_posts_per_month: parseInt(e.target.value) || 0 })}
+                margin="normal"
+                required
+              />
+            </Grid>
+          </Grid>
+
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={planForm.active ? 'active' : 'inactive'}
+                  label="Status"
+                  onChange={(e) => setPlanForm({ ...planForm, active: e.target.value === 'active' })}
+                >
+                  <MenuItem value="active">Ativo</MenuItem>
+                  <MenuItem value="inactive">Inativo</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} sx={{ display: 'flex', alignItems: 'center', mt: { xs: 0, sm: 1 } }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={!!planForm.is_enterprise_contact}
+                    onChange={(e) => setPlanForm({ ...planForm, is_enterprise_contact: e.target.checked })}
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body2">Plano "A consultar" (contato)</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Oculta o preço e direciona o CTA para WhatsApp
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setPlanDialog({ open: false, mode: 'create', plan: null })}>

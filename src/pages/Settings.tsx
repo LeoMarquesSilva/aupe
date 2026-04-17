@@ -58,9 +58,11 @@ import { ImageUrlService } from '../services/imageUrlService';
 import { subscriptionLimitsService } from '../services/subscriptionLimitsService';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { GLASS } from '../theme/glassTokens';
 import { appShellContainerSx } from '../theme/appShellLayout';
+import SubscriptionAddons from '../components/settings/SubscriptionAddons';
+import ExtensionIcon from '@mui/icons-material/Extension';
 
 interface UserProfile {
   id: string;
@@ -118,6 +120,7 @@ const Settings: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // Profile data
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -168,6 +171,15 @@ const Settings: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  // Mapear ?tab=addons / ?tab=subscription para a aba correspondente
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'addons') setCurrentTab(5);
+    else if (tabParam === 'subscription' || tabParam === 'assinatura') setCurrentTab(2);
+    else if (tabParam === 'profile' || tabParam === 'perfil') setCurrentTab(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const loadAgencyBranding = async () => {
     if (!user) return;
@@ -489,6 +501,7 @@ const Settings: React.FC = () => {
           <Tab icon={<CreditCardIcon />} iconPosition="start" label="Assinatura" />
           <Tab icon={<SecurityIcon />} iconPosition="start" label="Segurança" />
           <Tab icon={<WhatsAppIcon />} iconPosition="start" label="Notificações WhatsApp" />
+          <Tab icon={<ExtensionIcon />} iconPosition="start" label="Add-ons" />
         </Tabs>
 
         {/* Tab: Perfil */}
@@ -788,7 +801,7 @@ const Settings: React.FC = () => {
                       </List>
                   </CardContent>
                   <CardActions sx={{ px: { xs: 2, sm: 3 }, py: 2, borderTop: `1px solid ${GLASS.border.outer}`, bgcolor: GLASS.surface.bgFooter }}>
-                    <Button variant="outlined" onClick={() => navigate('/')} startIcon={<TrendingUpIcon />} sx={{ borderColor: GLASS.accent.orange, color: GLASS.accent.orange, borderRadius: GLASS.radius.button, '&:hover': { borderColor: GLASS.accent.orangeDark, bgcolor: 'rgba(247, 66, 17,0.06)' } }}>
+                    <Button variant="outlined" onClick={() => navigate('/plans')} startIcon={<TrendingUpIcon />} sx={{ borderColor: GLASS.accent.orange, color: GLASS.accent.orange, borderRadius: GLASS.radius.button, '&:hover': { borderColor: GLASS.accent.orangeDark, bgcolor: 'rgba(247, 66, 17,0.06)' } }}>
                       Ver planos
                     </Button>
                   </CardActions>
@@ -927,7 +940,7 @@ const Settings: React.FC = () => {
                     )}
                   </CardContent>
                   <CardActions sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 2, borderTop: `1px solid ${GLASS.border.outer}`, bgcolor: GLASS.surface.bgFooter, gap: 1.5 }}>
-                    <Button variant="contained" onClick={() => navigate('/')} startIcon={<TrendingUpIcon />} sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}>
+                    <Button variant="contained" onClick={() => navigate('/plans')} startIcon={<TrendingUpIcon />} sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}>
                       Fazer upgrade
                     </Button>
                     <Button variant="outlined" onClick={loadSubscription} startIcon={<RefreshIcon />} sx={{ borderColor: GLASS.accent.orange, color: GLASS.accent.orange, borderRadius: GLASS.radius.button, '&:hover': { borderColor: GLASS.accent.orangeDark, bgcolor: 'rgba(247, 66, 17,0.06)' } }}>
@@ -949,7 +962,7 @@ const Settings: React.FC = () => {
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                     Para começar a usar o sistema, assine um plano.
                   </Typography>
-                  <Button variant="contained" onClick={() => navigate('/')} startIcon={<TrendingUpIcon />} size="large" sx={{ borderRadius: 2 }}>
+                  <Button variant="contained" onClick={() => navigate('/plans')} startIcon={<TrendingUpIcon />} size="large" sx={{ borderRadius: 2 }}>
                     Ver planos disponíveis
                   </Button>
                 </CardContent>
@@ -1045,6 +1058,33 @@ const Settings: React.FC = () => {
         {/* Tab: Notificações WhatsApp */}
         <TabPanel value={currentTab} index={4}>
           <WhatsAppSettings />
+        </TabPanel>
+
+        {/* Tab: Add-ons */}
+        <TabPanel value={currentTab} index={5}>
+          {loadingSubscription ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+              <CircularProgress size={40} sx={{ color: GLASS.accent.orange }} />
+            </Box>
+          ) : (
+            <Box sx={{ px: { xs: 0, sm: 2 } }}>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+                  Add-ons da assinatura
+                </Typography>
+                <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
+                  Contrate recursos extras para turbinar sua operação. Tudo fica em uma única fatura do Stripe, com cobrança pro-rata.
+                </Typography>
+              </Box>
+              <SubscriptionAddons
+                subscription={subscription}
+                onUpdated={() => {
+                  loadSubscription();
+                  setSearchParams({}, { replace: true });
+                }}
+              />
+            </Box>
+          )}
         </TabPanel>
       </Paper>
 

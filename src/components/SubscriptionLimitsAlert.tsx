@@ -64,7 +64,7 @@ const SubscriptionLimitsAlert: React.FC<SubscriptionLimitsAlertProps> = ({
           <Button
             variant="contained"
             component={Link}
-            to="/"
+            to="/plans"
             size="small"
           >
             Ver Planos

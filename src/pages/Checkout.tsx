@@ -16,6 +16,7 @@ import { stripeService } from '../services/stripeService';
 import { supabase } from '../services/supabaseClient';
 import { roleService } from '../services/roleService';
 import { GLASS } from '../theme/glassTokens';
+import { ENTERPRISE_CONTACT_URL } from '../config/stripeProducts';
 
 const Checkout: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -61,12 +62,22 @@ const Checkout: React.FC = () => {
 
         // 3. Buscar plano
         const plans = await subscriptionService.getAllPlans();
-        const plan = plans.find(p => p.id === planId);
+        const plan = plans.find(p => p.id === planId) as any;
 
         if (!plan) {
           setError('Plano não encontrado');
           setLoading(false);
           return;
+        }
+
+        // 3.1 ENTERPRISE: redirecionar para WhatsApp (exceto se usuário for superadmin — bypass)
+        if (plan.is_enterprise_contact || plan.plan_code === 'ENTERPRISE') {
+          const role = (profile as any).role;
+          if (role !== 'superadmin' && role !== 'super_admin') {
+            window.location.href = ENTERPRISE_CONTACT_URL;
+            return;
+          }
+          // SuperAdmin: permite seguir para checkout R$1
         }
 
         if (!plan.stripe_price_id) {
@@ -75,9 +86,9 @@ const Checkout: React.FC = () => {
           return;
         }
 
-        // 4. Criar checkout e redirecionar
+        // 4. Criar checkout e redirecionar (novo formato: items[])
         await stripeService.startCheckout(
-          plan.stripe_price_id,
+          [{ priceId: plan.stripe_price_id, quantity: 1 }],
           organizationId,
           user.id
         );

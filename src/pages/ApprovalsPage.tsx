@@ -70,6 +70,7 @@ import {
   getPostIdsInActiveLinks,
   getPostIdsInActiveInternalLinks,
 } from '../services/approvalService';
+import FeatureGate from '../components/FeatureGate';
 import ApprovalRequestDialog from '../components/ApprovalRequestDialog';
 import InternalApprovalLinkDialog from '../components/InternalApprovalLinkDialog';
 import ApprovalUploadDrawer from '../components/ApprovalUploadDrawer';
@@ -1431,4 +1432,16 @@ const ApprovalsPage: React.FC = () => {
   );
 };
 
-export { ApprovalsPage as default };
+// Wrapper com gating por feature flag do add-on "Fluxo de Aprovação".
+// Usuários que não tiverem o add-on ativo veem a tela de upsell.
+const ApprovalsPageWithGate: React.FC = () => (
+  <FeatureGate
+    featureFlag="fluxo_aprovacao"
+    featureName="Fluxo de Aprovação"
+    description="Gere links personalizados para seus clientes aprovarem ou solicitarem ajustes nos posts. Acompanhe o status em um quadro Kanban e automatize o fluxo de revisões. Add-on disponível para todos os planos."
+  >
+    <ApprovalsPage />
+  </FeatureGate>
+);
+
+export default ApprovalsPageWithGate;

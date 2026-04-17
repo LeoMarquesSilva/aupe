@@ -1,0 +1,61 @@
+{
+  "plans": {
+    "STARTER": {
+      "productId": "prod_ULu0QpNaDKZNlE",
+      "priceId": "price_1TNCCk5QaHLfiCdUDgq3gXFs",
+      "amount": 3000
+    },
+    "BASIC": {
+      "productId": "prod_ULu0vv6PeH3UFK",
+      "priceId": "price_1TNCCl5QaHLfiCdUdOTp7k8C",
+      "amount": 17800
+    },
+    "PRO": {
+      "productId": "prod_ULu0UA4tiTvwpI",
+      "priceId": "price_1TNCCm5QaHLfiCdUOsn2lUEr",
+      "amount": 35600
+    },
+    "BUSINESS": {
+      "productId": "prod_ULu0bERgIZYl0a",
+      "priceId": "price_1TNCCn5QaHLfiCdUuEpXI2Je",
+      "amount": 50000
+    },
+    "ENTERPRISE": {
+      "productId": "prod_ULu0RK94yVmOdY",
+      "priceId": "price_1TNCCn5QaHLfiCdUv3ArgbTp",
+      "amount": 100
+    }
+  },
+  "addons": {
+    "CONTA_ADICIONAL_STARTER": {
+      "productId": "prod_ULu0ztBCxfXm44",
+      "priceId": "price_1TNCCo5QaHLfiCdUNfzq8ujI",
+      "amount": 3000
+    },
+    "CONTA_ADICIONAL_BASIC": {
+      "productId": "prod_ULu0f8yOKdMyeb",
+      "priceId": "price_1TNCCp5QaHLfiCdUcwtowKfC",
+      "amount": 2000
+    },
+    "CONTA_ADICIONAL_PRO": {
+      "productId": "prod_ULu0ReVHMaStMV",
+      "priceId": "price_1TNCCq5QaHLfiCdUZaVf2inw",
+      "amount": 1800
+    },
+    "CONTA_ADICIONAL_BUSINESS": {
+      "productId": "prod_ULu0rVvglHnUcG",
+      "priceId": "price_1TNCCq5QaHLfiCdUyPhI69yk",
+      "amount": 1500
+    },
+    "CONTA_ADICIONAL_ENTERPRISE": {
+      "productId": "prod_ULu0oNDfngNXkW",
+      "priceId": "price_1TNCCr5QaHLfiCdUXnbz0Rq4",
+      "amount": 1200
+    },
+    "FLUXO_APROVACAO": {
+      "productId": "prod_ULu0Vlnet7wUXB",
+      "priceId": "price_1TNCCs5QaHLfiCdUI2tqlFha",
+      "amount": 10000
+    }
+  }
+}

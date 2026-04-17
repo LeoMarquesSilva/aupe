@@ -64,11 +64,16 @@ serve(async (req) => {
       );
     }
 
-    const { priceId, organizationId, userId } = body;
+    const { priceId, items, organizationId, userId } = body as {
+      priceId?: string;
+      items?: Array<{ priceId: string; quantity?: number }>;
+      organizationId?: string;
+      userId?: string;
+    };
 
-    if (!priceId || !organizationId || !userId) {
+    if (!organizationId || !userId) {
       return new Response(
-        JSON.stringify({ error: 'priceId, organizationId e userId são obrigatórios' }),
+        JSON.stringify({ error: 'organizationId e userId são obrigatórios' }),
         {
           status: 400,
           headers: { ...cors, 'Content-Type': 'application/json' },
@@ -76,19 +81,36 @@ serve(async (req) => {
       );
     }
 
-    // Obter origem da requisição para URLs de redirect
+    // Normalizar entrada: aceita `items` (novo formato) ou `priceId` (legado)
+    const normalized: Array<{ priceId: string; quantity: number }> = [];
+    if (Array.isArray(items) && items.length > 0) {
+      for (const it of items) {
+        if (!it?.priceId) continue;
+        const qty = Number(it.quantity ?? 1);
+        normalized.push({ priceId: it.priceId, quantity: qty > 0 ? qty : 1 });
+      }
+    } else if (priceId) {
+      normalized.push({ priceId, quantity: 1 });
+    }
+
+    if (normalized.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'priceId ou items[] são obrigatórios' }),
+        {
+          status: 400,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const line_items = normalized.map((it) => ({ price: it.priceId, quantity: it.quantity }));
+
     const origin = req.headers.get('origin') || req.headers.get('referer') || 'http://localhost:3000';
 
-    // Criar sessão de checkout no Stripe
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
+      line_items,
       success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/checkout/cancel`,
       client_reference_id: organizationId,
@@ -96,7 +118,13 @@ serve(async (req) => {
         organization_id: organizationId,
         user_id: userId,
       },
-      customer_email: undefined, // Será preenchido pelo Stripe se o usuário estiver logado
+      subscription_data: {
+        metadata: {
+          organization_id: organizationId,
+          user_id: userId,
+        },
+      },
+      customer_email: undefined,
     });
 
     return new Response(
@@ -109,11 +137,23 @@ serve(async (req) => {
       }
     );
   } catch (error: unknown) {
-    console.error('❌ Erro ao criar checkout session:', error instanceof Error ? error.message : error);
+    const msg = error instanceof Error ? error.message : String(error);
+    const errAny = error as { type?: string; code?: string; statusCode?: number; raw?: { message?: string } };
+    console.error('❌ Erro ao criar checkout session:', {
+      message: msg,
+      type: errAny?.type,
+      code: errAny?.code,
+      statusCode: errAny?.statusCode,
+      raw: errAny?.raw?.message,
+    });
 
     return new Response(
       JSON.stringify({
-        error: 'Não foi possível criar a sessão de checkout. Tente novamente.',
+        error: 'Não foi possível criar a sessão de checkout.',
+        message: msg,
+        type: errAny?.type,
+        code: errAny?.code,
+        details: errAny?.raw?.message,
       }),
       {
         status: 500,
