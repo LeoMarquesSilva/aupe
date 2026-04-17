@@ -13,7 +13,7 @@
 const axios = require('axios');
 const { rateLimit, clientIpFromReq } = require('./rate-limit-ip');
 
-const DEBUG_TAG = 'ig-business-oauth-2026-04-17e-no-slash-5scopes';
+const DEBUG_TAG = 'ig-business-oauth-2026-04-17f-strict-secret';
 
 /**
  * While we are debugging the Meta App Review flow, keep verbose logging and
@@ -40,31 +40,47 @@ function log(step, payload) {
 /**
  * Instagram Business Login requires the "Instagram app ID" and "Instagram app secret"
  * from Products > Instagram > API setup with Instagram business login — these are
- * typically DIFFERENT from the Facebook App ID / Secret in Settings > Basic.
+ * DIFFERENT from the Facebook App ID / Secret in Settings > Basic.
+ *
+ * We DO NOT fall back to META_APP_SECRET or FACEBOOK_APP_SECRET anymore:
+ * silently using the Facebook secret with the Instagram App ID produces the
+ * famously misleading "Error validating verification code" message instead of
+ * a clear authentication error.
+ *
+ * Returns also `appIdSource` / `appSecretSource` so /api/instagram-business-oauth-token
+ * can include them in its debug payload and the developer can see WHICH env
+ * var actually fed the request.
  */
 function resolveCredentials() {
-  const appId = (
-    process.env.INSTAGRAM_BUSINESS_APP_ID ||
-    process.env.REACT_APP_INSTAGRAM_BUSINESS_APP_ID ||
-    process.env.META_APP_ID ||
-    process.env.REACT_APP_META_APP_ID ||
-    process.env.FACEBOOK_APP_ID ||
-    process.env.REACT_APP_FACEBOOK_APP_ID ||
-    process.env.REACT_APP_INSTAGRAM_APP_ID ||
-    process.env.INSTAGRAM_APP_ID ||
-    ''
-  ).trim();
-  const appSecret = (
-    process.env.INSTAGRAM_BUSINESS_APP_SECRET ||
-    process.env.REACT_APP_INSTAGRAM_BUSINESS_APP_SECRET ||
-    process.env.META_APP_SECRET ||
-    process.env.FACEBOOK_APP_SECRET ||
-    process.env.REACT_APP_FACEBOOK_APP_SECRET ||
-    process.env.INSTAGRAM_APP_SECRET ||
-    process.env.REACT_APP_INSTAGRAM_APP_SECRET ||
-    ''
-  ).trim();
-  return { appId, appSecret };
+  const appIdCandidates = [
+    'INSTAGRAM_BUSINESS_APP_ID',
+    'REACT_APP_INSTAGRAM_BUSINESS_APP_ID',
+  ];
+  const appSecretCandidates = [
+    'INSTAGRAM_BUSINESS_APP_SECRET',
+    'REACT_APP_INSTAGRAM_BUSINESS_APP_SECRET',
+  ];
+  let appId = '';
+  let appIdSource = null;
+  for (const k of appIdCandidates) {
+    const v = (process.env[k] || '').trim();
+    if (v) {
+      appId = v;
+      appIdSource = k;
+      break;
+    }
+  }
+  let appSecret = '';
+  let appSecretSource = null;
+  for (const k of appSecretCandidates) {
+    const v = (process.env[k] || '').trim();
+    if (v) {
+      appSecret = v;
+      appSecretSource = k;
+      break;
+    }
+  }
+  return { appId, appSecret, appIdSource, appSecretSource };
 }
 
 /**
@@ -90,17 +106,25 @@ async function handleInstagramBusinessOAuthToken(req, res) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const { appId, appSecret } = resolveCredentials();
+  const { appId, appSecret, appIdSource, appSecretSource } = resolveCredentials();
   log('credentials-check', {
     hasAppId: Boolean(appId),
     hasAppSecret: Boolean(appSecret),
     appIdMasked: maskId(appId),
     appSecretMasked: maskId(appSecret),
+    appIdSource,
+    appSecretSource,
   });
   if (!appId || !appSecret) {
     return res.status(500).json({
       message:
-        'Server is missing Meta credentials. Set INSTAGRAM_BUSINESS_APP_SECRET (and META_APP_ID) in Vercel env.',
+        'Server is missing Instagram Business Login credentials. ' +
+        'Set INSTAGRAM_BUSINESS_APP_ID and INSTAGRAM_BUSINESS_APP_SECRET in Vercel env ' +
+        '(values from Meta > Products > Instagram > API setup with Instagram business login). ' +
+        'Do NOT use the Facebook App Secret from Settings > Basic — they are different values.',
+      debug: IG_BUSINESS_DEBUG
+        ? { tag: DEBUG_TAG, appIdSource, appSecretSource, hasAppId: Boolean(appId), hasAppSecret: Boolean(appSecret) }
+        : undefined,
     });
   }
 
@@ -268,7 +292,9 @@ async function handleInstagramBusinessOAuthToken(req, res) {
             redirectUriHex: Buffer.from(redirectUri, 'utf8').toString('hex'),
             redirectUriLength: redirectUri.length,
             appIdMasked: maskId(appId),
+            appIdSource,
             appSecretMasked: maskId(appSecret),
+            appSecretSource,
             graphError,
           }
         : undefined,
