@@ -26,7 +26,10 @@ import {
 } from '@mui/icons-material';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import { isMetaAppReviewEmail } from '../config/metaAppReview';
 import { GLASS } from '../theme/glassTokens';
+
+const META_APP_REVIEW_IG_CONNECT_PATH = '/connect/instagram-business';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -47,6 +50,10 @@ const Login: React.FC = () => {
 
   React.useEffect(() => {
     if (user) {
+      if (isMetaAppReviewEmail(user.email)) {
+        navigate(META_APP_REVIEW_IG_CONNECT_PATH);
+        return;
+      }
       const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
       if (redirectAfterLogin) {
         sessionStorage.removeItem('redirectAfterLogin');
@@ -77,6 +84,10 @@ const Login: React.FC = () => {
       });
       if (error) throw error;
       console.log('Login realizado com sucesso:', data.user?.email);
+      if (isMetaAppReviewEmail(data.user?.email)) {
+        navigate(META_APP_REVIEW_IG_CONNECT_PATH);
+        return;
+      }
       const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
       if (redirectAfterLogin) {
         sessionStorage.removeItem('redirectAfterLogin');

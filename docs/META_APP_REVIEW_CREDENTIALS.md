@@ -45,23 +45,23 @@ Re-apply after resetting the database, or after rotating the password (update
 
 ## Reviewer walkthrough (what they do with this account)
 
+**Only this email** (`meta-app-review@insyt.com.br`) is redirected after login to the
+English Instagram Business flow. All other users keep the normal redirect to `/dashboard`
+(or `sessionStorage.redirectAfterLogin` when set).
+
+### Primary path (App Review screencast — public demo, all UI in English)
+
 1. Open `https://www.insyt.com.br/login` and sign in with the credentials above.
-2. From the dashboard, go to **Clients → New client** and create a placeholder
-   client (any name + the Instagram handle of their Meta test account).
-3. On that client's dashboard, click **Connect via Instagram Business Login**.
-   This opens the English consent page at `/clients/:clientId/connect-instagram-business`,
-   redirects to Meta for authorization, and returns to
-   `/callback/instagram-business`. The callback:
-     1. Exchanges the code for a long-lived Instagram Business token.
-     2. Reads the user's Instagram profile via `graph.instagram.com/me`.
-     3. Writes `access_token`, `instagram_account_id`, `instagram_username`,
-        `profile_picture`, `token_expiry` and `token_type='instagram_business'`
-        onto the `clients` row.
-     4. Redirects to `/clients/:clientId` (the client dashboard).
-4. From the client dashboard, schedule a post (photo or Reel) using the
-   existing scheduler UI. The post is saved to `scheduled_posts` with status
-   `pending`; the Supabase webhook fires the n8n workflow; n8n reads
-   `token_type='instagram_business'` and publishes via `graph.instagram.com`
-   (with built-in retry for transient errors).
-5. The reviewer opens Instagram and sees the post live on the connected account.
-6. Insights for published media are visible on the client dashboard.
+2. You are **automatically redirected** to `https://www.insyt.com.br/connect/instagram-business`
+   (same page as the public URL, but you are now signed in for support flows if needed).
+3. Click **Continue with Instagram**, complete the Meta consent dialog, then use the demo at
+   `/connect/instagram-business/demo` to exercise **instagram_business_basic**,
+   **instagram_business_content_publish**, and **instagram_business_manage_insights**
+   (profile, publish photo/Reel, insights).
+
+### Optional (full scheduling pipeline with n8n)
+
+If you need to demonstrate posts through `scheduled_posts` → Supabase → n8n: from the
+app shell go to **Clients → New client**, open that client, then **Connect via Instagram
+Business Login** (`/clients/:clientId/connect-instagram-business`). The callback persists
+the token on that client row and returns to the client dashboard for scheduling.
