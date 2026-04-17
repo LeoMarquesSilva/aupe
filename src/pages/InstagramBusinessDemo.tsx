@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Alert,
   Avatar,
@@ -9,8 +9,11 @@ import {
   CircularProgress,
   Container,
   Divider,
+  FormControlLabel,
   Link as MuiLink,
   Paper,
+  Radio,
+  RadioGroup,
   Stack,
   Tab,
   Table,
@@ -34,64 +37,25 @@ import {
   Image as ImageIcon,
   Movie as MovieIcon,
   CloudUpload as CloudUploadIcon,
-  AutoAwesome as AutoAwesomeIcon,
+  Schedule as ScheduleIcon,
+  FlashOn as FlashIcon,
 } from '@mui/icons-material';
 import {
   clearInstagramBusinessToken,
   getInstagramBusinessMedia,
   getInstagramBusinessProfile,
   getInstagramMediaInsights,
-  publishInstagramImage,
-  publishInstagramVideo,
   readInstagramBusinessToken,
   type InstagramBusinessMedia,
   type InstagramBusinessProfile,
   type InstagramMediaInsight,
 } from '../services/instagramBusinessAuthService';
+import { clientService, supabase } from '../services/supabaseClient';
 import { supabaseStorageService } from '../services/supabaseStorageService';
 import { supabaseVideoStorageService } from '../services/supabaseVideoStorageService';
+import { scheduleInstagramPost } from '../services/postService';
+import { Client, PostData } from '../types';
 import { GLASS } from '../theme/glassTokens';
-
-/** Same public URL pattern as `scheduleInstagramPost` / n8n (Supabase Storage). */
-function isSupabasePostImagesPublicUrl(url: string): boolean {
-  return /\/storage\/v1\/object\/public\/post-images\//i.test(url.trim());
-}
-
-/**
- * Main app always stores media on Supabase and passes that HTTPS URL to Instagram.
- * Mirror any external URL into `post-images` before publishing so Meta fetches our bucket.
- */
-async function mirrorImageToSupabaseIfNeeded(
-  rawUrl: string,
-  folder: string,
-): Promise<string> {
-  const trimmed = rawUrl.trim();
-  if (!trimmed) throw new Error('Image URL is empty');
-  if (isSupabasePostImagesPublicUrl(trimmed)) return trimmed;
-  const { url } = await supabaseStorageService.uploadImageFromUrl(
-    trimmed,
-    folder,
-    'ig-business-demo.jpg',
-  );
-  return url;
-}
-
-async function mirrorVideoToSupabaseIfNeeded(
-  rawUrl: string,
-  folder: string,
-): Promise<string> {
-  const trimmed = rawUrl.trim();
-  if (!trimmed) throw new Error('Video URL is empty');
-  if (isSupabasePostImagesPublicUrl(trimmed)) return trimmed;
-  const res = await fetch(trimmed);
-  if (!res.ok) throw new Error(`Could not download video (${res.status})`);
-  const blob = await res.blob();
-  const file = new File([blob], `ig-business-demo-${Date.now()}.mp4`, {
-    type: blob.type || 'video/mp4',
-  });
-  const result = await supabaseVideoStorageService.uploadVideo(file, folder);
-  return result.publicUrl || result.url;
-}
 
 interface MediaWithInsights extends InstagramBusinessMedia {
   insights?: InstagramMediaInsight[];
@@ -99,16 +63,20 @@ interface MediaWithInsights extends InstagramBusinessMedia {
 }
 
 type PublishMode = 'image' | 'video';
+type ScheduleMode = 'now' | 'later';
 
-/**
- * Sample sources downloaded in the browser, then uploaded to Supabase Storage
- * (same pipeline as Create Post / n8n). Instagram only sees the public
- * `post-images` URL — not the original host.
- */
-const SAMPLE_IMAGE_URL =
-  'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Fronalpstock_big.jpg/1024px-Fronalpstock_big.jpg';
-/** Short MP4 keeps “Use sample” fast; still mirrored to Storage before Graph. */
-const SAMPLE_VIDEO_URL = 'https://download.samplelib.com/mp4/sample-15s.mp4';
+/** Terminal states for a `scheduled_posts` row returned by the n8n pipeline. */
+const TERMINAL_STATUSES = new Set([
+  'posted',
+  'published',
+  'failed',
+  'cancelled',
+]);
+
+function formatStatusLabel(status: string | null | undefined): string {
+  if (!status) return 'pending';
+  return status.replace(/_/g, ' ');
+}
 
 const SectionHeader: React.FC<{
   icon: React.ReactNode;
@@ -156,46 +124,103 @@ const SectionHeader: React.FC<{
   </Stack>
 );
 
+function getDefaultSchedule(): string {
+  // Default "Schedule for..." value: 15 minutes from now, formatted for
+  // <input type="datetime-local"> ("YYYY-MM-DDTHH:mm").
+  const d = new Date(Date.now() + 15 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours(),
+  )}:${pad(d.getMinutes())}`;
+}
+
 const InstagramBusinessDemo: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const clientIdFromUrl = searchParams.get('clientId') || null;
 
+  // --- Connected account ------------------------------------------------------
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [igUserId, setIgUserId] = useState<string | null>(null);
+  const [client, setClient] = useState<Client | null>(null);
+  const [clientLoadError, setClientLoadError] = useState<string | null>(null);
 
+  // --- Section A: profile -----------------------------------------------------
   const [profile, setProfile] = useState<InstagramBusinessProfile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
 
+  // --- Section C: media + insights --------------------------------------------
   const [mediaList, setMediaList] = useState<MediaWithInsights[]>([]);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [mediaLoading, setMediaLoading] = useState(true);
 
+  // --- Section B: publish via production pipeline -----------------------------
   const [publishMode, setPublishMode] = useState<PublishMode>('image');
-  const [imageUrl, setImageUrl] = useState('');
-  const [videoUrl, setVideoUrl] = useState('');
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>('now');
+  const [scheduledAt, setScheduledAt] = useState<string>(getDefaultSchedule);
   const [caption, setCaption] = useState('');
-  const [publishing, setPublishing] = useState(false);
-  const [publishError, setPublishError] = useState<string | null>(null);
-  const [publishStatus, setPublishStatus] = useState<string | null>(null);
-  const [publishResult, setPublishResult] = useState<{
-    id: string;
-    permalink?: string;
-  } | null>(null);
-
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishedPostId, setPublishedPostId] = useState<string | null>(null);
+  const [pipelineStatus, setPipelineStatus] = useState<string>('idle');
+  const [pipelineInstagramId, setPipelineInstagramId] = useState<string | null>(null);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
+
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
 
+  // ----- bootstrap ------------------------------------------------------------
   useEffect(() => {
     const stored = readInstagramBusinessToken();
-    if (!stored || !stored.access_token) {
+
+    // If we have a clientId in the URL, the reviewer already completed the
+    // authenticated OAuth flow and the token is persisted on the `clients` row.
+    // Otherwise we fall back to the sessionStorage token (public demo).
+    if (!clientIdFromUrl && (!stored || !stored.access_token)) {
       navigate('/connect/instagram-business', { replace: true });
       return;
     }
-    setAccessToken(stored.access_token);
-    setUserId(String(stored.user_id));
-  }, [navigate]);
+
+    if (stored?.access_token) {
+      setAccessToken(stored.access_token);
+      setIgUserId(String(stored.user_id));
+    }
+
+    if (!clientIdFromUrl) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const c = await clientService.getClientById(clientIdFromUrl);
+        if (cancelled) return;
+        if (!c) {
+          setClientLoadError(
+            'We could not load the connected client row. Re-run the Instagram Business login flow.',
+          );
+          return;
+        }
+        setClient(c);
+        // Prefer the client row credentials over the sessionStorage ones — the
+        // callback persisted a long-lived token there.
+        if (c.accessToken) setAccessToken(c.accessToken);
+        if (c.instagramAccountId) setIgUserId(c.instagramAccountId);
+      } catch (e) {
+        if (!cancelled) {
+          setClientLoadError(
+            e instanceof Error ? e.message : 'Could not load client.',
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientIdFromUrl, navigate]);
 
   const loadProfile = useCallback(async (token: string) => {
     setProfileLoading(true);
@@ -242,138 +267,166 @@ const InstagramBusinessDemo: React.FC = () => {
     void loadMediaWithInsights(accessToken);
   }, [accessToken, loadProfile, loadMediaWithInsights]);
 
+  // ----- upload helpers -------------------------------------------------------
   const resetPublishFeedback = () => {
     setPublishError(null);
-    setPublishStatus(null);
-    setPublishResult(null);
     setUploadError(null);
-  };
-
-  const handlePublish = async () => {
-    if (!accessToken || !userId) return;
-    resetPublishFeedback();
-
-    const folder = userId || 'instagram-business-demo';
-
-    if (publishMode === 'image') {
-      if (!imageUrl.trim()) {
-        setPublishError('Please provide a public image URL or upload a file.');
-        return;
-      }
-      setPublishing(true);
-      setPublishStatus('Uploading to Supabase Storage (same as scheduled posts)…');
-      try {
-        const resolvedImageUrl = await mirrorImageToSupabaseIfNeeded(imageUrl, folder);
-        if (resolvedImageUrl !== imageUrl.trim()) {
-          setImageUrl(resolvedImageUrl);
-        }
-        setPublishStatus(null);
-        const result = await publishInstagramImage({
-          userId,
-          imageUrl: resolvedImageUrl,
-          caption: caption.trim() || undefined,
-          accessToken,
-        });
-        setPublishResult(result);
-        setImageUrl('');
-        setCaption('');
-        void loadMediaWithInsights(accessToken);
-      } catch (e) {
-        setPublishError(e instanceof Error ? e.message : 'Publish failed');
-      } finally {
-        setPublishing(false);
-        setPublishStatus(null);
-      }
-      return;
-    }
-
-    if (!videoUrl.trim()) {
-      setPublishError('Please provide a public video URL or upload a file.');
-      return;
-    }
-    setPublishing(true);
-    setPublishStatus('Uploading video to Supabase Storage (same as scheduled posts)…');
-    try {
-      const resolvedVideoUrl = await mirrorVideoToSupabaseIfNeeded(videoUrl, folder);
-      if (resolvedVideoUrl !== videoUrl.trim()) {
-        setVideoUrl(resolvedVideoUrl);
-      }
-      setPublishStatus(null);
-      const result = await publishInstagramVideo({
-        userId,
-        videoUrl: resolvedVideoUrl,
-        caption: caption.trim() || undefined,
-        accessToken,
-        onStatusUpdate: (status) => setPublishStatus(status),
-      });
-      setPublishResult(result);
-      setVideoUrl('');
-      setCaption('');
-      void loadMediaWithInsights(accessToken);
-    } catch (e) {
-      setPublishError(e instanceof Error ? e.message : 'Publish failed');
-    } finally {
-      setPublishing(false);
-      setPublishStatus(null);
-    }
-  };
-
-  const handleUseSample = async () => {
-    resetPublishFeedback();
-    if (!accessToken) return;
-    const folder = userId || 'instagram-business-demo';
-    setUploading(true);
-    setUploadError(null);
-    try {
-      if (publishMode === 'image') {
-        const url = await mirrorImageToSupabaseIfNeeded(SAMPLE_IMAGE_URL, folder);
-        setImageUrl(url);
-        if (!caption) {
-          setCaption('Posted from the Instagram Business Login demo (sample image).');
-        }
-      } else {
-        const url = await mirrorVideoToSupabaseIfNeeded(SAMPLE_VIDEO_URL, folder);
-        setVideoUrl(url);
-        if (!caption) {
-          setCaption('Posted from the Instagram Business Login demo (sample reel).');
-        }
-      }
-    } catch (e) {
-      setUploadError(
-        e instanceof Error
-          ? `${e.message} Try uploading a file from your device instead.`
-          : 'Sample upload failed. Try uploading from your device.',
-      );
-    } finally {
-      setUploading(false);
-    }
+    setPublishedPostId(null);
+    setPipelineStatus('idle');
+    setPipelineInstagramId(null);
+    setPipelineError(null);
   };
 
   const handleFilePicked = async (file: File | null) => {
-    if (!file || !accessToken) return;
+    if (!file) return;
     resetPublishFeedback();
     setUploading(true);
     try {
-      // We use the connected Instagram user_id as a folder name in the bucket
-      // so demo uploads do not collide with real org users.
-      const folder = userId || 'instagram-business-demo';
+      // The bucket path is `${userId}/...`; using the client.userId keeps
+      // uploads scoped to the reviewer's own Supabase user.
+      const folder = client?.userId || igUserId || 'instagram-business-demo';
       if (publishMode === 'image') {
         const result = await supabaseStorageService.uploadImage(file, folder);
-        setImageUrl(result.url);
+        setUploadedImageUrl(result.url);
       } else {
         const result = await supabaseVideoStorageService.uploadVideo(file, folder);
-        setVideoUrl(result.publicUrl || result.url);
+        setUploadedVideoUrl(result.publicUrl || result.url);
       }
     } catch (e) {
       setUploadError(
-        e instanceof Error
-          ? e.message
-          : 'Upload failed. Try the "Use sample" button instead.',
+        e instanceof Error ? e.message : 'Upload failed. Please try another file.',
       );
     } finally {
       setUploading(false);
     }
   };
+
+  const handleClearMedia = () => {
+    setUploadedImageUrl(null);
+    setUploadedVideoUrl(null);
+    if (imageInputRef.current) imageInputRef.current.value = '';
+    if (videoInputRef.current) videoInputRef.current.value = '';
+  };
+
+  // ----- publish via production pipeline --------------------------------------
+  const handlePublish = async () => {
+    if (!client) {
+      setPublishError('Connected client row was not loaded. Re-run the OAuth flow.');
+      return;
+    }
+    if (!client.accessToken || !client.instagramAccountId) {
+      setPublishError(
+        'Instagram credentials are missing on the client row. Connect Instagram first.',
+      );
+      return;
+    }
+
+    setPublishError(null);
+    setPipelineError(null);
+
+    const isReel = publishMode === 'video';
+    const mediaUrl = isReel ? uploadedVideoUrl : uploadedImageUrl;
+    if (!mediaUrl) {
+      setPublishError(
+        isReel
+          ? 'Please upload a video before publishing.'
+          : 'Please upload a photo before publishing.',
+      );
+      return;
+    }
+
+    let scheduledIso: string;
+    if (scheduleMode === 'now') {
+      scheduledIso = new Date().toISOString();
+    } else {
+      const picked = new Date(scheduledAt);
+      if (Number.isNaN(picked.getTime())) {
+        setPublishError('Please pick a valid future date and time.');
+        return;
+      }
+      if (picked.getTime() <= Date.now()) {
+        setPublishError('Scheduled time must be in the future.');
+        return;
+      }
+      scheduledIso = picked.toISOString();
+    }
+
+    const postData: PostData = {
+      clientId: client.id,
+      caption: caption.trim(),
+      images: [mediaUrl],
+      scheduledDate: scheduledIso,
+      postType: isReel ? 'reels' : 'post',
+      immediate: scheduleMode === 'now',
+      ...(isReel
+        ? {
+            video: mediaUrl,
+            shareToFeed: true,
+          }
+        : {}),
+    };
+
+    setPublishing(true);
+    setPipelineStatus('pending');
+    try {
+      const { supabasePost } = await scheduleInstagramPost(postData, client);
+      setPublishedPostId(supabasePost.id);
+      // Reset the form media (but keep the caption visible for context).
+      setUploadedImageUrl(null);
+      setUploadedVideoUrl(null);
+    } catch (e) {
+      setPublishError(e instanceof Error ? e.message : 'Scheduling failed.');
+      setPipelineStatus('idle');
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  // ----- poll `scheduled_posts` for the terminal status ----------------------
+  useEffect(() => {
+    if (!publishedPostId) return;
+    let cancelled = false;
+    const interval = setInterval(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('scheduled_posts')
+          .select('status, instagram_post_id, error_message')
+          .eq('id', publishedPostId)
+          .single();
+        if (cancelled) return;
+        if (error) {
+          setPipelineError(error.message);
+          return;
+        }
+        if (!data) return;
+        setPipelineStatus(data.status as string);
+        if (data.instagram_post_id) {
+          setPipelineInstagramId(data.instagram_post_id);
+        }
+        if (data.error_message) {
+          setPipelineError(data.error_message);
+        }
+        if (TERMINAL_STATUSES.has(data.status)) {
+          clearInterval(interval);
+          if (data.status === 'posted' || data.status === 'published') {
+            if (accessToken) {
+              void loadMediaWithInsights(accessToken);
+            }
+          }
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setPipelineError(
+            e instanceof Error ? e.message : 'Could not read scheduled_posts.',
+          );
+        }
+      }
+    }, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [publishedPostId, accessToken, loadMediaWithInsights]);
 
   const handleLogout = () => {
     clearInstagramBusinessToken();
@@ -386,6 +439,21 @@ const InstagramBusinessDemo: React.FC = () => {
     const value = metric?.values?.[0]?.value;
     return typeof value === 'number' ? value.toLocaleString('en-US') : '—';
   };
+
+  const pipelineTerminal = pipelineStatus
+    ? TERMINAL_STATUSES.has(pipelineStatus)
+    : false;
+  const pipelinePosted =
+    pipelineStatus === 'posted' || pipelineStatus === 'published';
+  const mediaReady =
+    (publishMode === 'image' && Boolean(uploadedImageUrl)) ||
+    (publishMode === 'video' && Boolean(uploadedVideoUrl));
+  const canPublish =
+    Boolean(client) &&
+    mediaReady &&
+    !publishing &&
+    !uploading &&
+    (publishedPostId ? pipelineTerminal : true);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f6f6f6', py: { xs: 3, md: 5 } }}>
@@ -425,25 +493,30 @@ const InstagramBusinessDemo: React.FC = () => {
             }}
           >
             <Typography variant="body2" sx={{ color: GLASS.text.body, lineHeight: 1.6 }}>
-              <strong>App Review reviewer notes.</strong> This page demonstrates the three
-              Instagram permissions our app requests, end-to-end, against the connected
-              Instagram Business / Creator account:
+              <strong>App Review reviewer notes.</strong> This page demonstrates the
+              three Instagram permissions our app requests, end-to-end, against the
+              connected Instagram Business / Creator account. Publishing uses the
+              same production pipeline as real customers: media is uploaded to
+              Supabase Storage, a row is inserted in <code>scheduled_posts</code>,
+              and our n8n workflow performs the Graph API calls.
             </Typography>
             <Stack spacing={0.5} sx={{ mt: 1 }}>
               <Typography variant="caption" sx={{ color: GLASS.text.body }}>
-                • <code>instagram_business_basic</code> — read the authenticated profile
-                (Section A below).
+                • <code>instagram_business_basic</code> — read the authenticated
+                profile (Section A below).
               </Typography>
               <Typography variant="caption" sx={{ color: GLASS.text.body }}>
-                • <code>instagram_business_content_publish</code> — publish a photo or a
-                Reel (Section B).
+                • <code>instagram_business_content_publish</code> — publish a photo
+                or a Reel, either immediately or at a scheduled time (Section B).
               </Typography>
               <Typography variant="caption" sx={{ color: GLASS.text.body }}>
-                • <code>instagram_business_manage_insights</code> — list recent media and
-                read per-media metrics (Section C).
+                • <code>instagram_business_manage_insights</code> — list recent
+                media and read per-media metrics (Section C).
               </Typography>
             </Stack>
           </Paper>
+
+          {clientLoadError && <Alert severity="error">{clientLoadError}</Alert>}
 
           {/* Section A — instagram_business_basic */}
           <Paper
@@ -516,7 +589,7 @@ const InstagramBusinessDemo: React.FC = () => {
             )}
           </Paper>
 
-          {/* Section B — instagram_business_content_publish */}
+          {/* Section B — instagram_business_content_publish (production pipeline) */}
           <Paper
             elevation={0}
             sx={{
@@ -531,206 +604,289 @@ const InstagramBusinessDemo: React.FC = () => {
               icon={<PublishIcon />}
               title="B. Publish a photo or a Reel"
               scope="instagram_business_content_publish"
-              description="Same pipeline as the main scheduler: media is stored on Supabase (public URL in the post-images bucket), then Instagram loads that URL — upload a file, paste any HTTPS URL (we mirror it to Storage), or use the sample."
+              description="Same flow as our production scheduler: upload media, choose Post now or Schedule for a later time, and the post goes through Supabase + n8n to the Instagram Graph API."
             />
 
-            <Tabs
-              value={publishMode}
-              onChange={(_, v: PublishMode) => {
-                setPublishMode(v);
-                resetPublishFeedback();
-              }}
-              sx={{
-                mb: 2,
-                minHeight: 36,
-                '& .MuiTab-root': {
-                  textTransform: 'none',
-                  minHeight: 36,
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                },
-                '& .Mui-selected': { color: `${GLASS.accent.orange} !important` },
-                '& .MuiTabs-indicator': { bgcolor: GLASS.accent.orange },
-              }}
-            >
-              <Tab
-                value="image"
-                label="Photo"
-                icon={<ImageIcon fontSize="small" />}
-                iconPosition="start"
-              />
-              <Tab
-                value="video"
-                label="Reel (video)"
-                icon={<MovieIcon fontSize="small" />}
-                iconPosition="start"
-              />
-            </Tabs>
+            {!client && !clientLoadError && (
+              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ py: 2 }}>
+                <CircularProgress size={18} sx={{ color: GLASS.accent.blue }} />
+                <Typography variant="body2" sx={{ color: GLASS.text.muted }}>
+                  Loading the connected client row...
+                </Typography>
+              </Stack>
+            )}
 
-            <Stack spacing={2}>
-              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<AutoAwesomeIcon />}
-                  onClick={handleUseSample}
-                  disabled={publishing || uploading}
+            {client && (
+              <Stack spacing={2}>
+                <Tabs
+                  value={publishMode}
+                  onChange={(_, v: PublishMode) => {
+                    setPublishMode(v);
+                    resetPublishFeedback();
+                    handleClearMedia();
+                  }}
                   sx={{
-                    textTransform: 'none',
-                    borderColor: GLASS.accent.orange,
-                    color: GLASS.accent.orange,
-                    '&:hover': {
-                      borderColor: GLASS.accent.orangeDark,
-                      bgcolor: 'rgba(247, 66, 17, 0.04)',
+                    minHeight: 36,
+                    '& .MuiTab-root': {
+                      textTransform: 'none',
+                      minHeight: 36,
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
                     },
+                    '& .Mui-selected': { color: `${GLASS.accent.orange} !important` },
+                    '& .MuiTabs-indicator': { bgcolor: GLASS.accent.orange },
                   }}
                 >
-                  Use sample {publishMode === 'image' ? 'image' : 'video'}
-                </Button>
-                <Button
-                  variant="outlined"
+                  <Tab
+                    value="image"
+                    label="Photo"
+                    icon={<ImageIcon fontSize="small" />}
+                    iconPosition="start"
+                  />
+                  <Tab
+                    value="video"
+                    label="Reel (video)"
+                    icon={<MovieIcon fontSize="small" />}
+                    iconPosition="start"
+                  />
+                </Tabs>
+
+                {/* Upload */}
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={
+                      uploading ? (
+                        <CircularProgress size={14} sx={{ color: GLASS.accent.blue }} />
+                      ) : (
+                        <CloudUploadIcon />
+                      )
+                    }
+                    onClick={() =>
+                      publishMode === 'image'
+                        ? imageInputRef.current?.click()
+                        : videoInputRef.current?.click()
+                    }
+                    disabled={publishing || uploading}
+                    sx={{
+                      textTransform: 'none',
+                      borderColor: GLASS.accent.blue,
+                      color: GLASS.accent.blue,
+                      '&:hover': { bgcolor: 'rgba(62, 84, 181, 0.04)' },
+                    }}
+                  >
+                    {uploading
+                      ? 'Uploading...'
+                      : `Upload ${publishMode === 'image' ? 'photo' : 'video'} from device`}
+                  </Button>
+                  {(uploadedImageUrl || uploadedVideoUrl) && !uploading && (
+                    <Button
+                      size="small"
+                      onClick={handleClearMedia}
+                      sx={{ textTransform: 'none', color: GLASS.text.muted }}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png"
+                    hidden
+                    onChange={(e) => handleFilePicked(e.target.files?.[0] ?? null)}
+                  />
+                  <input
+                    ref={videoInputRef}
+                    type="file"
+                    accept="video/mp4,video/quicktime"
+                    hidden
+                    onChange={(e) => handleFilePicked(e.target.files?.[0] ?? null)}
+                  />
+                </Stack>
+
+                {uploadError && <Alert severity="warning">{uploadError}</Alert>}
+
+                {uploadedImageUrl && publishMode === 'image' && (
+                  <Box
+                    component="img"
+                    src={uploadedImageUrl}
+                    alt="Uploaded preview"
+                    sx={{
+                      maxWidth: 240,
+                      borderRadius: GLASS.radius.inner,
+                      border: `1px solid ${GLASS.border.outer}`,
+                    }}
+                  />
+                )}
+
+                {uploadedVideoUrl && publishMode === 'video' && (
+                  <Box
+                    component="video"
+                    src={uploadedVideoUrl}
+                    controls
+                    sx={{
+                      maxWidth: 320,
+                      borderRadius: GLASS.radius.inner,
+                      border: `1px solid ${GLASS.border.outer}`,
+                    }}
+                  />
+                )}
+
+                <TextField
+                  label="Caption (optional)"
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  fullWidth
+                  multiline
+                  minRows={2}
+                  maxRows={4}
                   size="small"
+                />
+
+                {/* Post now / Schedule */}
+                <Box>
+                  <Typography
+                    variant="subtitle2"
+                    sx={{ color: GLASS.text.heading, fontWeight: 600, mb: 0.5 }}
+                  >
+                    When should we publish?
+                  </Typography>
+                  <RadioGroup
+                    row
+                    value={scheduleMode}
+                    onChange={(_, v) => setScheduleMode(v as ScheduleMode)}
+                  >
+                    <FormControlLabel
+                      value="now"
+                      control={<Radio size="small" sx={{ color: GLASS.accent.orange }} />}
+                      label={
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <FlashIcon fontSize="small" />
+                          <span>Post now</span>
+                        </Stack>
+                      }
+                    />
+                    <FormControlLabel
+                      value="later"
+                      control={<Radio size="small" sx={{ color: GLASS.accent.blue }} />}
+                      label={
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <ScheduleIcon fontSize="small" />
+                          <span>Schedule for...</span>
+                        </Stack>
+                      }
+                    />
+                  </RadioGroup>
+                  {scheduleMode === 'later' && (
+                    <TextField
+                      type="datetime-local"
+                      value={scheduledAt}
+                      onChange={(e) => setScheduledAt(e.target.value)}
+                      size="small"
+                      sx={{ mt: 1, maxWidth: 260 }}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  )}
+                </Box>
+
+                {publishError && <Alert severity="error">{publishError}</Alert>}
+
+                {publishedPostId && (
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      borderRadius: GLASS.radius.inner,
+                      bgcolor: pipelinePosted
+                        ? 'rgba(34, 197, 94, 0.06)'
+                        : pipelineStatus === 'failed'
+                          ? 'rgba(220, 38, 38, 0.06)'
+                          : 'rgba(62, 84, 181, 0.06)',
+                      border: `1px solid ${
+                        pipelinePosted
+                          ? 'rgba(34, 197, 94, 0.3)'
+                          : pipelineStatus === 'failed'
+                            ? 'rgba(220, 38, 38, 0.3)'
+                            : 'rgba(62, 84, 181, 0.25)'
+                      }`,
+                    }}
+                  >
+                    <Stack spacing={0.5}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        {!pipelineTerminal && (
+                          <CircularProgress
+                            size={16}
+                            sx={{ color: GLASS.accent.blue }}
+                          />
+                        )}
+                        {pipelinePosted && (
+                          <CheckCircleIcon
+                            sx={{ color: GLASS.accent.green, fontSize: 18 }}
+                          />
+                        )}
+                        <Typography
+                          variant="body2"
+                          sx={{ color: GLASS.text.body, fontWeight: 600 }}
+                        >
+                          Pipeline status:{' '}
+                          <code>{formatStatusLabel(pipelineStatus)}</code>
+                        </Typography>
+                      </Stack>
+                      <Typography variant="caption" sx={{ color: GLASS.text.muted }}>
+                        scheduled_posts.id = <code>{publishedPostId}</code>
+                      </Typography>
+                      {pipelineInstagramId && (
+                        <Typography variant="caption" sx={{ color: GLASS.text.muted }}>
+                          Instagram media id:{' '}
+                          <code>{pipelineInstagramId}</code>
+                        </Typography>
+                      )}
+                      {pipelinePosted && (
+                        <Typography variant="body2" sx={{ color: GLASS.accent.green }}>
+                          Post is now live on the connected Instagram account.
+                          Scroll down to Section C to see it appear with insights.
+                        </Typography>
+                      )}
+                      {pipelineStatus === 'failed' && pipelineError && (
+                        <Typography variant="body2" sx={{ color: '#b91c1c' }}>
+                          {pipelineError}
+                        </Typography>
+                      )}
+                    </Stack>
+                  </Paper>
+                )}
+
+                <Button
+                  variant="contained"
+                  onClick={handlePublish}
+                  disabled={!canPublish}
                   startIcon={
-                    uploading ? (
-                      <CircularProgress size={14} sx={{ color: GLASS.accent.blue }} />
+                    publishing ? (
+                      <CircularProgress size={16} sx={{ color: '#ffffff' }} />
+                    ) : scheduleMode === 'now' ? (
+                      <FlashIcon />
                     ) : (
-                      <CloudUploadIcon />
+                      <ScheduleIcon />
                     )
                   }
-                  onClick={() =>
-                    publishMode === 'image'
-                      ? imageInputRef.current?.click()
-                      : videoInputRef.current?.click()
-                  }
-                  disabled={publishing || uploading}
                   sx={{
+                    bgcolor: GLASS.accent.orange,
+                    '&:hover': { bgcolor: GLASS.accent.orangeDark },
+                    alignSelf: 'flex-start',
                     textTransform: 'none',
-                    borderColor: GLASS.accent.blue,
-                    color: GLASS.accent.blue,
-                    '&:hover': { bgcolor: 'rgba(62, 84, 181, 0.04)' },
+                    fontWeight: 600,
+                    px: 3,
                   }}
                 >
-                  {uploading ? 'Uploading...' : `Upload ${publishMode === 'image' ? 'image' : 'video'} from device`}
+                  {publishing
+                    ? 'Scheduling...'
+                    : scheduleMode === 'now'
+                      ? `Post ${publishMode === 'image' ? 'photo' : 'reel'} now`
+                      : `Schedule ${publishMode === 'image' ? 'photo' : 'reel'}`}
                 </Button>
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png"
-                  hidden
-                  onChange={(e) => handleFilePicked(e.target.files?.[0] ?? null)}
-                />
-                <input
-                  ref={videoInputRef}
-                  type="file"
-                  accept="video/mp4,video/quicktime"
-                  hidden
-                  onChange={(e) => handleFilePicked(e.target.files?.[0] ?? null)}
-                />
               </Stack>
-
-              {uploadError && <Alert severity="warning">{uploadError}</Alert>}
-
-              {publishMode === 'image' ? (
-                <TextField
-                  label="Public image URL (JPEG/PNG, https://...)"
-                  placeholder="https://example.com/photo.jpg"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  fullWidth
-                  size="small"
-                  helperText="External URLs are copied to Supabase Storage first (same as Create Post). Instagram then fetches from your project’s public bucket. Max 8 MiB."
-                />
-              ) : (
-                <TextField
-                  label="Public video URL (MP4, https://...)"
-                  placeholder="https://example.com/reel.mp4"
-                  value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
-                  fullWidth
-                  size="small"
-                  helperText="Videos are uploaded to Supabase Storage first (same as Reels in the app), then published. MP4, &lt; 90s, &lt; 1 GB recommended."
-                />
-              )}
-
-              <TextField
-                label="Caption (optional)"
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-                fullWidth
-                multiline
-                minRows={2}
-                maxRows={4}
-                size="small"
-              />
-
-              {publishError && <Alert severity="error">{publishError}</Alert>}
-
-              {publishStatus && (
-                <Alert
-                  severity="info"
-                  icon={
-                    publishStatus.includes('Uploading') ? (
-                      <CircularProgress size={16} sx={{ color: GLASS.accent.blue }} />
-                    ) : undefined
-                  }
-                >
-                  {publishStatus}
-                </Alert>
-              )}
-
-              {publishResult && (
-                <Alert
-                  severity="success"
-                  icon={<CheckCircleIcon />}
-                  action={
-                    publishResult.permalink ? (
-                      <MuiLink
-                        href={publishResult.permalink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        sx={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 0.5,
-                          fontWeight: 600,
-                        }}
-                      >
-                        View on Instagram <OpenInNewIcon fontSize="small" />
-                      </MuiLink>
-                    ) : undefined
-                  }
-                >
-                  Published successfully (media id <code>{publishResult.id}</code>).
-                </Alert>
-              )}
-
-              <Button
-                variant="contained"
-                onClick={handlePublish}
-                disabled={publishing || uploading || !accessToken}
-                startIcon={
-                  publishing ? (
-                    <CircularProgress size={16} sx={{ color: '#ffffff' }} />
-                  ) : (
-                    <PublishIcon />
-                  )
-                }
-                sx={{
-                  bgcolor: GLASS.accent.orange,
-                  '&:hover': { bgcolor: GLASS.accent.orangeDark },
-                  alignSelf: 'flex-start',
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  px: 3,
-                }}
-              >
-                {publishing
-                  ? publishMode === 'video'
-                    ? 'Processing reel...'
-                    : 'Publishing...'
-                  : `Publish ${publishMode === 'image' ? 'photo' : 'reel'} to Instagram`}
-              </Button>
-            </Stack>
+            )}
           </Paper>
 
           {/* Section C — instagram_business_manage_insights */}

@@ -45,23 +45,79 @@ Re-apply after resetting the database, or after rotating the password (update
 
 ## Reviewer walkthrough (what they do with this account)
 
-**Only this email** (`meta-app-review@insyt.com.br`) is redirected after login to the
-English Instagram Business flow. All other users keep the normal redirect to `/dashboard`
-(or `sessionStorage.redirectAfterLogin` when set).
+**Only this email** (`meta-app-review@insyt.com.br`) triggers the dedicated
+English-language flow. Login, client creation and routing to the demo page
+are all handled automatically without affecting normal users.
 
-### Primary path (App Review screencast — public demo, all UI in English)
+The demo uses the **same production pipeline** real customers use:
 
-1. Open `https://www.insyt.com.br/login` and sign in with the credentials above.
-2. You are **automatically redirected** to `https://www.insyt.com.br/connect/instagram-business`
-   (same page as the public URL, but you are now signed in for support flows if needed).
-3. Click **Continue with Instagram**, complete the Meta consent dialog, then use the demo at
-   `/connect/instagram-business/demo` to exercise **instagram_business_basic**,
-   **instagram_business_content_publish**, and **instagram_business_manage_insights**
-   (profile, publish photo/Reel, insights).
+```
+Demo UI
+  → Supabase Storage (post-images bucket)
+  → INSERT into scheduled_posts
+  → handle_scheduled_post_webhook
+  → n8n workflow `aupe-agendador-ig-business`
+  → graph.instagram.com (create container + publish + Reels polling)
+  → UPDATE scheduled_posts.status = 'posted'
+```
 
-### Optional (full scheduling pipeline with n8n)
+The browser never calls `graph.instagram.com` for publishing.
 
-If you need to demonstrate posts through `scheduled_posts` → Supabase → n8n: from the
-app shell go to **Clients → New client**, open that client, then **Connect via Instagram
-Business Login** (`/clients/:clientId/connect-instagram-business`). The callback persists
-the token on that client row and returns to the client dashboard for scheduling.
+### Screencast walkthrough (all UI in English)
+
+1. **Sign in** — open `https://www.insyt.com.br/login`, enter the reviewer
+   credentials and submit. After login the reviewer is redirected to
+   `https://www.insyt.com.br/connect/instagram-business`.
+2. **Auto-provisioned client** — on arrival, the app automatically finds or
+   creates a dedicated `Meta App Review Client` row inside the reviewer's
+   organization (via `ensureMetaAppReviewClient()`). No manual client
+   creation is required; this keeps the reviewer walkthrough short.
+3. **Continue with Instagram** — clicking the orange button opens the Meta
+   consent dialog requesting `instagram_business_basic`,
+   `instagram_business_content_publish`, and
+   `instagram_business_manage_insights`.
+4. **Callback** — after the reviewer approves, they are redirected to
+   `https://www.insyt.com.br/callback/instagram-business?code=...`. The app
+   exchanges the code for a long-lived token and persists it onto the
+   auto-provisioned client row with `token_type='instagram_business'`.
+5. **Demo page** — the reviewer then lands on
+   `https://www.insyt.com.br/connect/instagram-business/demo?clientId=...`,
+   which shows three sections:
+   - **Section A — Profile (`instagram_business_basic`)**: the authenticated
+     profile (@username, name, account type, media count) is fetched via
+     `GET graph.instagram.com/me`.
+   - **Section B — Publish (`instagram_business_content_publish`)**: a photo
+     or Reel is uploaded from the reviewer's device to Supabase Storage,
+     and a `scheduled_posts` row is created. The reviewer chooses
+     **Post now** (immediate) or **Schedule for...** (datetime picker).
+     The UI polls `scheduled_posts` every 3 s and shows the pipeline status
+     (`pending → sent_to_n8n → posted`). When `posted`, the UI displays the
+     returned Instagram media id.
+   - **Section C — Insights (`instagram_business_manage_insights`)**: the
+     last 5 media are listed with per-media metrics (reach, likes,
+     comments, saved, total interactions). After publishing in Section B,
+     the reviewer refreshes this section to see the new media appear.
+6. **Verify on Instagram** — the reviewer opens the Instagram app or
+   `https://www.instagram.com/<username>` and sees the newly published
+   photo/Reel. This closes the loop from consent dialog to live post.
+
+### Verifying server-side (optional, for us)
+
+After the reviewer publishes, we can double-check the pipeline with:
+
+```sql
+-- Supabase: latest scheduled post for the reviewer org
+SELECT id, status, instagram_post_id, posted_at, error_message
+FROM scheduled_posts
+WHERE organization_id = '18bf97e1-496a-489f-bd43-360d964a8500'
+ORDER BY created_at DESC
+LIMIT 5;
+
+-- Client row shows the Instagram Business token type:
+SELECT id, name, token_type, instagram_account_id, is_active
+FROM clients
+WHERE name = 'Meta App Review Client';
+```
+
+- In n8n, the workflow `aupe-agendador-ig-business` should show a green
+  execution for each `Post now` click.

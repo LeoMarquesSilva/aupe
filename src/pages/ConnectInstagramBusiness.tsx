@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import {
   Box,
@@ -25,6 +25,9 @@ import {
   getInstagramBusinessAppId,
   getInstagramBusinessRedirectUri,
 } from '../services/instagramBusinessAuthService';
+import { supabase } from '../services/supabaseClient';
+import { isMetaAppReviewEmail } from '../config/metaAppReview';
+import { ensureMetaAppReviewClient } from '../services/metaAppReviewClientService';
 import { GLASS } from '../theme/glassTokens';
 
 /**
@@ -42,7 +45,51 @@ const ConnectInstagramBusiness: React.FC = () => {
   // or a query string (?clientId=...). When set, the callback will persist the
   // resulting token onto this client and route into the scheduler dashboard
   // instead of the public App Review demo page.
-  const clientId = clientIdFromPath || searchParams.get('clientId') || undefined;
+  const clientIdFromUrl = clientIdFromPath || searchParams.get('clientId') || undefined;
+  // `effectiveClientId` can be filled in dynamically for the Meta App Review
+  // reviewer (see the effect below), so we track it in state.
+  const [effectiveClientId, setEffectiveClientId] = useState<string | undefined>(
+    clientIdFromUrl,
+  );
+  const [reviewerEnsuring, setReviewerEnsuring] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Reviewer auto-provisioning: when the dedicated App Review reviewer lands
+    // here without a clientId in the URL, find or create a dedicated
+    // "Meta App Review Client" inside their own organization and feed its id
+    // into the OAuth session. This mirrors what a normal user gets from the
+    // /clients/:id/connect-instagram-business entry point, so the callback can
+    // persist the token onto a real clients row (token_type='instagram_business')
+    // and the production scheduler/n8n pipeline can publish for it.
+    if (clientIdFromUrl) return;
+
+    let cancelled = false;
+    const provision = async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const email = sessionData?.session?.user?.email;
+        if (!email || !isMetaAppReviewEmail(email)) return;
+        setReviewerEnsuring(true);
+        const client = await ensureMetaAppReviewClient();
+        if (cancelled) return;
+        setEffectiveClientId(client.id);
+      } catch (e) {
+        if (!cancelled) {
+          setError(
+            e instanceof Error
+              ? `Could not prepare the review client row: ${e.message}`
+              : 'Could not prepare the review client row.',
+          );
+        }
+      } finally {
+        if (!cancelled) setReviewerEnsuring(false);
+      }
+    };
+    void provision();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientIdFromUrl]);
 
   // Resolve config eagerly so config errors (missing env var) surface on
   // mount instead of after the user clicks Continue. We also expose the
@@ -65,8 +112,8 @@ const ConnectInstagramBusiness: React.FC = () => {
     try {
       const state = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
       window.sessionStorage.setItem('ig_business_oauth_state', state);
-      if (clientId) {
-        window.sessionStorage.setItem('ig_business_oauth_client_id', clientId);
+      if (effectiveClientId) {
+        window.sessionStorage.setItem('ig_business_oauth_client_id', effectiveClientId);
       } else {
         window.sessionStorage.removeItem('ig_business_oauth_client_id');
       }
@@ -228,7 +275,7 @@ const ConnectInstagramBusiness: React.FC = () => {
               size="large"
               startIcon={<InstagramIcon />}
               onClick={handleConnect}
-              disabled={Boolean(configError)}
+              disabled={Boolean(configError) || reviewerEnsuring}
               fullWidth
               sx={{
                 bgcolor: GLASS.accent.orange,
@@ -245,7 +292,7 @@ const ConnectInstagramBusiness: React.FC = () => {
                 },
               }}
             >
-              Continue with Instagram
+              {reviewerEnsuring ? 'Preparing…' : 'Continue with Instagram'}
             </Button>
 
             <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">

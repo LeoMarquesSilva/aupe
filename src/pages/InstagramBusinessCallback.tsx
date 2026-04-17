@@ -16,6 +16,7 @@ import {
   saveInstagramBusinessToken,
 } from '../services/instagramBusinessAuthService';
 import { supabase } from '../services/supabaseClient';
+import { isMetaAppReviewEmail } from '../config/metaAppReview';
 import { GLASS } from '../theme/glassTokens';
 
 type Status = 'loading' | 'error';
@@ -82,9 +83,11 @@ const InstagramBusinessCallback: React.FC = () => {
         window.sessionStorage.removeItem('ig_business_oauth_client_id');
 
         let hasAuthSession = false;
+        let sessionEmail: string | null = null;
         try {
           const { data: sessionData } = await supabase.auth.getSession();
           hasAuthSession = Boolean(sessionData?.session?.user?.id);
+          sessionEmail = sessionData?.session?.user?.email ?? null;
         } catch {
           hasAuthSession = false;
         }
@@ -92,7 +95,18 @@ const InstagramBusinessCallback: React.FC = () => {
         if (pendingClientId && hasAuthSession) {
           try {
             await persistInstagramBusinessAuthToClient(pendingClientId, token);
-            navigate(`/clients/${pendingClientId}`, { replace: true });
+            // Meta App Review reviewer: jump into the in-app demo that drives
+            // the production scheduling pipeline (scheduleInstagramPost →
+            // Supabase → n8n) against the freshly connected client. Normal
+            // users keep landing on the per-client dashboard.
+            if (isMetaAppReviewEmail(sessionEmail)) {
+              navigate(
+                `/connect/instagram-business/demo?clientId=${pendingClientId}`,
+                { replace: true },
+              );
+            } else {
+              navigate(`/clients/${pendingClientId}`, { replace: true });
+            }
             return;
           } catch (persistErr) {
             setStatus('error');
