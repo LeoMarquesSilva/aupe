@@ -54,6 +54,8 @@ import { clientService, supabase } from '../services/supabaseClient';
 import { supabaseStorageService } from '../services/supabaseStorageService';
 import { supabaseVideoStorageService } from '../services/supabaseVideoStorageService';
 import { scheduleInstagramPost } from '../services/postService';
+import { ensureMetaAppReviewClient } from '../services/metaAppReviewClientService';
+import { isMetaAppReviewEmail } from '../config/metaAppReview';
 import { Client, PostData } from '../types';
 import { GLASS } from '../theme/glassTokens';
 
@@ -176,47 +178,87 @@ const InstagramBusinessDemo: React.FC = () => {
 
   // ----- bootstrap ------------------------------------------------------------
   useEffect(() => {
-    const stored = readInstagramBusinessToken();
-
-    // If we have a clientId in the URL, the reviewer already completed the
-    // authenticated OAuth flow and the token is persisted on the `clients` row.
-    // Otherwise we fall back to the sessionStorage token (public demo).
-    if (!clientIdFromUrl && (!stored || !stored.access_token)) {
-      navigate('/connect/instagram-business', { replace: true });
-      return;
-    }
-
-    if (stored?.access_token) {
-      setAccessToken(stored.access_token);
-      setIgUserId(String(stored.user_id));
-    }
-
-    if (!clientIdFromUrl) return;
-
     let cancelled = false;
+
+    const applyClient = (c: Client) => {
+      if (cancelled) return;
+      setClient(c);
+      // Prefer the long-lived token stored on the `clients` row (persisted
+      // during the OAuth callback) over the sessionStorage one.
+      if (c.accessToken) setAccessToken(c.accessToken);
+      if (c.instagramAccountId) setIgUserId(c.instagramAccountId);
+    };
+
     (async () => {
+      const stored = readInstagramBusinessToken();
+      if (stored?.access_token) {
+        setAccessToken(stored.access_token);
+        setIgUserId(String(stored.user_id));
+      }
+
+      // 1) Explicit clientId in the URL (normal reviewer path after OAuth
+      //    callback). Load the client directly.
+      if (clientIdFromUrl) {
+        try {
+          const c = await clientService.getClientById(clientIdFromUrl);
+          if (!c) {
+            if (!cancelled) {
+              setClientLoadError(
+                'We could not load the connected client row. Re-run the Instagram Business login flow.',
+              );
+            }
+            return;
+          }
+          applyClient(c);
+        } catch (e) {
+          if (!cancelled) {
+            setClientLoadError(
+              e instanceof Error ? e.message : 'Could not load client.',
+            );
+          }
+        }
+        return;
+      }
+
+      // 2) No clientId in URL. If the signed-in user is the Meta App Review
+      //    reviewer, auto-resolve their dedicated client row. This handles:
+      //      - direct navigation to /connect/instagram-business/demo
+      //      - callback fall-through when sessionStorage was cleared
+      //      - re-entering the demo after a refresh
       try {
-        const c = await clientService.getClientById(clientIdFromUrl);
-        if (cancelled) return;
-        if (!c) {
-          setClientLoadError(
-            'We could not load the connected client row. Re-run the Instagram Business login flow.',
-          );
+        const { data: sessionData } = await supabase.auth.getSession();
+        const email = sessionData?.session?.user?.email;
+        if (isMetaAppReviewEmail(email)) {
+          const c = await ensureMetaAppReviewClient();
+          if (!c.accessToken || !c.instagramAccountId) {
+            // Reviewer has the client row but hasn't completed OAuth yet —
+            // send them to the connect page to finish it.
+            if (!cancelled) {
+              navigate('/connect/instagram-business', { replace: true });
+            }
+            return;
+          }
+          applyClient(c);
           return;
         }
-        setClient(c);
-        // Prefer the client row credentials over the sessionStorage ones — the
-        // callback persisted a long-lived token there.
-        if (c.accessToken) setAccessToken(c.accessToken);
-        if (c.instagramAccountId) setIgUserId(c.instagramAccountId);
       } catch (e) {
         if (!cancelled) {
           setClientLoadError(
-            e instanceof Error ? e.message : 'Could not load client.',
+            e instanceof Error ? e.message : 'Could not resolve reviewer client row.',
           );
         }
+        return;
+      }
+
+      // 3) Anonymous public demo: we only allow Sections A/C via sessionStorage
+      //    token (Section B requires a signed-in client). Without a token
+      //    there is nothing to show, so bounce back to the connect page.
+      if (!stored || !stored.access_token) {
+        if (!cancelled) navigate('/connect/instagram-business', { replace: true });
+        return;
       }
     })();
+
     return () => {
       cancelled = true;
     };

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -38,6 +38,7 @@ import { GLASS } from '../theme/glassTokens';
  * up on the demo page where each requested permission is exercised.
  */
 const ConnectInstagramBusiness: React.FC = () => {
+  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const { clientId: clientIdFromPath } = useParams<{ clientId?: string }>();
   const [searchParams] = useSearchParams();
@@ -72,6 +73,17 @@ const ConnectInstagramBusiness: React.FC = () => {
         setReviewerEnsuring(true);
         const client = await ensureMetaAppReviewClient();
         if (cancelled) return;
+        // If the reviewer has already connected Instagram in a previous
+        // session (the `clients` row already has credentials), skip the OAuth
+        // step and jump straight to the demo. This keeps the screencast tidy
+        // on refreshes and makes the "already connected" case obvious.
+        if (client.accessToken && client.instagramAccountId) {
+          navigate(
+            `/connect/instagram-business/demo?clientId=${client.id}`,
+            { replace: true },
+          );
+          return;
+        }
         setEffectiveClientId(client.id);
       } catch (e) {
         if (!cancelled) {
@@ -89,7 +101,7 @@ const ConnectInstagramBusiness: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [clientIdFromUrl]);
+  }, [clientIdFromUrl, navigate]);
 
   // Resolve config eagerly so config errors (missing env var) surface on
   // mount instead of after the user clicks Continue. We also expose the
