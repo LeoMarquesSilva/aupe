@@ -15,6 +15,7 @@ import {
   persistInstagramBusinessAuthToClient,
   saveInstagramBusinessToken,
 } from '../services/instagramBusinessAuthService';
+import { supabase } from '../services/supabaseClient';
 import { GLASS } from '../theme/glassTokens';
 
 type Status = 'loading' | 'error';
@@ -68,11 +69,27 @@ const InstagramBusinessCallback: React.FC = () => {
         // persist the token onto the chosen client row so the n8n scheduler
         // can publish posts for it. Otherwise fall back to the public App
         // Review demo page (sessionStorage-only).
+        //
+        // Important: sessionStorage can carry a stale `ig_business_oauth_client_id`
+        // from a prior authenticated test, even if the reviewer now lands here
+        // via the public `/connect/instagram-business` flow. Gate the persist
+        // branch on an *actually authenticated* Supabase session, otherwise the
+        // clients RLS rejects the write with "Usuário não autenticado" and the
+        // public reviewer sees a misleading error.
         const pendingClientId = window.sessionStorage.getItem(
           'ig_business_oauth_client_id',
         );
-        if (pendingClientId) {
-          window.sessionStorage.removeItem('ig_business_oauth_client_id');
+        window.sessionStorage.removeItem('ig_business_oauth_client_id');
+
+        let hasAuthSession = false;
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          hasAuthSession = Boolean(sessionData?.session?.user?.id);
+        } catch {
+          hasAuthSession = false;
+        }
+
+        if (pendingClientId && hasAuthSession) {
           try {
             await persistInstagramBusinessAuthToClient(pendingClientId, token);
             navigate(`/clients/${pendingClientId}`, { replace: true });
@@ -88,6 +105,9 @@ const InstagramBusinessCallback: React.FC = () => {
           }
         }
 
+        // Public App Review flow (no Supabase login, or no clientId in context):
+        // hand off to the in-browser demo page that exercises all three scopes
+        // using the sessionStorage-held access token.
         navigate('/connect/instagram-business/demo', { replace: true });
       } catch (e) {
         setStatus('error');
