@@ -13,7 +13,7 @@
 const axios = require('axios');
 const { rateLimit, clientIpFromReq } = require('./rate-limit-ip');
 
-const DEBUG_TAG = 'ig-business-oauth-2026-04-17c';
+const DEBUG_TAG = 'ig-business-oauth-2026-04-17d';
 
 /**
  * While we are debugging the Meta App Review flow, keep verbose logging and
@@ -168,34 +168,33 @@ async function handleInstagramBusinessOAuthToken(req, res) {
   );
 
   try {
-    // Step 1: short-lived token via api.instagram.com
-    // The Meta docs example uses `curl -F` (multipart/form-data). We replicate
-    // that format exactly because Instagram has been known to be picky about
-    // the content type on this endpoint in some edge cases.
-    const boundary = `----ig-business-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    const lines = [];
-    const addField = (name, value) => {
-      lines.push(`--${boundary}`);
-      lines.push(`Content-Disposition: form-data; name="${name}"`);
-      lines.push('');
-      lines.push(String(value));
-    };
-    addField('client_id', appId);
-    addField('client_secret', appSecret);
-    addField('grant_type', 'authorization_code');
-    addField('redirect_uri', redirectUri);
-    addField('code', cleanCode);
-    lines.push(`--${boundary}--`);
-    lines.push('');
-    const multipartBody = lines.join('\r\n');
+    // Step 1: short-lived token via api.instagram.com.
+    //
+    // We send `application/x-www-form-urlencoded` (the canonical OAuth 2.0
+    // body format). Earlier we tried `multipart/form-data` because Meta's
+    // docs use `curl -F` examples, but several working community
+    // implementations (and Instagram's accepted error pattern) confirm the
+    // x-www-form-urlencoded variant is the one Instagram's "redirect_uri
+    // identical" check is calibrated against.
+    const formBody = new URLSearchParams();
+    formBody.append('client_id', appId);
+    formBody.append('client_secret', appSecret);
+    formBody.append('grant_type', 'authorization_code');
+    formBody.append('redirect_uri', redirectUri);
+    formBody.append('code', cleanCode);
+
+    // Hex-dump the redirect_uri so we can detect any invisible / non-ASCII
+    // characters (e.g. trailing zero-width-space, NBSP, BOM) sneaking in
+    // from copy-paste of the URI in the Meta dashboard.
+    const redirectUriBytes = Buffer.from(redirectUri, 'utf8').toString('hex');
+    log('redirect-uri-hex', { hex: redirectUriBytes, length: redirectUri.length });
 
     const shortRes = await axios.post(
       'https://api.instagram.com/oauth/access_token',
-      multipartBody,
+      formBody.toString(),
       {
         headers: {
-          'Content-Type': `multipart/form-data; boundary=${boundary}`,
-          'Content-Length': Buffer.byteLength(multipartBody),
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
       },
     );
@@ -264,7 +263,10 @@ async function handleInstagramBusinessOAuthToken(req, res) {
       message,
       debug: (IG_BUSINESS_DEBUG || process.env.NODE_ENV !== 'production')
         ? {
+            tag: DEBUG_TAG,
             redirectUriSent: redirectUri,
+            redirectUriHex: Buffer.from(redirectUri, 'utf8').toString('hex'),
+            redirectUriLength: redirectUri.length,
             appIdMasked: maskId(appId),
             appSecretMasked: maskId(appSecret),
             graphError,
