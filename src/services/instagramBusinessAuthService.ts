@@ -27,20 +27,20 @@ export interface InstagramBusinessProfile {
 /**
  * Scopes requested at the authorize step.
  *
- * IMPORTANT: this list MUST match the scopes shown in the Meta App Dashboard
- * "Embedded URL" preview (Products > Instagram > API setup with Instagram
- * business login > Business login configuration). If they differ Instagram
- * sometimes returns the famously misleading "Error validating verification
- * code. Please make sure your redirect_uri is identical..." even though the
- * redirect_uri itself is fine.
+ * Only the scopes we actively demonstrate in the App Review screencast.
+ * Meta rejects submissions that request a permission without showing it
+ * being used end-to-end in the recording, so we keep this list minimal:
  *
- * Order matters — keep it identical to the embedded URL so byte comparisons
- * cannot drift.
+ *   - instagram_business_basic           — read profile (Section A)
+ *   - instagram_business_content_publish — publish a photo/video (Section B)
+ *   - instagram_business_manage_insights — read media insights (Section C)
+ *
+ * If you ever add `instagram_business_manage_messages` or
+ * `instagram_business_manage_comments` back, you MUST add corresponding
+ * sections to InstagramBusinessDemo.tsx that exercise those permissions.
  */
 export const INSTAGRAM_BUSINESS_SCOPES = [
   'instagram_business_basic',
-  'instagram_business_manage_messages',
-  'instagram_business_manage_comments',
   'instagram_business_content_publish',
   'instagram_business_manage_insights',
 ] as const;
@@ -329,6 +329,93 @@ export async function publishInstagramImage(
   }
   const { id: creationId } = (await createRes.json()) as { id: string };
 
+  return publishContainer(userId, creationId, accessToken);
+}
+
+export interface PublishVideoArgs {
+  userId: string;
+  videoUrl: string;
+  caption?: string;
+  accessToken: string;
+  /**
+   * Whether the Reel should be shared to the main feed (default `true`).
+   * Maps to the `share_to_feed` parameter on the container endpoint.
+   */
+  shareToFeed?: boolean;
+  /**
+   * Optional callback fired with the container status while we poll.
+   * Useful for showing "Processing video... (IN_PROGRESS)" in the UI.
+   */
+  onStatusUpdate?: (status: string) => void;
+}
+
+/**
+ * Three-step publish flow for Reels (`instagram_business_content_publish`):
+ *  1. Create a media container with `media_type=REELS` and `video_url`.
+ *  2. Poll the container's `status_code` until it is `FINISHED`
+ *     (Instagram needs to download & transcode the video first).
+ *  3. Publish the container with `media_publish`.
+ */
+export async function publishInstagramVideo(
+  args: PublishVideoArgs,
+): Promise<{ id: string; permalink?: string }> {
+  const { userId, videoUrl, caption, accessToken, shareToFeed = true, onStatusUpdate } = args;
+
+  const createBody = new URLSearchParams({
+    media_type: 'REELS',
+    video_url: videoUrl,
+    share_to_feed: shareToFeed ? 'true' : 'false',
+    access_token: accessToken,
+  });
+  if (caption) createBody.set('caption', caption);
+
+  const createRes = await fetch(`${GRAPH_IG_BASE}/${userId}/media`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: createBody.toString(),
+  });
+  if (!createRes.ok) {
+    const text = await createRes.text();
+    throw new Error(`Reel container creation failed: ${text.slice(0, 400)}`);
+  }
+  const { id: creationId } = (await createRes.json()) as { id: string };
+
+  // Poll status_code until FINISHED (or fail). Reels typically take 10-60s
+  // depending on video length. We poll every 4s for up to 5 minutes.
+  const maxAttempts = 75;
+  const pollIntervalMs = 4000;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    await new Promise((r) => setTimeout(r, pollIntervalMs));
+    const statusRes = await fetch(
+      `${GRAPH_IG_BASE}/${creationId}?fields=status_code,status&access_token=${encodeURIComponent(
+        accessToken,
+      )}`,
+    );
+    if (!statusRes.ok) {
+      const text = await statusRes.text();
+      throw new Error(`Reel status check failed: ${text.slice(0, 400)}`);
+    }
+    const statusJson = (await statusRes.json()) as { status_code?: string; status?: string };
+    const code = statusJson.status_code || statusJson.status || 'UNKNOWN';
+    onStatusUpdate?.(code);
+    if (code === 'FINISHED') break;
+    if (code === 'ERROR' || code === 'EXPIRED') {
+      throw new Error(`Reel processing ${code}: ${statusJson.status || ''}`);
+    }
+  }
+
+  return publishContainer(userId, creationId, accessToken);
+}
+
+/**
+ * Internal: publish a previously-created container and resolve its permalink.
+ * Shared between image and video flows.
+ */
+async function publishContainer(
+  userId: string,
+  creationId: string,
+  accessToken: string,
+): Promise<{ id: string; permalink?: string }> {
   const publishBody = new URLSearchParams({
     creation_id: creationId,
     access_token: accessToken,

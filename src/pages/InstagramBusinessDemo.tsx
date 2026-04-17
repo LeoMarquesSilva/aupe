@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -12,11 +12,13 @@ import {
   Link as MuiLink,
   Paper,
   Stack,
+  Tab,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -29,6 +31,10 @@ import {
   Logout as LogoutIcon,
   OpenInNew as OpenInNewIcon,
   CheckCircle as CheckCircleIcon,
+  Image as ImageIcon,
+  Movie as MovieIcon,
+  CloudUpload as CloudUploadIcon,
+  AutoAwesome as AutoAwesomeIcon,
 } from '@mui/icons-material';
 import {
   clearInstagramBusinessToken,
@@ -36,17 +42,32 @@ import {
   getInstagramBusinessProfile,
   getInstagramMediaInsights,
   publishInstagramImage,
+  publishInstagramVideo,
   readInstagramBusinessToken,
   type InstagramBusinessMedia,
   type InstagramBusinessProfile,
   type InstagramMediaInsight,
 } from '../services/instagramBusinessAuthService';
+import { supabaseStorageService } from '../services/supabaseStorageService';
+import { supabaseVideoStorageService } from '../services/supabaseVideoStorageService';
 import { GLASS } from '../theme/glassTokens';
 
 interface MediaWithInsights extends InstagramBusinessMedia {
   insights?: InstagramMediaInsight[];
   insightsError?: string;
 }
+
+type PublishMode = 'image' | 'video';
+
+/**
+ * Sample assets used by the App Review reviewer when they don't have a public
+ * URL handy. They live on stable, public CDNs so we don't need to keep our own
+ * copy on disk. Both meet the official Instagram constraints (image < 8 MiB,
+ * MP4 < 1 GB, < 90s for Reels).
+ */
+const SAMPLE_IMAGE_URL = 'https://picsum.photos/id/1015/1080/1080';
+const SAMPLE_VIDEO_URL =
+  'https://download.samplelib.com/mp4/sample-15s.mp4';
 
 const SectionHeader: React.FC<{
   icon: React.ReactNode;
@@ -108,14 +129,22 @@ const InstagramBusinessDemo: React.FC = () => {
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [mediaLoading, setMediaLoading] = useState(true);
 
+  const [publishMode, setPublishMode] = useState<PublishMode>('image');
   const [imageUrl, setImageUrl] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
   const [caption, setCaption] = useState('');
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishStatus, setPublishStatus] = useState<string | null>(null);
   const [publishResult, setPublishResult] = useState<{
     id: string;
     permalink?: string;
   } | null>(null);
+
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const stored = readInstagramBusinessToken();
@@ -172,30 +201,105 @@ const InstagramBusinessDemo: React.FC = () => {
     void loadMediaWithInsights(accessToken);
   }, [accessToken, loadProfile, loadMediaWithInsights]);
 
+  const resetPublishFeedback = () => {
+    setPublishError(null);
+    setPublishStatus(null);
+    setPublishResult(null);
+    setUploadError(null);
+  };
+
   const handlePublish = async () => {
     if (!accessToken || !userId) return;
-    if (!imageUrl.trim()) {
-      setPublishError('Please provide a public image URL.');
+    resetPublishFeedback();
+
+    if (publishMode === 'image') {
+      if (!imageUrl.trim()) {
+        setPublishError('Please provide a public image URL or upload a file.');
+        return;
+      }
+      setPublishing(true);
+      try {
+        const result = await publishInstagramImage({
+          userId,
+          imageUrl: imageUrl.trim(),
+          caption: caption.trim() || undefined,
+          accessToken,
+        });
+        setPublishResult(result);
+        setImageUrl('');
+        setCaption('');
+        void loadMediaWithInsights(accessToken);
+      } catch (e) {
+        setPublishError(e instanceof Error ? e.message : 'Publish failed');
+      } finally {
+        setPublishing(false);
+      }
+      return;
+    }
+
+    if (!videoUrl.trim()) {
+      setPublishError('Please provide a public video URL or upload a file.');
       return;
     }
     setPublishing(true);
-    setPublishError(null);
-    setPublishResult(null);
     try {
-      const result = await publishInstagramImage({
+      const result = await publishInstagramVideo({
         userId,
-        imageUrl: imageUrl.trim(),
+        videoUrl: videoUrl.trim(),
         caption: caption.trim() || undefined,
         accessToken,
+        onStatusUpdate: (status) => setPublishStatus(status),
       });
       setPublishResult(result);
-      setImageUrl('');
+      setVideoUrl('');
       setCaption('');
       void loadMediaWithInsights(accessToken);
     } catch (e) {
       setPublishError(e instanceof Error ? e.message : 'Publish failed');
     } finally {
       setPublishing(false);
+      setPublishStatus(null);
+    }
+  };
+
+  const handleUseSample = () => {
+    resetPublishFeedback();
+    if (publishMode === 'image') {
+      setImageUrl(SAMPLE_IMAGE_URL);
+      if (!caption) {
+        setCaption('Posted from the Instagram Business Login demo (sample image).');
+      }
+    } else {
+      setVideoUrl(SAMPLE_VIDEO_URL);
+      if (!caption) {
+        setCaption('Posted from the Instagram Business Login demo (sample reel).');
+      }
+    }
+  };
+
+  const handleFilePicked = async (file: File | null) => {
+    if (!file || !accessToken) return;
+    resetPublishFeedback();
+    setUploading(true);
+    try {
+      // We use the connected Instagram user_id as a folder name in the bucket
+      // so demo uploads do not collide with real org users.
+      const folder = userId || 'instagram-business-demo';
+      if (publishMode === 'image') {
+        const result = await supabaseStorageService.uploadImage(file, folder);
+        setImageUrl(result.url);
+      } else {
+        const result = await supabaseVideoStorageService.uploadVideo(file, folder);
+        setVideoUrl(result.publicUrl || result.url);
+      }
+    } catch (e) {
+      setUploadError(
+        e instanceof Error
+          ? e.message
+          : 'Upload failed. Try the "Use sample" button instead.',
+      );
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -238,6 +342,37 @@ const InstagramBusinessDemo: React.FC = () => {
             </Tooltip>
           </Stack>
 
+          {/* Intro / explainer for Meta App Reviewers */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 2.5, md: 3 },
+              borderRadius: GLASS.radius.card,
+              bgcolor: 'rgba(247, 66, 17, 0.04)',
+              border: `1px solid rgba(247, 66, 17, 0.2)`,
+            }}
+          >
+            <Typography variant="body2" sx={{ color: GLASS.text.body, lineHeight: 1.6 }}>
+              <strong>App Review reviewer notes.</strong> This page demonstrates the three
+              Instagram permissions our app requests, end-to-end, against the connected
+              Instagram Business / Creator account:
+            </Typography>
+            <Stack spacing={0.5} sx={{ mt: 1 }}>
+              <Typography variant="caption" sx={{ color: GLASS.text.body }}>
+                • <code>instagram_business_basic</code> — read the authenticated profile
+                (Section A below).
+              </Typography>
+              <Typography variant="caption" sx={{ color: GLASS.text.body }}>
+                • <code>instagram_business_content_publish</code> — publish a photo or a
+                Reel (Section B).
+              </Typography>
+              <Typography variant="caption" sx={{ color: GLASS.text.body }}>
+                • <code>instagram_business_manage_insights</code> — list recent media and
+                read per-media metrics (Section C).
+              </Typography>
+            </Stack>
+          </Paper>
+
           {/* Section A — instagram_business_basic */}
           <Paper
             elevation={0}
@@ -251,7 +386,7 @@ const InstagramBusinessDemo: React.FC = () => {
           >
             <SectionHeader
               icon={<PersonIcon />}
-              title="Profile (basic)"
+              title="A. Profile (basic)"
               scope="instagram_business_basic"
               description="Reading the authenticated account's profile through the Instagram Graph API."
             />
@@ -322,21 +457,129 @@ const InstagramBusinessDemo: React.FC = () => {
           >
             <SectionHeader
               icon={<PublishIcon />}
-              title="Publish a photo"
+              title="B. Publish a photo or a Reel"
               scope="instagram_business_content_publish"
-              description="Two-step flow: create a media container, then publish it to the connected feed."
+              description="Pick how you want to provide the media: upload a file, paste a public URL, or click 'Use sample' to fill an example automatically."
             />
 
-            <Stack spacing={2}>
-              <TextField
-                label="Public image URL (JPEG, https://...)"
-                placeholder="https://example.com/photo.jpg"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                fullWidth
-                size="small"
-                helperText="Instagram requires the URL to be publicly reachable."
+            <Tabs
+              value={publishMode}
+              onChange={(_, v: PublishMode) => {
+                setPublishMode(v);
+                resetPublishFeedback();
+              }}
+              sx={{
+                mb: 2,
+                minHeight: 36,
+                '& .MuiTab-root': {
+                  textTransform: 'none',
+                  minHeight: 36,
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                },
+                '& .Mui-selected': { color: `${GLASS.accent.orange} !important` },
+                '& .MuiTabs-indicator': { bgcolor: GLASS.accent.orange },
+              }}
+            >
+              <Tab
+                value="image"
+                label="Photo"
+                icon={<ImageIcon fontSize="small" />}
+                iconPosition="start"
               />
+              <Tab
+                value="video"
+                label="Reel (video)"
+                icon={<MovieIcon fontSize="small" />}
+                iconPosition="start"
+              />
+            </Tabs>
+
+            <Stack spacing={2}>
+              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<AutoAwesomeIcon />}
+                  onClick={handleUseSample}
+                  disabled={publishing || uploading}
+                  sx={{
+                    textTransform: 'none',
+                    borderColor: GLASS.accent.orange,
+                    color: GLASS.accent.orange,
+                    '&:hover': {
+                      borderColor: GLASS.accent.orangeDark,
+                      bgcolor: 'rgba(247, 66, 17, 0.04)',
+                    },
+                  }}
+                >
+                  Use sample {publishMode === 'image' ? 'image' : 'video'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={
+                    uploading ? (
+                      <CircularProgress size={14} sx={{ color: GLASS.accent.blue }} />
+                    ) : (
+                      <CloudUploadIcon />
+                    )
+                  }
+                  onClick={() =>
+                    publishMode === 'image'
+                      ? imageInputRef.current?.click()
+                      : videoInputRef.current?.click()
+                  }
+                  disabled={publishing || uploading}
+                  sx={{
+                    textTransform: 'none',
+                    borderColor: GLASS.accent.blue,
+                    color: GLASS.accent.blue,
+                    '&:hover': { bgcolor: 'rgba(62, 84, 181, 0.04)' },
+                  }}
+                >
+                  {uploading ? 'Uploading...' : `Upload ${publishMode === 'image' ? 'image' : 'video'} from device`}
+                </Button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  hidden
+                  onChange={(e) => handleFilePicked(e.target.files?.[0] ?? null)}
+                />
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept="video/mp4,video/quicktime"
+                  hidden
+                  onChange={(e) => handleFilePicked(e.target.files?.[0] ?? null)}
+                />
+              </Stack>
+
+              {uploadError && <Alert severity="warning">{uploadError}</Alert>}
+
+              {publishMode === 'image' ? (
+                <TextField
+                  label="Public image URL (JPEG/PNG, https://...)"
+                  placeholder="https://example.com/photo.jpg"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  fullWidth
+                  size="small"
+                  helperText="Instagram requires the URL to be publicly reachable. Max 8 MiB."
+                />
+              ) : (
+                <TextField
+                  label="Public video URL (MP4, https://...)"
+                  placeholder="https://example.com/reel.mp4"
+                  value={videoUrl}
+                  onChange={(e) => setVideoUrl(e.target.value)}
+                  fullWidth
+                  size="small"
+                  helperText="Reels: MP4, < 90 seconds, < 1 GB. Vertical 9:16 recommended."
+                />
+              )}
+
               <TextField
                 label="Caption (optional)"
                 value={caption}
@@ -349,6 +592,16 @@ const InstagramBusinessDemo: React.FC = () => {
               />
 
               {publishError && <Alert severity="error">{publishError}</Alert>}
+
+              {publishStatus && (
+                <Alert
+                  severity="info"
+                  icon={<CircularProgress size={16} sx={{ color: GLASS.accent.blue }} />}
+                >
+                  Reel processing on Instagram (status: <code>{publishStatus}</code>). Reels
+                  usually take 10-60 seconds to transcode.
+                </Alert>
+              )}
 
               {publishResult && (
                 <Alert
@@ -367,7 +620,7 @@ const InstagramBusinessDemo: React.FC = () => {
                           fontWeight: 600,
                         }}
                       >
-                        View post <OpenInNewIcon fontSize="small" />
+                        View on Instagram <OpenInNewIcon fontSize="small" />
                       </MuiLink>
                     ) : undefined
                   }
@@ -379,7 +632,7 @@ const InstagramBusinessDemo: React.FC = () => {
               <Button
                 variant="contained"
                 onClick={handlePublish}
-                disabled={publishing || !accessToken}
+                disabled={publishing || uploading || !accessToken}
                 startIcon={
                   publishing ? (
                     <CircularProgress size={16} sx={{ color: '#ffffff' }} />
@@ -396,7 +649,11 @@ const InstagramBusinessDemo: React.FC = () => {
                   px: 3,
                 }}
               >
-                {publishing ? 'Publishing...' : 'Publish to Instagram'}
+                {publishing
+                  ? publishMode === 'video'
+                    ? 'Processing reel...'
+                    : 'Publishing...'
+                  : `Publish ${publishMode === 'image' ? 'photo' : 'reel'} to Instagram`}
               </Button>
             </Stack>
           </Paper>
@@ -414,7 +671,7 @@ const InstagramBusinessDemo: React.FC = () => {
           >
             <SectionHeader
               icon={<InsightsIcon />}
-              title="Recent media and insights"
+              title="C. Recent media and insights"
               scope="instagram_business_manage_insights"
               description="Listing the last 5 media and fetching metrics for each one."
             />
