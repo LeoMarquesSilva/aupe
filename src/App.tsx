@@ -19,6 +19,7 @@ import ResetPassword from './pages/ResetPassword';
 import EmailConfirmation from './pages/EmailConfirmation'; // ✅ Nova importação
 import Landing from './pages/Landing';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 
 // Pages - Protected
 import CreatePost from './pages/CreatePost';
@@ -157,8 +158,20 @@ const router = createBrowserRouter([
     element: <PublicLayout><SuperAdminLogin /></PublicLayout>,
   },
   {
+    // Canonical privacy URL we share with Meta / Instagram (App Review,
+    // Deauthorize callback footer, etc.). `/privacy-policy` is kept as a
+    // legacy alias so existing links stay valid.
+    path: "/privacy",
+    element: <PublicLayout><PrivacyPolicy /></PublicLayout>,
+  },
+  {
     path: "/privacy-policy",
     element: <PublicLayout><PrivacyPolicy /></PublicLayout>,
+  },
+  {
+    // Canonical terms URL we share with Meta App Review.
+    path: "/terms",
+    element: <PublicLayout><TermsOfService /></PublicLayout>,
   },
   {
     path: "/view/:token",
