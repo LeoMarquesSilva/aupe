@@ -604,7 +604,7 @@ const StoryCalendar: React.FC = () => {
           navigate(`/edit-story/${selectedContent.id}`);
           break;
         case 'reels':
-          navigate(`/edit-reel/${selectedContent.id}`);
+          navigate(`/edit-post/${selectedContent.id}`);
           break;
         default:
           navigate(`/edit-post/${selectedContent.id}`);

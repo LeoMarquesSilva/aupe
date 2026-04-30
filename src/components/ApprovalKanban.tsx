@@ -7,6 +7,7 @@ import {
   useMediaQuery,
   Tooltip,
   useTheme,
+  alpha,
 } from '@mui/material';
 import {
   Schedule as AwaitingIcon,
@@ -49,10 +50,11 @@ interface ApprovalKanbanProps {
   loading?: boolean;
 }
 
-const COLUMNS: { id: ApprovalKanbanColumn; title: string; icon: React.ReactNode; hint?: string }[] = [
+const COLUMNS: { id: ApprovalKanbanColumn; title: string; caption: string; icon: React.ReactNode; hint?: string }[] = [
   {
     id: 'internal',
     title: 'Pré-aprovação interna',
+    caption: 'Revisão do gestor',
     icon: <InternalIcon />,
     hint:
       'O gestor aprova pelo link de revisão interna. Quando aprovado, o cartão passa para "Aguardando cliente". O link enviado ao cliente não é criado automaticamente: gere-o na página Aprovações.',
@@ -60,16 +62,18 @@ const COLUMNS: { id: ApprovalKanbanColumn; title: string; icon: React.ReactNode;
   {
     id: 'awaiting',
     title: 'Aguardando cliente',
+    caption: 'Link enviado ou pronto',
     icon: <AwaitingIcon />,
     hint:
       'Conteúdo liberado após a pré-aprovação interna (se houver). Use "Gerar link ao cliente" na página Aprovações para o cliente aprovar ou pedir ajustes.',
   },
-  { id: 'approved', title: 'Aprovados', icon: <ApprovedIcon /> },
-  { id: 'scheduled', title: 'Aprovados/Agendados', icon: <ScheduledIcon /> },
-  { id: 'adjustments', title: 'Ajustes', icon: <AdjustmentsIcon /> },
+  { id: 'approved', title: 'Aprovados', caption: 'Liberados pelo cliente', icon: <ApprovedIcon /> },
+  { id: 'scheduled', title: 'Aprovados/Agendados', caption: 'Na fila de publicação', icon: <ScheduledIcon /> },
+  { id: 'adjustments', title: 'Ajustes', caption: 'Cliente pediu revisão', icon: <AdjustmentsIcon /> },
   {
     id: 'completed',
     title: 'Publicados',
+    caption: 'Conteúdo finalizado',
     icon: <CompletedIcon />,
     hint: 'Conteúdo já publicado no canal. Cartões compactos para não poluir o funil.',
   },
@@ -101,6 +105,38 @@ function CardSkeleton() {
 const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loading = false }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const boardGridSx = {
+    display: 'grid',
+    gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(286px, 1fr))',
+    gap: 2,
+    alignItems: 'stretch',
+    minWidth: isMobile ? 'auto' : 6 * 286 + 5 * 16,
+  };
+  const scrollAreaSx = {
+    overflowX: isMobile ? 'visible' : 'auto',
+    overflowY: 'hidden',
+    pb: isMobile ? 0 : 1,
+    mx: isMobile ? 0 : -0.5,
+    px: isMobile ? 0 : 0.5,
+    scrollbarGutter: 'stable',
+    scrollbarWidth: 'thin',
+    scrollbarColor: `${alpha(GLASS.accent.orange, 0.42)} transparent`,
+    '&::-webkit-scrollbar': {
+      height: 10,
+    },
+    '&::-webkit-scrollbar-track': {
+      borderRadius: 999,
+      backgroundColor: alpha(theme.palette.text.primary, 0.05),
+    },
+    '&::-webkit-scrollbar-thumb': {
+      borderRadius: 999,
+      backgroundColor: alpha(GLASS.accent.orange, 0.36),
+      border: `2px solid ${alpha(theme.palette.background.paper, 0.72)}`,
+    },
+    '&::-webkit-scrollbar-thumb:hover': {
+      backgroundColor: alpha(GLASS.accent.orange, 0.56),
+    },
+  };
   const colors = {
     internal: theme.palette.secondary.main,
     awaiting: theme.palette.warning.main,
@@ -146,14 +182,12 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
     return (
       <Box
         sx={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))',
-          gap: 2,
-          alignItems: 'flex-start',
+          ...scrollAreaSx,
         }}
       >
-        {COLUMNS.map((col, colIndex) => (
-          <Box key={col.id}>
+        <Box sx={boardGridSx}>
+        {COLUMNS.map((col) => (
+          <Box key={col.id} sx={{ minWidth: 0 }}>
             <Paper
               elevation={0}
               sx={{
@@ -161,8 +195,9 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
                 border: `1px solid ${GLASS.border.outer}`,
                 borderTop: `3px solid ${colors[col.id as keyof typeof colors]}`,
                 overflow: 'hidden',
-                minHeight: 200,
-                bgcolor: GLASS.surface.bg,
+                minHeight: 260,
+                height: '100%',
+                bgcolor: alpha(colors[col.id as keyof typeof colors], 0.035),
                 backdropFilter: `blur(${GLASS.surface.blur})`,
                 WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
                 boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
@@ -170,21 +205,42 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
             >
               <Box
                 sx={{
-                  px: 1.5,
-                  py: 1.25,
+                  px: 1.35,
+                  py: 1.2,
+                  minHeight: 74,
                   borderBottom: `1px solid ${GLASS.border.subtle}`,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 1,
+                  background: `linear-gradient(135deg, ${alpha(colors[col.id as keyof typeof colors], 0.16)} 0%, ${alpha(colors[col.id as keyof typeof colors], 0.045)} 100%)`,
                 }}
               >
-                <Box sx={{ color: colors[col.id as keyof typeof colors], '& .MuiSvgIcon-root': { fontSize: 18 } }}>
+                <Box
+                  sx={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: colors[col.id as keyof typeof colors],
+                    bgcolor: alpha(colors[col.id as keyof typeof colors], 0.13),
+                    border: `1px solid ${alpha(colors[col.id as keyof typeof colors], 0.18)}`,
+                    flexShrink: 0,
+                    '& .MuiSvgIcon-root': { fontSize: 19 },
+                  }}
+                >
                   {col.icon}
                 </Box>
-                <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1, color: GLASS.text.heading, fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {col.title}
-                </Typography>
-                <Skeleton variant="rounded" width={24} height={20} />
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ color: GLASS.text.heading, fontSize: '0.83rem', letterSpacing: '-0.01em', lineHeight: 1.2 }}>
+                    {col.title}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: GLASS.text.muted, display: 'block', fontSize: '0.68rem', lineHeight: 1.2, mt: 0.3 }}>
+                    {col.caption}
+                  </Typography>
+                </Box>
+                <Skeleton variant="rounded" width={34} height={24} sx={{ borderRadius: 999 }} />
               </Box>
               <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                 <CardSkeleton />
@@ -193,6 +249,7 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
             </Paper>
           </Box>
         ))}
+        </Box>
       </Box>
     );
   }
@@ -200,12 +257,10 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
   return (
     <Box
       sx={{
-        display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(6, minmax(0, 1fr))',
-        gap: 2,
-        alignItems: 'flex-start',
+        ...scrollAreaSx,
       }}
     >
+      <Box sx={boardGridSx}>
       {byColumn.map((col, colIndex) => (
         <motion.div
           key={col.id}
@@ -221,79 +276,113 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
               border: `1px solid ${GLASS.border.outer}`,
               borderTop: `3px solid ${colors[col.id as keyof typeof colors]}`,
               overflow: 'hidden',
-              minHeight: 200,
-              bgcolor: GLASS.surface.bg,
+              minHeight: 260,
+              height: '100%',
+              bgcolor: alpha(colors[col.id as keyof typeof colors], 0.035),
               backdropFilter: `blur(${GLASS.surface.blur})`,
               WebkitBackdropFilter: `blur(${GLASS.surface.blur})`,
               boxShadow: `${GLASS.shadow.card}, ${GLASS.shadow.cardInset}`,
+              transition: `border-color ${GLASS.motion.duration.normal} ${GLASS.motion.easing}, box-shadow ${GLASS.motion.duration.normal} ${GLASS.motion.easing}`,
+              '&:hover': {
+                borderColor: alpha(colors[col.id as keyof typeof colors], 0.38),
+                boxShadow: GLASS.shadow.cardHover,
+              },
             }}
           >
             <Box
               sx={{
-                px: 1.5,
-                py: 1.25,
+                px: 1.35,
+                py: 1.2,
+                minHeight: 74,
                 borderBottom: `1px solid ${GLASS.border.subtle}`,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1,
+                background: `linear-gradient(135deg, ${alpha(colors[col.id as keyof typeof colors], 0.16)} 0%, ${alpha(colors[col.id as keyof typeof colors], 0.045)} 100%)`,
               }}
             >
               <Box
                 sx={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: '12px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: colors[col.id as keyof typeof colors],
-                  '& .MuiSvgIcon-root': { fontSize: 18 },
+                  bgcolor: alpha(colors[col.id as keyof typeof colors], 0.13),
+                  border: `1px solid ${alpha(colors[col.id as keyof typeof colors], 0.18)}`,
+                  flexShrink: 0,
+                  '& .MuiSvgIcon-root': { fontSize: 19 },
                 }}
               >
                 {col.icon}
               </Box>
               {col.hint ? (
                 <Tooltip title={col.hint} arrow placement="top">
-                  <Typography
-                    variant="subtitle2"
-                    fontWeight={600}
+                  <Box
                     component="span"
                     sx={{
                       flex: 1,
-                      color: GLASS.text.heading,
-                      fontSize: '0.875rem',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
+                      minWidth: 0,
                       cursor: 'help',
-                      borderBottom: `1px dotted ${GLASS.text.muted}`,
+                    }}
+                  >
+                    <Typography
+                      variant="subtitle2"
+                      fontWeight={700}
+                      component="span"
+                      sx={{
+                        color: GLASS.text.heading,
+                        fontSize: '0.83rem',
+                        letterSpacing: '-0.01em',
+                        lineHeight: 1.2,
+                        borderBottom: `1px dotted ${GLASS.text.muted}`,
+                      }}
+                    >
+                      {col.title}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: GLASS.text.muted, display: 'block', fontSize: '0.68rem', lineHeight: 1.2, mt: 0.3 }}>
+                      {col.caption}
+                    </Typography>
+                  </Box>
+                </Tooltip>
+              ) : (
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight={700}
+                    sx={{
+                      color: GLASS.text.heading,
+                      fontSize: '0.83rem',
+                      letterSpacing: '-0.01em',
+                      lineHeight: 1.2,
                     }}
                   >
                     {col.title}
                   </Typography>
-                </Tooltip>
-              ) : (
-                <Typography
-                  variant="subtitle2"
-                  fontWeight={600}
-                  sx={{
-                    flex: 1,
-                    color: GLASS.text.heading,
-                    fontSize: '0.875rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  {col.title}
-                </Typography>
+                  <Typography variant="caption" sx={{ color: GLASS.text.muted, display: 'block', fontSize: '0.68rem', lineHeight: 1.2, mt: 0.3 }}>
+                    {col.caption}
+                  </Typography>
+                </Box>
               )}
               <Box
                 component="span"
                 sx={{
+                  minWidth: 34,
+                  height: 26,
                   px: 1,
-                  py: 0.25,
-                  borderRadius: GLASS.radius.buttonSm,
-                  bgcolor: GLASS.surface.bgStrong,
-                  border: `1px solid ${GLASS.border.subtle}`,
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  color: GLASS.text.muted,
+                  borderRadius: 999,
+                  bgcolor: alpha(colors[col.id as keyof typeof colors], 0.14),
+                  border: `1px solid ${alpha(colors[col.id as keyof typeof colors], 0.22)}`,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.78rem',
+                  fontWeight: 800,
+                  color: colors[col.id as keyof typeof colors],
+                  lineHeight: 1,
+                  flexShrink: 0,
                 }}
               >
                 {col.items.length}
@@ -305,9 +394,25 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 1.5,
-                maxHeight: isMobile ? 320 : 420,
+                minHeight: isMobile ? 220 : 360,
+                maxHeight: isMobile ? 360 : 'min(64vh, 620px)',
                 overflow: 'auto',
                 bgcolor: 'transparent',
+                scrollbarWidth: 'thin',
+                scrollbarColor: `${alpha(colors[col.id as keyof typeof colors], 0.42)} transparent`,
+                '&::-webkit-scrollbar': {
+                  width: 8,
+                },
+                '&::-webkit-scrollbar-track': {
+                  backgroundColor: 'transparent',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  borderRadius: 999,
+                  backgroundColor: alpha(colors[col.id as keyof typeof colors], 0.28),
+                },
+                '&::-webkit-scrollbar-thumb:hover': {
+                  backgroundColor: alpha(colors[col.id as keyof typeof colors], 0.44),
+                },
               }}
             >
               {col.items.length === 0 ? (
@@ -353,6 +458,7 @@ const ApprovalKanban: React.FC<ApprovalKanbanProps> = ({ posts, onCardClick, loa
           </Paper>
         </motion.div>
       ))}
+      </Box>
     </Box>
   );
 };
