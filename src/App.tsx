@@ -25,6 +25,7 @@ import TermsOfService from './pages/TermsOfService';
 import CreatePost from './pages/CreatePost';
 import CreateStory from './pages/CreateStory';
 import CreateReels from './pages/CreateReels';
+import CreateBrandImage from './pages/CreateBrandImage';
 import Callback from './pages/Callback';
 import StoryCalendar from './pages/StoryCalendar';
 import EditStory from './pages/EditStory';
@@ -230,6 +231,10 @@ const router = createBrowserRouter([
   {
     path: "/create-reels",
     element: <ProtectedPageLayout><CreateReels /></ProtectedPageLayout>,
+  },
+  {
+    path: "/create-brand-image",
+    element: <ProtectedPageLayout><CreateBrandImage /></ProtectedPageLayout>,
   },
   {
     path: "/edit-story/:id",

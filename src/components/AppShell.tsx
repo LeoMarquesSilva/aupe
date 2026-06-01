@@ -29,6 +29,7 @@ import {
   Settings as SettingsIcon,
   Slideshow as ReelsIcon,
   ThumbUp as ApprovalsIcon,
+  AutoAwesome as BrandImageIcon,
 } from '@mui/icons-material';
 import { PanelLeft } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -150,6 +151,12 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
         to: '/share-links',
         icon: <LinkIcon fontSize="small" />,
         match: (pathname) => pathname.startsWith('/share-links'),
+      },
+      {
+        label: 'Estúdio de imagens',
+        to: '/create-brand-image',
+        icon: <BrandImageIcon fontSize="small" />,
+        match: (pathname) => pathname.startsWith('/create-brand-image'),
       },
       {
         label: 'Configurações',
@@ -627,6 +634,10 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
         <MenuItem onClick={() => handleNavigate('/create-story')}>
           <ListItemIcon><StoryIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="Criar Story" />
+        </MenuItem>
+        <MenuItem onClick={() => handleNavigate('/create-brand-image')}>
+          <ListItemIcon><BrandImageIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Estúdio de imagens" />
         </MenuItem>
       </Menu>
 

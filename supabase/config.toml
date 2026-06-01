@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.instagram-refresh-tokens]
 verify_jwt = false
+
+[functions.openai-image-generate]
+verify_jwt = true

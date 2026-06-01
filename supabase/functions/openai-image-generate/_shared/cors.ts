@@ -1,3 +1,4 @@
+/** Cópia local para bundle da função (mantenha alinhado com supabase/functions/_shared/cors.ts). */
 /** Lista de origens permitidas (vírgula). Vazio = compat: Access-Control-Allow-Origin: * */
 export function parseAllowedOrigins(): string[] {
   return (Deno.env.get('ALLOWED_ORIGINS') || '')

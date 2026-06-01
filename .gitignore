@@ -32,3 +32,10 @@ dev.vars
 
 # Artefacto local de deploy/debug Edge (não versionar)
 .args-get-standalone.json
+.deploy-openai-fn.json
+.openai-fn-deploy.json
+.tmp-deploy-openai.json
+.tmp-deploy-openai.oneline.json
+
+# Saída local do script de prévia OpenAI (imagens geradas)
+/scripts/output/

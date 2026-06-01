@@ -98,6 +98,19 @@ const CreatePost: React.FC = () => {
   }, [searchParams]);
 
   useEffect(() => {
+    const imageUrl = searchParams.get('imageUrl');
+    if (!imageUrl) return;
+    setImages((prev) => {
+      if (prev.length > 0) return prev;
+      const id =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `img-${Date.now()}`;
+      return [{ id, url: decodeURIComponent(imageUrl), order: 0 }];
+    });
+  }, [searchParams]);
+
+  useEffect(() => {
     console.log("Estado de imagens atualizado:", images.length);
   }, [images]);
 

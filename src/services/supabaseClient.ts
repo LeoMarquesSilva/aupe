@@ -89,6 +89,10 @@ const columnMapping: Record<string, string> = {
   'internalApprovalStatus': 'internal_approval_status',
   'internalApprovalComment': 'internal_approval_comment',
   'isActive': 'is_active',
+  'brandGuidelines': 'brand_guidelines',
+  'brandPrimaryColor': 'brand_primary_color',
+  'brandSecondaryColor': 'brand_secondary_color',
+  'brandFontNotes': 'brand_font_notes',
   'expiresAt': 'expires_at',
   'createdBy': 'created_by',
   'approvalRequestId': 'approval_request_id',
@@ -168,6 +172,31 @@ const getCurrentUser = async () => {
   }
   return user;
 };
+
+/** Converte linha `clients` do Supabase para o tipo `Client`. */
+function mapClientFromDb(data: Record<string, any>): Client {
+  return {
+    id: data.id,
+    name: data.name,
+    instagram: data.instagram,
+    logoUrl: data.logo_url,
+    brandGuidelines: data.brand_guidelines ?? undefined,
+    brandPrimaryColor: data.brand_primary_color ?? undefined,
+    brandSecondaryColor: data.brand_secondary_color ?? undefined,
+    brandFontNotes: data.brand_font_notes ?? undefined,
+    accessToken: data.access_token,
+    userId: data.user_id,
+    appId: data.app_id,
+    instagramAccountId: data.instagram_account_id,
+    username: data.instagram_username,
+    profilePicture: data.profile_picture,
+    tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
+    pageId: data.page_id,
+    pageName: data.page_name,
+    instagramLongLivedIssuedAt: data.instagram_long_lived_issued_at || undefined,
+    isActive: data.is_active !== false,
+  };
+}
 
 // Serviços para gerenciar perfis de usuário
 export const userProfileService = {
@@ -265,27 +294,7 @@ export const clientService = {
           client.instagram_account_id = client.app_id;
         }
         
-        // CONVERSÃO MANUAL IGUAL À saveInstagramAuth
-        const convertedClient: Client = {
-          id: client.id,
-          name: client.name,
-          instagram: client.instagram,
-          logoUrl: client.logo_url,
-          accessToken: client.access_token,
-          userId: client.user_id,
-          appId: client.app_id,
-          // *** CONVERSÃO MANUAL DOS CAMPOS CRÍTICOS DO INSTAGRAM ***
-          instagramAccountId: client.instagram_account_id,
-          username: client.instagram_username,
-          profilePicture: client.profile_picture,
-          tokenExpiry: client.token_expiry ? new Date(client.token_expiry) : undefined,
-          pageId: client.page_id,
-          pageName: client.page_name,
-          instagramLongLivedIssuedAt: client.instagram_long_lived_issued_at || undefined,
-          isActive: client.is_active !== false,
-        };
-        
-        return convertedClient;
+        return mapClientFromDb(client);
       });
     } catch (error) {
       logClientError('Erro ao buscar clientes:', error);
@@ -327,26 +336,7 @@ export const clientService = {
         throw new Error('Não foi possível buscar o cliente');
       }
       
-      // CONVERSÃO MANUAL IGUAL À getClients
-      const convertedClient: Client = {
-        id: data.id,
-        name: data.name,
-        instagram: data.instagram,
-        logoUrl: data.logo_url,
-        accessToken: data.access_token,
-        userId: data.user_id,
-        appId: data.app_id,
-        instagramAccountId: data.instagram_account_id,
-        username: data.instagram_username,
-        profilePicture: data.profile_picture,
-        tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
-        pageId: data.page_id,
-        pageName: data.page_name,
-        instagramLongLivedIssuedAt: data.instagram_long_lived_issued_at || undefined,
-        isActive: data.is_active !== false,
-      };
-      
-      return convertedClient;
+      return mapClientFromDb(data);
     } catch (error) {
       logClientError('Erro ao buscar cliente por ID:', error);
       throw error;
@@ -404,24 +394,7 @@ export const clientService = {
         throw new Error('Nenhum dado retornado após inserção');
       }
       
-      // CONVERSÃO MANUAL IGUAL À getClients
-      const convertedClient: Client = {
-        id: data.id,
-        name: data.name,
-        instagram: data.instagram,
-        logoUrl: data.logo_url,
-        accessToken: data.access_token,
-        userId: data.user_id,
-        appId: data.app_id,
-        instagramAccountId: data.instagram_account_id,
-        username: data.instagram_username,
-        profilePicture: data.profile_picture,
-        tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
-        pageId: data.page_id,
-        pageName: data.page_name
-      };
-      
-      return convertedClient;
+      return mapClientFromDb(data);
     } catch (err) {
       logClientError('Erro ao adicionar cliente:', err);
       throw err;
@@ -535,26 +508,7 @@ export const clientService = {
         throw new Error(`Não foi possível atualizar o cliente: ${error.message}`);
       }
       
-      // CONVERSÃO MANUAL IGUAL À getClients
-      const convertedClient: Client = {
-        id: data.id,
-        name: data.name,
-        instagram: data.instagram,
-        logoUrl: data.logo_url,
-        accessToken: data.access_token,
-        userId: data.user_id,
-        appId: data.app_id,
-        instagramAccountId: data.instagram_account_id,
-        username: data.instagram_username,
-        profilePicture: data.profile_picture,
-        tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
-        pageId: data.page_id,
-        pageName: data.page_name,
-        instagramLongLivedIssuedAt: data.instagram_long_lived_issued_at || undefined,
-        isActive: data.is_active !== false,
-      };
-      
-      return convertedClient;
+      return mapClientFromDb(data);
     } catch (err) {
       logClientError('Erro ao atualizar cliente:', err);
       throw err;
@@ -686,24 +640,7 @@ export const clientService = {
         devLog('Dados salvos com sucesso no banco (token redigido):', redactClientRowForLog(data as Record<string, unknown>));
       }
 
-      // Conversão manual para garantir que funcione
-      const convertedClient: Client = {
-        id: data.id,
-        name: data.name,
-        instagram: data.instagram,
-        logoUrl: data.logo_url,
-        accessToken: data.access_token,
-        userId: data.user_id,
-        appId: data.app_id,
-        // Conversão manual dos campos críticos do Instagram
-        instagramAccountId: data.instagram_account_id,
-        username: data.instagram_username,
-        profilePicture: data.profile_picture,
-        tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
-        pageId: data.page_id,
-        pageName: data.page_name,
-        instagramLongLivedIssuedAt: data.instagram_long_lived_issued_at || undefined,
-      };
+      const convertedClient = mapClientFromDb(data);
       
       if (verboseClient) {
         devLog('Cliente convertido (token redigido):', { ...convertedClient, accessToken: '[REDACTED]' });
@@ -782,25 +719,7 @@ export const clientService = {
         throw new Error(`Não foi possível remover os dados de autenticação: ${error.message}`);
       }
       
-      // CONVERSÃO MANUAL IGUAL À getClients
-      const convertedClient: Client = {
-        id: data.id,
-        name: data.name,
-        instagram: data.instagram,
-        logoUrl: data.logo_url,
-        accessToken: data.access_token,
-        userId: data.user_id,
-        appId: data.app_id,
-        instagramAccountId: data.instagram_account_id,
-        username: data.instagram_username,
-        profilePicture: data.profile_picture,
-        tokenExpiry: data.token_expiry ? new Date(data.token_expiry) : undefined,
-        pageId: data.page_id,
-        pageName: data.page_name,
-        instagramLongLivedIssuedAt: data.instagram_long_lived_issued_at || undefined,
-      };
-      
-      return convertedClient;
+      return mapClientFromDb(data);
     } catch (err) {
       logClientError('Erro ao remover dados de autenticação do Instagram:', err);
       throw err;

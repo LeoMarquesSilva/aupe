@@ -8,6 +8,11 @@ export interface Client {
   name: string;
   instagram: string;
   logoUrl?: string;
+  /** Diretrizes de marca para geração de imagens (IA). */
+  brandGuidelines?: string;
+  brandPrimaryColor?: string;
+  brandSecondaryColor?: string;
+  brandFontNotes?: string;
   /** When false, client is inactive (scheduling UI may hide or warn). */
   isActive?: boolean;
   accessToken?: string;
@@ -25,6 +30,98 @@ export interface Client {
   pageName?: string;
   /** Emissão do token long-lived Instagram (refresh Meta). */
   instagramLongLivedIssuedAt?: string;
+}
+
+export type ClientBrandAssetType =
+  | 'logo'
+  | 'logo_dark'
+  | 'logo_light'
+  | 'reference'
+  | 'product'
+  | 'background'
+  | 'template';
+
+export interface ClientBrandAsset {
+  id: string;
+  organizationId: string;
+  brandKitId: string;
+  clientId: string;
+  assetType: ClientBrandAssetType;
+  label?: string;
+  fileUrl: string;
+  storagePath?: string;
+  mimeType?: string;
+  fileSize?: number;
+  sortOrder: number;
+  createdAt?: string;
+}
+
+export interface ClientBrandKit {
+  id?: string;
+  organizationId?: string;
+  clientId: string;
+  brandName?: string;
+  tagline?: string;
+  websiteUrl?: string;
+  instagramHandle?: string;
+  brandStory?: string;
+  audience?: string;
+  valueProposition?: string;
+  toneOfVoice?: string;
+  visualStyle?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  fontHeadline?: string;
+  fontBody?: string;
+  logoUsage?: string;
+  wordsToUse?: string;
+  wordsToAvoid?: string;
+  hashtags?: string;
+  promptGuardrails?: string;
+  isActive?: boolean;
+  assets?: ClientBrandAsset[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type ImageStudioFormat = 'feed' | 'story' | 'carousel';
+export type ImageStudioObjective = 'educate' | 'sell' | 'announce' | 'engage' | 'brand';
+export type ImageStudioTextMode = 'none' | 'short' | 'per-slide';
+
+export interface ImageStudioBrief {
+  format: ImageStudioFormat;
+  platform: PostingPlatform;
+  objective: ImageStudioObjective;
+  postType: 'single' | 'carousel';
+  topic: string;
+  audience: string;
+  offer?: string;
+  tone: string;
+  slideCount?: number;
+  imageCount: number;
+  cta: string;
+  inImageTextMode: ImageStudioTextMode;
+  notes?: string;
+  backgroundImageUrl?: string;
+  backgroundImageName?: string;
+}
+
+export interface ImageStudioSlidePlan {
+  slideNumber: number;
+  title: string;
+  body: string;
+  visualDirection: string;
+  imageUrl?: string;
+  path?: string;
+}
+
+export interface ImageStudioCreativePlan {
+  headline: string;
+  caption: string;
+  cta: string;
+  hashtags: string[];
+  slides: ImageStudioSlidePlan[];
 }
 
 export interface Post {

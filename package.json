@@ -62,6 +62,7 @@
     "build": "react-scripts build",
     "build:ci": "react-scripts build",
     "serve:build": "node scripts/serve-build-with-api.js",
+    "preview:gpt-image": "node scripts/preview-gpt-image.cjs",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
