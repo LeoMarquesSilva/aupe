@@ -129,6 +129,7 @@ const CreateBrandImage: React.FC = () => {
   const [brief, setBrief] = useState<ImageStudioBrief>(defaultBrief);
   const [quality, setQuality] = useState<string>('medium');
   const [generating, setGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0 });
   const [backgroundUploading, setBackgroundUploading] = useState(false);
   const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState('');
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
@@ -325,6 +326,8 @@ const CreateBrandImage: React.FC = () => {
     setGenerating(true);
     setResultUrls([]);
     setCreativePlan(null);
+    const totalImages = expectedImageCount;
+    setGenerationProgress({ current: 0, total: totalImages });
     try {
       await handleSaveKit();
       let backgroundImageUrl = brief.backgroundImageUrl;
@@ -339,11 +342,16 @@ const CreateBrandImage: React.FC = () => {
         backgroundImageUrl,
         backgroundImageName: brief.backgroundImageName || backgroundFile?.name,
         imageCount: brief.format === 'carousel' ? Math.max(2, brief.slideCount || 5) : Math.min(4, Math.max(1, brief.imageCount || 1)),
+        postType: brief.format === 'carousel' ? 'carousel' : brief.postType,
       };
+
       const res = await generateBrandImages({
         clientId: selectedClientId,
         brief: normalizedBrief,
         quality,
+        onProgress: (current, total) => {
+          setGenerationProgress({ current, total });
+        },
       });
       setResultUrls(res.images.map((i) => i.publicUrl));
       setCreativePlan(res.creativePlan || null);
@@ -358,6 +366,7 @@ const CreateBrandImage: React.FC = () => {
     } finally {
       setBackgroundUploading(false);
       setGenerating(false);
+      setGenerationProgress({ current: 0, total: 0 });
     }
   };
 
@@ -774,7 +783,9 @@ const CreateBrandImage: React.FC = () => {
                     {generating && (
                       <>
                         <Alert severity="info">
-                          A IA está montando {expectedImageCount > 1 ? `${expectedImageCount} imagens` : 'a imagem'} com o Brand Kit. Pode levar alguns minutos.
+                          {generationProgress.total > 1
+                            ? `Gerando imagem ${generationProgress.current} de ${generationProgress.total}… Cada uma pode levar até ~2 minutos.`
+                            : 'A IA está montando a imagem com o Brand Kit. Pode levar até ~2 minutos.'}
                         </Alert>
                         <Grid container spacing={2}>
                           {Array.from({ length: expectedImageCount }).map((_, index) => (

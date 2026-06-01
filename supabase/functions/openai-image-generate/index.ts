@@ -455,6 +455,7 @@ async function openAiGenerationsOnce(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(120_000),
   });
   const json = (await res.json().catch(() => ({}))) as {
     data?: OpenAiImageItem[];
@@ -584,6 +585,10 @@ serve(async (req) => {
       format?: 'feed' | 'story' | 'carousel';
       quality?: string;
       n?: number;
+      /** Carrossel: gera só este slide (0-based). Obrigatório para evitar timeout da Edge (150s). */
+      slideIndex?: number;
+      /** Índice da variação em posts com múltiplas imagens (0-based). */
+      imageIndex?: number;
     } | null;
 
     const brief = body?.brief || null;
@@ -601,7 +606,7 @@ serve(async (req) => {
     const apiSize = apiSizeFor(imageModel, format);
     const qRaw = body.quality || 'medium';
     const uiQuality = normalizeUiQuality(qRaw);
-    const nRequested = Math.min(4, Math.max(1, Number(body.n || brief?.imageCount) || 1));
+    const nRequested = 1;
 
     const { data: client, error: clientErr } = await supabaseAdmin
       .from('clients')
@@ -671,19 +676,38 @@ serve(async (req) => {
 
     const isCarousel = normalizedBrief.format === 'carousel' || normalizedBrief.postType === 'carousel';
     let items: OpenAiImageItem[] = [];
+    let targetSlideIndex = 0;
 
     if (isCarousel) {
-      for (const slide of creativePlan.slides) {
-        const slidePrompt = buildComposedPrompt(row, format, `${userPrompt}\n\nCreate this specific carousel slide: ${slide.title}. ${slide.body}. ${slide.visualDirection}`, {
+      if (typeof body.slideIndex !== 'number' || !Number.isInteger(body.slideIndex)) {
+        return json(
+          {
+            error:
+              'Carrossel exige slideIndex (0-based) em cada requisição. Gere um slide por vez no cliente para evitar timeout.',
+          },
+          400,
+          cors,
+        );
+      }
+      targetSlideIndex = body.slideIndex;
+      if (targetSlideIndex < 0 || targetSlideIndex >= creativePlan.slides.length) {
+        return json({ error: `slideIndex inválido (0-${creativePlan.slides.length - 1})` }, 400, cors);
+      }
+      const slide = creativePlan.slides[targetSlideIndex];
+      const slidePrompt = buildComposedPrompt(
+        row,
+        format,
+        `${userPrompt}\n\nCreate this specific carousel slide: ${slide.title}. ${slide.body}. ${slide.visualDirection}`,
+        {
           reserveCornerForLogoOverlay: !!logoBytes,
           brief: normalizedBrief,
           brandKit: kit,
           assets,
           slide,
-        });
-        const { items: slideItems } = await openAiGenerationsOnce(apiKey, imageModel, slidePrompt, apiSize, uiQuality, 1);
-        items.push(slideItems[0]);
-      }
+        },
+      );
+      const { items: slideItems } = await openAiGenerationsOnce(apiKey, imageModel, slidePrompt, apiSize, uiQuality, 1);
+      items = slideItems;
     } else {
       const generated = await generateImagesBatched(apiKey, imageModel, prompt, apiSize, uiQuality, nRequested);
       items = generated.items;
@@ -717,7 +741,12 @@ serve(async (req) => {
           );
         }
       }
-      const filePath = `${organizationId}/${userId}/ai-gen/${Date.now()}-${i}.png`;
+      const suffix = isCarousel
+        ? `slide-${targetSlideIndex}`
+        : typeof body.imageIndex === 'number'
+          ? `var-${body.imageIndex}`
+          : `${i}`;
+      const filePath = `${organizationId}/${userId}/ai-gen/${Date.now()}-${suffix}.png`;
       const { error: upErr } = await supabaseAdmin.storage.from('post-images').upload(filePath, binary, {
         contentType: 'image/png',
         upsert: false,
@@ -732,7 +761,13 @@ serve(async (req) => {
       }
       const { data: pub } = supabaseAdmin.storage.from('post-images').getPublicUrl(filePath);
       images.push({ publicUrl: pub.publicUrl, path: filePath });
-      if (creativePlan.slides[i]) {
+      if (isCarousel && creativePlan.slides[targetSlideIndex]) {
+        creativePlan.slides[targetSlideIndex] = {
+          ...creativePlan.slides[targetSlideIndex],
+          imageUrl: pub.publicUrl,
+          path: filePath,
+        };
+      } else if (creativePlan.slides[i]) {
         creativePlan.slides[i] = {
           ...creativePlan.slides[i],
           imageUrl: pub.publicUrl,
@@ -755,6 +790,19 @@ serve(async (req) => {
     );
   } catch (e) {
     console.error('openai-image-generate:', e);
+    const isTimeout =
+      e instanceof DOMException && e.name === 'TimeoutError' ||
+      (e instanceof Error && /timeout|aborted/i.test(e.message));
+    if (isTimeout) {
+      return json(
+        {
+          error:
+            'A geração demorou demais (limite ~2 min por imagem). Tente qualidade "low", menos slides ou defina GPT_IMAGES_MODEL=dall-e-3 nos secrets da Edge Function.',
+        },
+        504,
+        cors,
+      );
+    }
     return json(
       { error: e instanceof Error ? e.message : 'Erro interno' },
       500,
