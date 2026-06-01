@@ -59,3 +59,6 @@ verify_jwt = false
 
 [functions.openai-image-generate]
 verify_jwt = true
+
+[functions.openai-image-studio-assist]
+verify_jwt = true

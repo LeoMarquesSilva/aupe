@@ -56,6 +56,7 @@ async function generateBrandImagesOnce(params: {
   quality?: string;
   slideIndex?: number;
   imageIndex?: number;
+  revisionNotes?: string;
 }): Promise<GenerateBrandImagesResult> {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData?.session?.access_token;
@@ -79,6 +80,9 @@ async function generateBrandImagesOnce(params: {
   }
   if (typeof params.imageIndex === 'number') {
     body.imageIndex = params.imageIndex;
+  }
+  if (params.revisionNotes?.trim()) {
+    body.revisionNotes = params.revisionNotes.trim();
   }
 
   const res = await fetch(fnUrl(), {
@@ -148,14 +152,29 @@ export async function generateBrandImages(params: {
   slideIndex?: number;
   imageIndex?: number;
   onProgress?: (current: number, total: number) => void;
+  revisionNotes?: string;
+  /** Carrossel: regerar apenas este slide (0-based). */
+  onlySlideIndex?: number;
 }): Promise<GenerateBrandImagesResult> {
   const explicitSingle =
     typeof params.slideIndex === 'number' || typeof params.imageIndex === 'number';
   const carousel = isCarouselBrief(params.brief);
-  const total = expectedImageTotal(params.brief, params.n);
+  let total = expectedImageTotal(params.brief, params.n);
+
+  if (carousel && typeof params.onlySlideIndex === 'number') {
+    total = 1;
+  }
 
   if (explicitSingle || total <= 1) {
-    const res = await generateBrandImagesOnce(params);
+    const slideIndex =
+      typeof params.onlySlideIndex === 'number'
+        ? params.onlySlideIndex
+        : params.slideIndex;
+    const res = await generateBrandImagesOnce({
+      ...params,
+      slideIndex: carousel ? slideIndex : params.slideIndex,
+      imageIndex: carousel ? undefined : params.imageIndex,
+    });
     return res;
   }
 

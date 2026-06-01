@@ -11,6 +11,7 @@ import {
   CircularProgress,
   Container,
   Dialog,
+  DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
@@ -40,12 +41,14 @@ import {
   Palette as PaletteIcon,
   RateReview as BriefIcon,
   Save as SaveIcon,
+  Tune as TuneIcon,
   ViewCarousel as CarouselIcon,
 } from '@mui/icons-material';
 import { Client, ClientBrandAsset, ClientBrandAssetType, ClientBrandKit, ImageStudioBrief, ImageStudioCreativePlan } from '../types';
 import { clientService } from '../services/supabaseClient';
 import { clientBrandAssetService } from '../services/clientBrandAssetService';
 import { generateBrandImages } from '../services/openAiImageService';
+import { suggestBrandKit, suggestImageStudioBrief } from '../services/openAiStudioAssistService';
 import ClientManager from '../components/ClientManager';
 import AppSnackbar from '../components/AppSnackbar';
 import { GLASS } from '../theme/glassTokens';
@@ -54,6 +57,7 @@ import {
   aspectRatioSx,
   CAROUSEL_SLIDE_COUNTS,
   DEFAULT_CAROUSEL_SLIDES,
+  IMAGE_REVISION_PRESETS,
   IMAGE_STUDIO_OBJECTIVES,
   IMAGE_STUDIO_OUTPUT,
 } from '../config/imageStudio';
@@ -192,6 +196,13 @@ const CreateBrandImage: React.FC = () => {
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
   const [resultUrls, setResultUrls] = useState<string[]>([]);
   const [creativePlan, setCreativePlan] = useState<ImageStudioCreativePlan | null>(null);
+
+  const [assistLoading, setAssistLoading] = useState<'brief' | 'brandKit' | null>(null);
+  const [brandKitSeedText, setBrandKitSeedText] = useState('');
+  const [revisionDialogOpen, setRevisionDialogOpen] = useState(false);
+  const [revisionPresetIds, setRevisionPresetIds] = useState<string[]>([]);
+  const [revisionCustomNote, setRevisionCustomNote] = useState('');
+  const [revisionSlideTarget, setRevisionSlideTarget] = useState<'all' | number>('all');
 
   const [notification, setNotification] = useState<{
     open: boolean;
@@ -381,19 +392,114 @@ const CreateBrandImage: React.FC = () => {
     });
   };
 
-  const handleGenerate = async () => {
-    if (!selectedClientId || !canGenerate) {
+  const buildRevisionNotes = (presetIds: string[], customNote: string): string => {
+    const parts = IMAGE_REVISION_PRESETS
+      .filter((preset) => presetIds.includes(preset.id))
+      .map((preset) => preset.instruction);
+    if (customNote.trim()) {
+      parts.push(customNote.trim());
+    }
+    return parts.join('\n\n');
+  };
+
+  const briefPatchFromRevisionPresets = (presetIds: string[]): Partial<ImageStudioBrief> => {
+    const patch: Partial<ImageStudioBrief> = {};
+    for (const id of presetIds) {
+      const preset = IMAGE_REVISION_PRESETS.find((item) => item.id === id);
+      if (!preset?.briefPatch) continue;
+      if (preset.briefPatch.inImageTextMode) {
+        patch.inImageTextMode = preset.briefPatch.inImageTextMode;
+      }
+      if (preset.briefPatch.notes) {
+        patch.notes = [brief.notes, preset.briefPatch.notes].filter(Boolean).join('; ');
+      }
+    }
+    return patch;
+  };
+
+  const toggleRevisionPreset = (id: string) => {
+    setRevisionPresetIds((prev) => (
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    ));
+  };
+
+  const openRevisionDialog = (slideIndex?: number) => {
+    setRevisionPresetIds(['less_clutter']);
+    setRevisionCustomNote('');
+    setRevisionSlideTarget(typeof slideIndex === 'number' ? slideIndex : 'all');
+    setRevisionDialogOpen(true);
+  };
+
+  const handleSuggestBrief = async () => {
+    if (!selectedClientId) {
+      showNotification('Selecione um cliente primeiro', 'warning');
+      return;
+    }
+    setAssistLoading('brief');
+    try {
+      const suggestions = await suggestImageStudioBrief({
+        clientId: selectedClientId,
+        brief,
+        brandKit,
+      });
+      patchBrief(suggestions);
+      showNotification('Briefing sugerido pela IA — revise os campos antes de gerar', 'success');
+    } catch (e) {
+      showNotification(e instanceof Error ? e.message : 'Falha ao sugerir briefing', 'error');
+    } finally {
+      setAssistLoading(null);
+    }
+  };
+
+  const handleSuggestBrandKit = async () => {
+    if (!selectedClientId || !brandKit) {
+      showNotification('Selecione um cliente primeiro', 'warning');
+      return;
+    }
+    setAssistLoading('brandKit');
+    try {
+      const suggestions = await suggestBrandKit({
+        clientId: selectedClientId,
+        brandKit,
+        seedText: brandKitSeedText || undefined,
+      });
+      patchKit(suggestions);
+      showNotification('Brand Kit sugerido pela IA — confira cores e textos antes de salvar', 'success');
+    } catch (e) {
+      showNotification(e instanceof Error ? e.message : 'Falha ao sugerir Brand Kit', 'error');
+    } finally {
+      setAssistLoading(null);
+    }
+  };
+
+  const handleGenerate = async (opts?: {
+    revisionNotes?: string;
+    onlySlideIndex?: number;
+    briefOverride?: Partial<ImageStudioBrief>;
+  }) => {
+    const workingBrief = { ...brief, ...opts?.briefOverride };
+    const topicOk = workingBrief.topic.trim().length > 0;
+    const audienceOk = workingBrief.audience.trim().length > 0;
+    const ctaOk = workingBrief.cta.trim().length > 0;
+
+    if (!selectedClientId || !identityReady || !topicOk || !audienceOk || !ctaOk) {
       showNotification('Complete o Brand Kit e o briefing antes de gerar', 'warning');
       return;
     }
+
+    const isPartialCarousel =
+      workingBrief.format === 'carousel' && typeof opts?.onlySlideIndex === 'number';
+
     setGenerating(true);
-    setResultUrls([]);
-    setCreativePlan(null);
-    const totalImages = expectedImageCount;
+    if (!isPartialCarousel) {
+      setResultUrls([]);
+      setCreativePlan(null);
+    }
+    const totalImages = isPartialCarousel ? 1 : expectedImageCount;
     setGenerationProgress({ current: 0, total: totalImages });
     try {
       await handleSaveKit();
-      let backgroundImageUrl = brief.backgroundImageUrl;
+      let backgroundImageUrl = workingBrief.backgroundImageUrl;
       if (backgroundFile) {
         setBackgroundUploading(true);
         const uploaded = await clientBrandAssetService.uploadBriefBackgroundImage(backgroundFile, selectedClientId);
@@ -401,27 +507,58 @@ const CreateBrandImage: React.FC = () => {
         patchBrief({ backgroundImageUrl, backgroundImageName: backgroundFile.name });
       }
       const normalizedBrief: ImageStudioBrief = {
-        ...brief,
+        ...workingBrief,
         backgroundImageUrl,
-        backgroundImageName: brief.backgroundImageName || backgroundFile?.name,
-        imageCount: brief.format === 'carousel' ? Math.max(2, brief.slideCount || 5) : Math.min(4, Math.max(1, brief.imageCount || 1)),
-        postType: brief.format === 'carousel' ? 'carousel' : brief.postType,
+        backgroundImageName: workingBrief.backgroundImageName || backgroundFile?.name,
+        imageCount: workingBrief.format === 'carousel'
+          ? Math.max(2, workingBrief.slideCount || 5)
+          : Math.min(4, Math.max(1, workingBrief.imageCount || 1)),
+        postType: workingBrief.format === 'carousel' ? 'carousel' : workingBrief.postType,
       };
 
       const res = await generateBrandImages({
         clientId: selectedClientId,
         brief: normalizedBrief,
         quality,
+        revisionNotes: opts?.revisionNotes,
+        onlySlideIndex: opts?.onlySlideIndex,
         onProgress: (current, total) => {
           setGenerationProgress({ current, total });
         },
       });
-      setResultUrls(res.images.map((i) => i.publicUrl));
-      setCreativePlan(res.creativePlan || null);
+
+      if (isPartialCarousel && typeof opts?.onlySlideIndex === 'number') {
+        const slideIndex = opts.onlySlideIndex;
+        const newUrl = res.images[0]?.publicUrl;
+        if (newUrl) {
+          setResultUrls((prev) => {
+            const next = [...prev];
+            next[slideIndex] = newUrl;
+            return next;
+          });
+          setCreativePlan((prev) => {
+            if (!prev?.slides.length) return prev;
+            const slides = prev.slides.map((slide, index) => (
+              index === slideIndex ? { ...slide, imageUrl: newUrl } : slide
+            ));
+            return { ...prev, slides };
+          });
+        }
+      } else {
+        setResultUrls(res.images.map((i) => i.publicUrl));
+        setCreativePlan(res.creativePlan || null);
+      }
+
+      if (opts?.briefOverride && Object.keys(opts.briefOverride).length > 0) {
+        patchBrief(opts.briefOverride);
+      }
+
       showNotification(
-        res.mode === 'composite'
-          ? 'Post gerado com Brand Kit e logo aplicada sem redesenhar'
-          : 'Post gerado com Brand Kit',
+        opts?.revisionNotes
+          ? 'Imagem ajustada com as correções solicitadas'
+          : res.mode === 'composite'
+            ? 'Post gerado com Brand Kit e logo aplicada sem redesenhar'
+            : 'Post gerado com Brand Kit',
         'success',
       );
     } catch (e) {
@@ -431,6 +568,26 @@ const CreateBrandImage: React.FC = () => {
       setGenerating(false);
       setGenerationProgress({ current: 0, total: 0 });
     }
+  };
+
+  const handleApplyRevision = async () => {
+    const revisionNotes = buildRevisionNotes(revisionPresetIds, revisionCustomNote);
+    if (!revisionNotes.trim()) {
+      showNotification('Escolha pelo menos um ajuste ou descreva o que mudar', 'warning');
+      return;
+    }
+    const briefOverride = briefPatchFromRevisionPresets(revisionPresetIds);
+    setRevisionDialogOpen(false);
+
+    if (revisionSlideTarget === 'all') {
+      await handleGenerate({ revisionNotes, briefOverride });
+      return;
+    }
+    await handleGenerate({
+      revisionNotes,
+      briefOverride,
+      onlySlideIndex: revisionSlideTarget,
+    });
   };
 
   useEffect(() => () => {
@@ -606,15 +763,27 @@ const CreateBrandImage: React.FC = () => {
                         </Typography>
                       </Box>
                     </Stack>
-                    <Chip
-                      label={
-                        brief.format === 'carousel'
-                          ? `${brief.slideCount || DEFAULT_CAROUSEL_SLIDES} slides · ${IMAGE_STUDIO_OUTPUT.feed.ratioLabel}`
-                          : `${brief.imageCount || 1} imagem(ns) · ${outputSpec.ratioLabel}`
-                      }
-                      icon={brief.format === 'carousel' ? <CarouselIcon /> : <ImageIcon />}
-                      sx={{ fontWeight: 800 }}
-                    />
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                      <Chip
+                        label={
+                          brief.format === 'carousel'
+                            ? `${brief.slideCount || DEFAULT_CAROUSEL_SLIDES} slides · ${IMAGE_STUDIO_OUTPUT.feed.ratioLabel}`
+                            : `${brief.imageCount || 1} imagem(ns) · ${outputSpec.ratioLabel}`
+                        }
+                        icon={brief.format === 'carousel' ? <CarouselIcon /> : <ImageIcon />}
+                        sx={{ fontWeight: 800 }}
+                      />
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={assistLoading === 'brief' ? <CircularProgress size={14} /> : <AutoAwesomeIcon />}
+                        disabled={!selectedClientId || assistLoading !== null || generating}
+                        onClick={handleSuggestBrief}
+                        sx={{ textTransform: 'none', fontWeight: 700 }}
+                      >
+                        Preencher com IA
+                      </Button>
+                    </Stack>
                   </Stack>
 
                   {!identityReady && (
@@ -853,7 +1022,7 @@ const CreateBrandImage: React.FC = () => {
                       variant="contained"
                       size="large"
                       startIcon={generating ? <CircularProgress size={18} color="inherit" /> : <AutoAwesomeIcon />}
-                      onClick={handleGenerate}
+                      onClick={() => handleGenerate()}
                       disabled={generating || backgroundUploading || !canGenerate}
                       sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, textTransform: 'none', fontWeight: 800 }}
                     >
@@ -877,15 +1046,26 @@ const CreateBrandImage: React.FC = () => {
                         <Typography variant="body2" color="text.secondary">Plano criativo, imagens e caminhos para postar.</Typography>
                       </Box>
                       {!!resultUrls.length && (
-                        <Button
-                          startIcon={<DownloadIcon />}
-                          href={resultUrls[0]}
-                          target="_blank"
-                          rel="noreferrer"
-                          sx={{ textTransform: 'none' }}
-                        >
-                          Abrir primeira imagem
-                        </Button>
+                        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                          <Button
+                            startIcon={<DownloadIcon />}
+                            href={resultUrls[0]}
+                            target="_blank"
+                            rel="noreferrer"
+                            sx={{ textTransform: 'none' }}
+                          >
+                            Abrir primeira imagem
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            startIcon={<TuneIcon />}
+                            disabled={generating}
+                            onClick={() => openRevisionDialog()}
+                            sx={{ textTransform: 'none', fontWeight: 700 }}
+                          >
+                            Ajustar resultado
+                          </Button>
+                        </Stack>
                       )}
                     </Stack>
 
@@ -1009,7 +1189,7 @@ const CreateBrandImage: React.FC = () => {
                                 <Typography variant="subtitle2" fontWeight={800}>{slide.title}</Typography>
                                 <Typography variant="body2" color="text.secondary">{slide.body}</Typography>
                               </Stack>
-                              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                              <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap" useFlexGap>
                                 {slide.imageUrl && (
                                   <>
                                     <Button size="small" href={slide.imageUrl} download target="_blank" rel="noreferrer">Baixar</Button>
@@ -1019,6 +1199,16 @@ const CreateBrandImage: React.FC = () => {
                                       onClick={() => navigate(`/create-post?clientId=${encodeURIComponent(selectedClientId)}&imageUrl=${encodeURIComponent(slide.imageUrl || '')}`)}
                                     >
                                       Usar no post
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      variant="text"
+                                      startIcon={<TuneIcon fontSize="small" />}
+                                      disabled={generating}
+                                      onClick={() => openRevisionDialog(index)}
+                                      sx={{ textTransform: 'none' }}
+                                    >
+                                      Ajustar slide
                                     </Button>
                                   </>
                                 )}
@@ -1035,7 +1225,7 @@ const CreateBrandImage: React.FC = () => {
                           <Grid item xs={12} md={6} key={`${url}-${index}`}>
                             <Paper elevation={0} sx={{ p: 1.5, borderRadius: GLASS.radius.inner, border: `1px solid ${GLASS.border.subtle}`, bgcolor: '#fff' }}>
                               <Box component="img" src={url} alt={`Imagem gerada ${index + 1}`} sx={{ width: '100%', ...aspectRatioSx(brief.format), objectFit: 'contain', borderRadius: 2, bgcolor: '#f6f6f6' }} />
-                              <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                              <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap" useFlexGap>
                                 <Button size="small" href={url} download target="_blank" rel="noreferrer">Baixar</Button>
                                 <Button
                                   size="small"
@@ -1043,6 +1233,16 @@ const CreateBrandImage: React.FC = () => {
                                   onClick={() => navigate(`/create-post?clientId=${encodeURIComponent(selectedClientId)}&imageUrl=${encodeURIComponent(url)}`)}
                                 >
                                   Usar no post
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant="text"
+                                  startIcon={<TuneIcon fontSize="small" />}
+                                  disabled={generating}
+                                  onClick={() => openRevisionDialog(index)}
+                                  sx={{ textTransform: 'none' }}
+                                >
+                                  Ajustar
                                 </Button>
                               </Stack>
                             </Paper>
@@ -1100,6 +1300,46 @@ const CreateBrandImage: React.FC = () => {
                   ? 'Este Brand Kit já está salvo. Ajuste apenas quando a identidade do cliente mudar.'
                   : 'Primeiro cadastro: preencha o essencial da marca e salve para liberar gerações consistentes.'}
               </Alert>
+
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1.5,
+                  borderRadius: GLASS.radius.inner,
+                  border: `1px dashed ${alpha(GLASS.accent.orange, 0.34)}`,
+                  bgcolor: alpha(GLASS.accent.orange, 0.035),
+                }}
+              >
+                <Stack spacing={1.25}>
+                  <Typography variant="subtitle2" fontWeight={850}>
+                    Completar Brand Kit com IA
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Cole site, bio do Instagram ou um texto sobre a marca. A IA sugere público, tom, cores e direção visual.
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    multiline
+                    minRows={2}
+                    size="small"
+                    value={brandKitSeedText}
+                    onChange={(e) => setBrandKitSeedText(e.target.value)}
+                    placeholder="Ex.: clínica odontológica premium em SP, foco em implantes, público 35-55 anos..."
+                  />
+                  <Box>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={assistLoading === 'brandKit' ? <CircularProgress size={14} /> : <AutoAwesomeIcon />}
+                      disabled={assistLoading !== null}
+                      onClick={handleSuggestBrandKit}
+                      sx={{ textTransform: 'none', fontWeight: 700 }}
+                    >
+                      Sugerir campos com IA
+                    </Button>
+                  </Box>
+                </Stack>
+              </Paper>
 
               <Grid container spacing={1.5}>
                 <Grid item xs={12}>
@@ -1265,6 +1505,101 @@ const CreateBrandImage: React.FC = () => {
             </Stack>
           )}
         </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={revisionDialogOpen}
+        onClose={() => !generating && setRevisionDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Stack direction="row" spacing={1.25} alignItems="center">
+            <TuneIcon sx={{ color: GLASS.accent.orange }} />
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 850 }}>Ajustar e regerar</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Mantém o Brand Kit e o briefing, mas prioriza correções visuais no próximo render.
+              </Typography>
+            </Box>
+          </Stack>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <Alert severity="info">
+              Use quando a arte saiu com <strong>muita informação</strong>, texto demais ou visual poluído.
+              Você pode combinar vários ajustes abaixo.
+            </Alert>
+
+            <Box>
+              <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1 }}>
+                Ajustes rápidos
+              </Typography>
+              <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                {IMAGE_REVISION_PRESETS.map((preset) => {
+                  const selected = revisionPresetIds.includes(preset.id);
+                  return (
+                    <Tooltip key={preset.id} title={preset.description}>
+                      <Chip
+                        label={preset.label}
+                        clickable
+                        color={selected ? 'primary' : 'default'}
+                        variant={selected ? 'filled' : 'outlined'}
+                        onClick={() => toggleRevisionPreset(preset.id)}
+                        sx={{ fontWeight: 700 }}
+                      />
+                    </Tooltip>
+                  );
+                })}
+              </Stack>
+            </Box>
+
+            <TextField
+              fullWidth
+              multiline
+              minRows={3}
+              label="Instrução extra (opcional)"
+              value={revisionCustomNote}
+              onChange={(e) => setRevisionCustomNote(e.target.value)}
+              placeholder="Ex.: tirar os 3 bullet points do meio; deixar só título e produto..."
+            />
+
+            {brief.format === 'carousel' && resultUrls.length > 1 && (
+              <FormControl fullWidth size="small">
+                <InputLabel>O que regerar</InputLabel>
+                <Select
+                  label="O que regerar"
+                  value={revisionSlideTarget === 'all' ? 'all' : String(revisionSlideTarget)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setRevisionSlideTarget(v === 'all' ? 'all' : Number(v));
+                  }}
+                >
+                  <MenuItem value="all">Todo o carrossel ({resultUrls.length} slides)</MenuItem>
+                  {resultUrls.map((_, index) => (
+                    <MenuItem key={`rev-slide-${index}`} value={String(index)}>
+                      Apenas slide {index + 1}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setRevisionDialogOpen(false)} disabled={generating} sx={{ textTransform: 'none' }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={generating ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeIcon />}
+            disabled={generating}
+            onClick={handleApplyRevision}
+            sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, textTransform: 'none', fontWeight: 800 }}
+          >
+            {generating ? 'Regenerando...' : 'Ajustar e regerar'}
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <AppSnackbar

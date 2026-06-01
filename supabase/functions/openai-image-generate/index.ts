@@ -235,6 +235,7 @@ function buildComposedPrompt(
     brandKit?: BrandKitRow | null;
     assets?: BrandAssetRow[];
     slide?: CreativeSlide;
+    revisionNotes?: string;
   },
 ): string {
   const kit = opts?.brandKit;
@@ -342,6 +343,15 @@ function buildComposedPrompt(
         '- Respect brand identity; do not parody or distort official marks.',
       ].join('\n');
 
+  const revisionBlock = opts?.revisionNotes?.trim()
+    ? [
+        '',
+        'Revision feedback from the marketer (apply on this generation — highest priority):',
+        opts.revisionNotes.trim(),
+        'Treat this as a correction to the previous attempt: change composition accordingly while keeping brand facts intact.',
+      ].join('\n')
+    : '';
+
   return [
     'Goal:',
     'Create one polished, brand-safe social image for Instagram (organic or paid). Production quality suitable for a real client deliverable.',
@@ -373,6 +383,7 @@ function buildComposedPrompt(
     formatComposition,
     '- Quality cue: photorealistic or premium photography when the scene calls for realism; otherwise follow the marketer’s stated style (illustration, flat, 3D, etc.).',
     logoInvariant,
+    revisionBlock,
     constraintFooter,
   ].join('\n');
 }
@@ -616,6 +627,8 @@ serve(async (req) => {
       slideIndex?: number;
       /** Índice da variação em posts com múltiplas imagens (0-based). */
       imageIndex?: number;
+      /** Correção pós-geração: instruções prioritárias para ajustar o resultado anterior. */
+      revisionNotes?: string;
     } | null;
 
     const brief = body?.brief || null;
@@ -634,6 +647,8 @@ serve(async (req) => {
     const qRaw = body.quality || 'medium';
     const uiQuality = normalizeUiQuality(qRaw);
     const nRequested = 1;
+
+    const revisionNotes = typeof body.revisionNotes === 'string' ? body.revisionNotes.trim() : '';
 
     const { data: client, error: clientErr } = await supabaseAdmin
       .from('clients')
@@ -699,6 +714,7 @@ serve(async (req) => {
       brief: normalizedBrief,
       brandKit: kit,
       assets,
+      revisionNotes,
     });
 
     const isCarousel = normalizedBrief.format === 'carousel' || normalizedBrief.postType === 'carousel';
@@ -731,6 +747,7 @@ serve(async (req) => {
           brandKit: kit,
           assets,
           slide,
+          revisionNotes,
         },
       );
       const { items: slideItems } = await openAiGenerationsOnce(apiKey, imageModel, slidePrompt, apiSize, uiQuality, 1);
