@@ -12,8 +12,20 @@ const OPENAI_URL = 'https://api.openai.com/v1';
 /** Requer org OpenAI verificada; use dall-e-3 via GPT_IMAGES_MODEL se não tiver acesso. */
 const DEFAULT_IMAGE_MODEL = 'gpt-image-2';
 
+/** Entrega final Instagram (redimensionada após geração). */
+const OUTPUT_FEED = { width: 1080, height: 1350 };
+const OUTPUT_STORY = { width: 1080, height: 1920 };
+
+/** gpt-image-2: WIDTHxHEIGHT com múltiplos de 16 (1080→1088, 1350→1360, 1920 ok). */
+const API_SIZE_GPT_FEED = '1088x1360';
+const API_SIZE_GPT_STORY = '1088x1920';
+
 function resolveImageModel(): string {
   return (Deno.env.get('GPT_IMAGES_MODEL') || DEFAULT_IMAGE_MODEL).trim();
+}
+
+function outputDimensions(format: 'feed' | 'story'): { width: number; height: number } {
+  return format === 'story' ? OUTPUT_STORY : OUTPUT_FEED;
 }
 
 function apiSizeFor(model: string, format: 'feed' | 'story'): string {
@@ -23,7 +35,7 @@ function apiSizeFor(model: string, format: 'feed' | 'story'): string {
   if (model === 'dall-e-2') {
     return '1024x1024';
   }
-  return format === 'story' ? '1024x1536' : '1024x1024';
+  return format === 'story' ? API_SIZE_GPT_STORY : API_SIZE_GPT_FEED;
 }
 
 function normalizeUiQuality(raw: string): string {
@@ -284,15 +296,24 @@ function buildComposedPrompt(
       ].join('\n')
     : '';
 
+  const textModeHint =
+    brief?.inImageTextMode === 'none'
+      ? 'Do not render readable text in the image unless the marketer quoted exact copy in the creative direction.'
+      : brief?.inImageTextMode === 'per-slide'
+        ? 'Render short, legible headline text per slide when the slide brief includes a title; keep typography on-brand.'
+        : 'You may include one short headline or CTA line if it improves clarity; keep text minimal and legible.';
+
   const formatComposition =
     format === 'story'
       ? [
-          'Canvas: vertical 9:16 social story; leave comfortable safe margins for on-screen UI and thumb stickers.',
+          'Canvas: vertical 9:16 Instagram Story (1080×1920 px). Leave safe margins for stickers and UI overlays.',
           'Framing: clear focal subject; intentional negative space where appropriate.',
+          textModeHint,
         ].join('\n')
       : [
-          'Canvas: square 1:1 Instagram feed post.',
-          'Framing: balanced composition; premium campaign or editorial social layout.',
+          'Canvas: vertical 4:5 Instagram feed portrait (1080×1350 px). This is NOT square — compose tall, mobile-first, with strong top-to-bottom hierarchy.',
+          'Framing: premium campaign layout; subject and text zones balanced for thumb-stopping scroll.',
+          textModeHint,
         ].join('\n');
 
   const logoInvariant = opts?.reserveCornerForLogoOverlay
@@ -394,6 +415,12 @@ async function bytesFromImageItem(item: OpenAiImageItem): Promise<Uint8Array> {
 /**
  * Sobrepõe a logo decodificada sem passar pela OpenAI — arte da logo preservada (só escala uniforme + posição).
  */
+async function resizePngToExact(png: Uint8Array, width: number, height: number): Promise<Uint8Array> {
+  const img = await Image.decode(png);
+  img.resize(width, height);
+  return new Uint8Array(await img.encode(2));
+}
+
 async function compositeLogoOntoPng(basePng: Uint8Array, logoImage: Image): Promise<Uint8Array> {
   const base = await Image.decode(basePng);
   const bw = base.width;
@@ -723,9 +750,15 @@ serve(async (req) => {
     }
     const usedComposite = !!logoDecoded;
 
+    const outDims = outputDimensions(format);
     const images: Array<{ publicUrl: string; path: string }> = [];
     for (let i = 0; i < items.length; i++) {
       let binary = await bytesFromImageItem(items[i]);
+      try {
+        binary = await resizePngToExact(binary, outDims.width, outDims.height);
+      } catch (e) {
+        console.warn('openai-image-generate: resize para output falhou', e);
+      }
       if (logoDecoded) {
         try {
           binary = await compositeLogoOntoPng(binary, logoDecoded);
@@ -783,6 +816,7 @@ serve(async (req) => {
         mode: usedComposite ? 'composite' : 'generate',
         model: imageModel,
         size: apiSize,
+        outputSize: `${outDims.width}x${outDims.height}`,
         quality: uiQuality,
       },
       200,

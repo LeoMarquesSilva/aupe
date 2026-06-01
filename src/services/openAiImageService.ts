@@ -14,6 +14,7 @@ export type GenerateBrandImagesResult = {
   /** Modelo usado na Edge (ex.: gpt-image-2, dall-e-3). */
   model?: string;
   size: string;
+  outputSize?: string;
   quality: string;
 };
 
@@ -98,6 +99,7 @@ async function generateBrandImagesOnce(params: {
     mode?: string;
     model?: string;
     size?: string;
+    outputSize?: string;
     quality?: string;
   };
   try {
@@ -131,6 +133,7 @@ async function generateBrandImagesOnce(params: {
     mode: modeRaw,
     model: payload.model,
     size: payload.size || '',
+    outputSize: payload.outputSize,
     quality: payload.quality || '',
   };
 }
@@ -152,15 +155,17 @@ export async function generateBrandImages(params: {
   const total = expectedImageTotal(params.brief, params.n);
 
   if (explicitSingle || total <= 1) {
-    return generateBrandImagesOnce(params);
+    const res = await generateBrandImagesOnce(params);
+    return res;
   }
 
   const collectedImages: GenerateBrandImagesResult['images'] = [];
   let mergedPlan: ImageStudioCreativePlan | null = null;
   let lastMode: 'generate' | 'composite' = 'generate';
   let lastModel: string | undefined;
-  let lastSize = '';
-  let lastQuality = '';
+    let lastSize = '';
+    let lastOutputSize: string | undefined;
+    let lastQuality = '';
 
   for (let index = 0; index < total; index += 1) {
     params.onProgress?.(index + 1, total);
@@ -172,6 +177,7 @@ export async function generateBrandImages(params: {
     lastMode = res.mode;
     lastModel = res.model;
     lastSize = res.size;
+    lastOutputSize = res.outputSize;
     lastQuality = res.quality;
     collectedImages.push(...res.images);
     mergedPlan = mergeCreativePlans(mergedPlan, res.creativePlan);
@@ -183,6 +189,7 @@ export async function generateBrandImages(params: {
     mode: lastMode,
     model: lastModel,
     size: lastSize,
+    outputSize: lastOutputSize,
     quality: lastQuality,
   };
 }

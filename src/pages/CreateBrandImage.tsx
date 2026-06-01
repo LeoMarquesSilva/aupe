@@ -50,6 +50,13 @@ import ClientManager from '../components/ClientManager';
 import AppSnackbar from '../components/AppSnackbar';
 import { GLASS } from '../theme/glassTokens';
 import { appShellContainerSx } from '../theme/appShellLayout';
+import {
+  aspectRatioSx,
+  CAROUSEL_SLIDE_COUNTS,
+  DEFAULT_CAROUSEL_SLIDES,
+  IMAGE_STUDIO_OBJECTIVES,
+  IMAGE_STUDIO_OUTPUT,
+} from '../config/imageStudio';
 
 const assetLabels: Record<ClientBrandAssetType, string> = {
   logo: 'Logo principal',
@@ -70,12 +77,73 @@ const defaultBrief: ImageStudioBrief = {
   audience: '',
   offer: '',
   tone: 'Profissional, claro e comercial sem parecer genérico.',
-  slideCount: 5,
+  slideCount: DEFAULT_CAROUSEL_SLIDES,
   imageCount: 1,
-  cta: 'Fale com a gente',
+  cta: 'Saiba mais',
   inImageTextMode: 'short',
   notes: '',
 };
+
+function ColorField({
+  label,
+  value,
+  onChange,
+  placeholder = '#000000',
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  placeholder?: string;
+}) {
+  const pickerValue = /^#[0-9A-Fa-f]{6}$/.test(value || '') ? value : '#111111';
+  return (
+    <Stack direction="row" spacing={1} alignItems="flex-start">
+      <TextField
+        label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        fullWidth
+        placeholder={placeholder}
+        size="small"
+      />
+      <Box
+        component="input"
+        type="color"
+        value={pickerValue}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={`${label} (seletor)`}
+        sx={{
+          width: 44,
+          height: 40,
+          mt: 0.25,
+          p: 0.25,
+          border: `1px solid ${GLASS.border.subtle}`,
+          borderRadius: 1.5,
+          bgcolor: '#fff',
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      />
+    </Stack>
+  );
+}
+
+function kitFieldScore(kit: ClientBrandKit | null): { filled: number; total: number } {
+  if (!kit) return { filled: 0, total: 9 };
+  const checks = [
+    kit.brandName,
+    kit.visualStyle || kit.brandStory,
+    kit.primaryColor,
+    kit.toneOfVoice,
+    kit.audience,
+    kit.valueProposition,
+    kit.logoUsage,
+    kit.fontHeadline || kit.fontBody,
+  ];
+  const hasLogo = kit.assets?.some((asset) => asset.assetType.startsWith('logo'));
+  const filled = checks.filter((v) => !!v?.trim()).length + (hasLogo ? 1 : 0);
+  return { filled, total: 9 };
+}
 
 function newEmptyKit(client?: Client): ClientBrandKit {
   return {
@@ -97,18 +165,7 @@ function newEmptyKit(client?: Client): ClientBrandKit {
 }
 
 function countCompletedKitFields(kit: ClientBrandKit | null): number {
-  if (!kit) return 0;
-  const fields = [
-    kit.brandName,
-    kit.visualStyle,
-    kit.primaryColor,
-    kit.toneOfVoice,
-    kit.audience,
-    kit.valueProposition,
-    kit.logoUsage,
-  ];
-  const hasLogo = kit.assets?.some((asset) => asset.assetType.startsWith('logo'));
-  return fields.filter((v) => !!v?.trim()).length + (hasLogo ? 1 : 0);
+  return kitFieldScore(kit).filled;
 }
 
 const CreateBrandImage: React.FC = () => {
@@ -144,12 +201,14 @@ const CreateBrandImage: React.FC = () => {
 
   const selectedClient = clients.find((c) => c.id === selectedClientId);
   const brandScore = countCompletedKitFields(brandKit);
-  const brandProgress = Math.round((brandScore / 8) * 100);
+  const brandScoreMeta = kitFieldScore(brandKit);
+  const brandProgress = Math.round((brandScore / brandScoreMeta.total) * 100);
   const logoAsset = brandKit?.assets?.find((asset) => asset.assetType === 'logo')
     || brandKit?.assets?.find((asset) => asset.assetType === 'logo_light')
     || brandKit?.assets?.find((asset) => asset.assetType === 'logo_dark');
 
-  const identityReady = !!selectedClientId && !!brandKit && brandScore >= 4;
+  const identityReady = !!selectedClientId && !!brandKit && brandScore >= 5;
+  const outputSpec = brief.format === 'story' ? IMAGE_STUDIO_OUTPUT.story : IMAGE_STUDIO_OUTPUT.feed;
   const canGenerate =
     identityReady &&
     brief.topic.trim().length > 0 &&
@@ -213,11 +272,15 @@ const CreateBrandImage: React.FC = () => {
     try {
       const saved = await clientBrandAssetService.getBrandKit(clientId);
       setBrandKit(saved || newEmptyKit(client));
-      setBrandKitDialogOpen(!saved);
+      if (!saved) {
+        setBrandKitDialogOpen(true);
+      }
       setBrief((prev) => ({
         ...prev,
-        audience: prev.audience || saved?.audience || '',
-        tone: saved?.toneOfVoice || prev.tone,
+        audience: prev.audience.trim() || saved?.audience || '',
+        tone: saved?.toneOfVoice?.trim() || prev.tone,
+        offer: prev.offer?.trim() || saved?.valueProposition || '',
+        cta: prev.cta === 'Saiba mais' && saved?.tagline ? saved.tagline.slice(0, 48) : prev.cta,
       }));
     } catch (e) {
       showNotification(e instanceof Error ? e.message : 'Erro ao carregar Brand Kit', 'error');
@@ -544,7 +607,11 @@ const CreateBrandImage: React.FC = () => {
                       </Box>
                     </Stack>
                     <Chip
-                      label={brief.format === 'carousel' ? `${brief.slideCount || 5} slides` : `${brief.imageCount || 1} imagem(ns)`}
+                      label={
+                        brief.format === 'carousel'
+                          ? `${brief.slideCount || DEFAULT_CAROUSEL_SLIDES} slides · ${IMAGE_STUDIO_OUTPUT.feed.ratioLabel}`
+                          : `${brief.imageCount || 1} imagem(ns) · ${outputSpec.ratioLabel}`
+                      }
                       icon={brief.format === 'carousel' ? <CarouselIcon /> : <ImageIcon />}
                       sx={{ fontWeight: 800 }}
                     />
@@ -552,7 +619,7 @@ const CreateBrandImage: React.FC = () => {
 
                   {!identityReady && (
                     <Alert severity="warning">
-                      Complete pelo menos nome, estilo visual, tom/público e um asset de logo/referência para gerar com consistência.
+                      Complete o Brand Kit (nome, estilo, cores, tom, público, proposta e logo) para gerar peças consistentes.
                     </Alert>
                   )}
 
@@ -561,9 +628,9 @@ const CreateBrandImage: React.FC = () => {
                       <FormControl fullWidth>
                         <InputLabel>Formato</InputLabel>
                         <Select label="Formato" value={brief.format} onChange={(e) => patchBrief({ format: e.target.value as ImageStudioBrief['format'] })}>
-                          <MenuItem value="feed">Feed 1:1</MenuItem>
-                          <MenuItem value="story">Story 9:16</MenuItem>
-                          <MenuItem value="carousel">Carrossel</MenuItem>
+                          <MenuItem value="feed">{IMAGE_STUDIO_OUTPUT.feed.label} ({IMAGE_STUDIO_OUTPUT.feed.ratioLabel})</MenuItem>
+                          <MenuItem value="story">{IMAGE_STUDIO_OUTPUT.story.label} ({IMAGE_STUDIO_OUTPUT.story.ratioLabel})</MenuItem>
+                          <MenuItem value="carousel">Carrossel 4:5 ({IMAGE_STUDIO_OUTPUT.feed.ratioLabel} por slide)</MenuItem>
                         </Select>
                       </FormControl>
                     </Grid>
@@ -571,11 +638,14 @@ const CreateBrandImage: React.FC = () => {
                       <FormControl fullWidth>
                         <InputLabel>Objetivo</InputLabel>
                         <Select label="Objetivo" value={brief.objective} onChange={(e) => patchBrief({ objective: e.target.value as ImageStudioBrief['objective'] })}>
-                          <MenuItem value="brand">Marca / posicionamento</MenuItem>
-                          <MenuItem value="educate">Educar</MenuItem>
-                          <MenuItem value="sell">Vender</MenuItem>
-                          <MenuItem value="announce">Anunciar</MenuItem>
-                          <MenuItem value="engage">Engajar</MenuItem>
+                          {IMAGE_STUDIO_OBJECTIVES.map((item) => (
+                            <MenuItem key={item.value} value={item.value}>
+                              <Box>
+                                <Typography variant="body2" fontWeight={700}>{item.label}</Typography>
+                                <Typography variant="caption" color="text.secondary">{item.hint}</Typography>
+                              </Box>
+                            </MenuItem>
+                          ))}
                         </Select>
                       </FormControl>
                     </Grid>
@@ -583,9 +653,9 @@ const CreateBrandImage: React.FC = () => {
                       <FormControl fullWidth>
                         <InputLabel>Qualidade</InputLabel>
                         <Select label="Qualidade" value={quality} onChange={(e) => setQuality(e.target.value)}>
-                          <MenuItem value="low">Baixa (rápida)</MenuItem>
-                          <MenuItem value="medium">Média</MenuItem>
-                          <MenuItem value="high">Alta</MenuItem>
+                          <MenuItem value="low">Rápida — rascunho / teste</MenuItem>
+                          <MenuItem value="medium">Média — uso geral</MenuItem>
+                          <MenuItem value="high">Alta — entrega final</MenuItem>
                           <MenuItem value="auto">Auto</MenuItem>
                         </Select>
                       </FormControl>
@@ -594,32 +664,58 @@ const CreateBrandImage: React.FC = () => {
 
                   <TextField
                     fullWidth
-                    label="Qual é a ideia central?"
+                    required
+                    label="Ideia central do post"
+                    helperText="Uma frase clara: o que esta peça precisa comunicar?"
                     value={brief.topic}
                     onChange={(e) => patchBrief({ topic: e.target.value })}
-                    placeholder="Ex.: campanha para divulgar consultoria de tráfego pago para clínicas odontológicas"
+                    placeholder="Ex.: consultoria de tráfego para clínicas odontológicas que querem mais agendamentos"
                   />
 
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={6}>
-                      <TextField fullWidth multiline minRows={3} label="Quem precisa ver isso?" value={brief.audience} onChange={(e) => patchBrief({ audience: e.target.value })} />
+                      <TextField
+                        fullWidth
+                        required
+                        multiline
+                        minRows={3}
+                        label="Público-alvo desta peça"
+                        helperText={brandKit?.audience ? 'Sugestão vinda do Brand Kit — ajuste se for campanha específica.' : 'Quem precisa parar o scroll e entender a mensagem?'}
+                        value={brief.audience}
+                        onChange={(e) => patchBrief({ audience: e.target.value })}
+                      />
                     </Grid>
                     <Grid item xs={12} md={6}>
-                      <TextField fullWidth multiline minRows={3} label="Oferta, produto ou promessa" value={brief.offer || ''} onChange={(e) => patchBrief({ offer: e.target.value })} />
+                      <TextField
+                        fullWidth
+                        multiline
+                        minRows={3}
+                        label="Oferta ou destaque"
+                        helperText="Produto, serviço, promoção ou benefício principal (opcional)."
+                        value={brief.offer || ''}
+                        onChange={(e) => patchBrief({ offer: e.target.value })}
+                      />
                     </Grid>
                   </Grid>
 
                   <Grid container spacing={2}>
                     <Grid item xs={12} md={6}>
-                      <TextField fullWidth label="CTA" value={brief.cta} onChange={(e) => patchBrief({ cta: e.target.value })} placeholder="Ex.: Chame no direct" />
+                      <TextField
+                        fullWidth
+                        required
+                        label="Chamada para ação (CTA)"
+                        value={brief.cta}
+                        onChange={(e) => patchBrief({ cta: e.target.value })}
+                        placeholder="Ex.: Agende uma avaliação"
+                      />
                     </Grid>
                     <Grid item xs={12} md={6}>
                       <FormControl fullWidth>
-                        <InputLabel>Texto na arte</InputLabel>
-                        <Select label="Texto na arte" value={brief.inImageTextMode} onChange={(e) => patchBrief({ inImageTextMode: e.target.value as ImageStudioBrief['inImageTextMode'] })}>
-                          <MenuItem value="none">Sem texto</MenuItem>
-                          <MenuItem value="short">Texto curto</MenuItem>
-                          <MenuItem value="per-slide">Texto por slide</MenuItem>
+                        <InputLabel>Texto dentro da imagem</InputLabel>
+                        <Select label="Texto dentro da imagem" value={brief.inImageTextMode} onChange={(e) => patchBrief({ inImageTextMode: e.target.value as ImageStudioBrief['inImageTextMode'] })}>
+                          <MenuItem value="none">Sem texto — só visual</MenuItem>
+                          <MenuItem value="short">Headline curta + CTA</MenuItem>
+                          <MenuItem value="per-slide">Texto por slide (carrossel)</MenuItem>
                         </Select>
                       </FormControl>
                     </Grid>
@@ -629,35 +725,48 @@ const CreateBrandImage: React.FC = () => {
                     {brief.format === 'carousel' ? (
                       <Grid item xs={12} md={4}>
                         <FormControl fullWidth>
-                          <InputLabel>Quantidade de slides</InputLabel>
-                          <Select label="Quantidade de slides" value={brief.slideCount || 5} onChange={(e) => patchBrief({ slideCount: Number(e.target.value) })}>
-                            {[3, 4, 5, 6, 7, 8, 9, 10].map((x) => <MenuItem key={x} value={x}>{x} slides</MenuItem>)}
+                          <InputLabel>Slides do carrossel</InputLabel>
+                          <Select label="Slides do carrossel" value={brief.slideCount || DEFAULT_CAROUSEL_SLIDES} onChange={(e) => patchBrief({ slideCount: Number(e.target.value) })}>
+                            {CAROUSEL_SLIDE_COUNTS.map((x) => <MenuItem key={x} value={x}>{x} slides</MenuItem>)}
                           </Select>
                         </FormControl>
                       </Grid>
-                    ) : (
+                    ) : brief.format === 'feed' ? (
                       <Grid item xs={12} md={4}>
                         <FormControl fullWidth>
-                          <InputLabel>Quantidade</InputLabel>
-                          <Select label="Quantidade" value={brief.imageCount} onChange={(e) => patchBrief({ imageCount: Number(e.target.value) })}>
-                            {[1, 2, 3, 4].map((x) => <MenuItem key={x} value={x}>{x} imagem{x > 1 ? 's' : ''}</MenuItem>)}
+                          <InputLabel>Variações</InputLabel>
+                          <Select label="Variações" value={brief.imageCount} onChange={(e) => patchBrief({ imageCount: Number(e.target.value) })}>
+                            {[1, 2, 3, 4].map((x) => <MenuItem key={x} value={x}>{x} versão{x > 1 ? 'ões' : ''}</MenuItem>)}
                           </Select>
                         </FormControl>
                       </Grid>
-                    )}
-                    <Grid item xs={12} md={8}>
-                      <TextField fullWidth label="Tom desta peça" value={brief.tone} onChange={(e) => patchBrief({ tone: e.target.value })} />
+                    ) : null}
+                    <Grid item xs={12} md={brief.format === 'story' ? 12 : 8}>
+                      <TextField
+                        fullWidth
+                        label="Tom desta peça"
+                        helperText={brandKit?.toneOfVoice ? `Base do Brand Kit: ${brandKit.toneOfVoice.slice(0, 80)}${(brandKit.toneOfVoice.length > 80) ? '…' : ''}` : 'Como a copy e o visual devem soar neste post específico.'}
+                        value={brief.tone}
+                        onChange={(e) => patchBrief({ tone: e.target.value })}
+                      />
                     </Grid>
                   </Grid>
+
+                  {brief.format === 'carousel' && (
+                    <Alert severity="info" icon={<CarouselIcon />}>
+                      O carrossel segue a estrutura: <strong>capa com gancho</strong> → slides de conteúdo → <strong>fechamento com CTA</strong>.
+                      Cada slide é gerado em {IMAGE_STUDIO_OUTPUT.feed.ratioLabel} (portrait 4:5).
+                    </Alert>
+                  )}
 
                   <TextField
                     fullWidth
                     multiline
-                    minRows={3}
-                    label="Observações para esta geração"
+                    minRows={2}
+                    label="Direção criativa extra"
                     value={brief.notes || ''}
                     onChange={(e) => patchBrief({ notes: e.target.value })}
-                    placeholder="Ex.: evitar pessoas, usar fundo escuro, priorizar produto, deixar espaço para texto..."
+                    placeholder="Ex.: fundo escuro, sem rostos, foco no produto, estilo editorial, evitar vermelho..."
                   />
 
                   <Paper
@@ -751,7 +860,7 @@ const CreateBrandImage: React.FC = () => {
                       {backgroundUploading ? 'Enviando fundo...' : generating ? 'Gerando post completo...' : 'Gerar post completo'}
                     </Button>
                     <Typography variant="caption" color="text.secondary">
-                      Carrosséis geram uma imagem por slide e podem levar alguns minutos.
+                      Saída em {outputSpec.ratioLabel}. Carrosséis geram um slide por vez (~2 min cada).
                     </Typography>
                   </Stack>
                 </Stack>
@@ -801,7 +910,8 @@ const CreateBrandImage: React.FC = () => {
                               >
                                 <Box
                                   sx={{
-                                    height: { xs: 260, md: brief.format === 'story' ? 520 : 420 },
+                                    width: '100%',
+                                    ...aspectRatioSx(brief.format),
                                     borderRadius: 2,
                                     display: 'grid',
                                     placeItems: 'center',
@@ -861,7 +971,7 @@ const CreateBrandImage: React.FC = () => {
                             alt="Preview principal gerado"
                             sx={{
                               width: '100%',
-                              maxHeight: { xs: 420, md: 620 },
+                              ...aspectRatioSx(brief.format),
                               objectFit: 'contain',
                               borderRadius: 2,
                               bgcolor: '#f6f6f6',
@@ -888,7 +998,7 @@ const CreateBrandImage: React.FC = () => {
                           <Grid item xs={12} md={brief.format === 'carousel' ? 6 : 12} key={`${slide.slideNumber}-${index}`}>
                             <Paper elevation={0} sx={{ p: 1.5, borderRadius: GLASS.radius.inner, border: `1px solid ${GLASS.border.subtle}`, bgcolor: '#fff' }}>
                               {slide.imageUrl ? (
-                                <Box component="img" src={slide.imageUrl} alt={slide.title} sx={{ width: '100%', maxHeight: 420, objectFit: 'contain', borderRadius: 2, bgcolor: '#f6f6f6' }} />
+                                <Box component="img" src={slide.imageUrl} alt={slide.title} sx={{ width: '100%', ...aspectRatioSx(brief.format), objectFit: 'contain', borderRadius: 2, bgcolor: '#f6f6f6' }} />
                               ) : (
                                 <Box sx={{ height: 180, display: 'grid', placeItems: 'center', bgcolor: '#f6f6f6', borderRadius: 2 }}>
                                   <ImageIcon color="disabled" />
@@ -924,7 +1034,7 @@ const CreateBrandImage: React.FC = () => {
                         {resultUrls.map((url, index) => (
                           <Grid item xs={12} md={6} key={`${url}-${index}`}>
                             <Paper elevation={0} sx={{ p: 1.5, borderRadius: GLASS.radius.inner, border: `1px solid ${GLASS.border.subtle}`, bgcolor: '#fff' }}>
-                              <Box component="img" src={url} alt={`Imagem gerada ${index + 1}`} sx={{ width: '100%', maxHeight: 420, objectFit: 'contain', borderRadius: 2, bgcolor: '#f6f6f6' }} />
+                              <Box component="img" src={url} alt={`Imagem gerada ${index + 1}`} sx={{ width: '100%', ...aspectRatioSx(brief.format), objectFit: 'contain', borderRadius: 2, bgcolor: '#f6f6f6' }} />
                               <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                                 <Button size="small" href={url} download target="_blank" rel="noreferrer">Baixar</Button>
                                 <Button
@@ -992,54 +1102,108 @@ const CreateBrandImage: React.FC = () => {
               </Alert>
 
               <Grid container spacing={1.5}>
-                <Grid item xs={12} md={6}>
-                  <TextField label="Nome da marca" value={brandKit.brandName || ''} onChange={(e) => patchKit({ brandName: e.target.value })} fullWidth />
+                <Grid item xs={12}>
+                  <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.08em' }}>
+                    Identidade
+                  </Typography>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField label="Tagline" value={brandKit.tagline || ''} onChange={(e) => patchKit({ tagline: e.target.value })} fullWidth />
+                  <TextField label="Nome da marca" value={brandKit.brandName || ''} onChange={(e) => patchKit({ brandName: e.target.value })} fullWidth size="small" />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField label="Site" value={brandKit.websiteUrl || ''} onChange={(e) => patchKit({ websiteUrl: e.target.value })} fullWidth placeholder="https://..." />
+                  <TextField label="Tagline" value={brandKit.tagline || ''} onChange={(e) => patchKit({ tagline: e.target.value })} fullWidth size="small" placeholder="Frase curta da marca" />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField label="Instagram" value={brandKit.instagramHandle || ''} onChange={(e) => patchKit({ instagramHandle: e.target.value })} fullWidth placeholder="@cliente" />
+                  <TextField label="Site" value={brandKit.websiteUrl || ''} onChange={(e) => patchKit({ websiteUrl: e.target.value })} fullWidth size="small" placeholder="https://..." />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Instagram" value={brandKit.instagramHandle || ''} onChange={(e) => patchKit({ instagramHandle: e.target.value })} fullWidth size="small" placeholder="@cliente" />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    label="História / contexto da marca"
+                    value={brandKit.brandStory || ''}
+                    onChange={(e) => patchKit({ brandStory: e.target.value })}
+                    fullWidth
+                    multiline
+                    minRows={2}
+                    size="small"
+                    placeholder="Quem é a marca, o que faz e por que importa — ajuda a IA a não soar genérica."
+                  />
                 </Grid>
               </Grid>
 
-              <TextField label="Público ideal" value={brandKit.audience || ''} onChange={(e) => patchKit({ audience: e.target.value })} fullWidth multiline minRows={2} />
-              <TextField label="Proposta de valor" value={brandKit.valueProposition || ''} onChange={(e) => patchKit({ valueProposition: e.target.value })} fullWidth multiline minRows={2} />
-              <TextField label="Tom de voz" value={brandKit.toneOfVoice || ''} onChange={(e) => patchKit({ toneOfVoice: e.target.value })} fullWidth multiline minRows={2} placeholder="Ex.: confiante, didático, direto, sem jargão..." />
-              <TextField label="Estilo visual" value={brandKit.visualStyle || ''} onChange={(e) => patchKit({ visualStyle: e.target.value })} fullWidth multiline minRows={3} placeholder="Paleta, fotografia, textura, composição, o que evitar..." />
+              <Divider />
 
               <Grid container spacing={1.5}>
-                <Grid item xs={12} md={4}>
-                  <TextField label="Cor primária" value={brandKit.primaryColor || ''} onChange={(e) => patchKit({ primaryColor: e.target.value })} fullWidth placeholder="#F74211" />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <TextField label="Cor secundária" value={brandKit.secondaryColor || ''} onChange={(e) => patchKit({ secondaryColor: e.target.value })} fullWidth />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <TextField label="Acento" value={brandKit.accentColor || ''} onChange={(e) => patchKit({ accentColor: e.target.value })} fullWidth />
+                <Grid item xs={12}>
+                  <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.08em' }}>
+                    Público e voz
+                  </Typography>
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField label="Fonte títulos" value={brandKit.fontHeadline || ''} onChange={(e) => patchKit({ fontHeadline: e.target.value })} fullWidth />
+                  <TextField label="Público ideal" value={brandKit.audience || ''} onChange={(e) => patchKit({ audience: e.target.value })} fullWidth multiline minRows={2} size="small" />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField label="Fonte corpo" value={brandKit.fontBody || ''} onChange={(e) => patchKit({ fontBody: e.target.value })} fullWidth />
+                  <TextField label="Proposta de valor" value={brandKit.valueProposition || ''} onChange={(e) => patchKit({ valueProposition: e.target.value })} fullWidth multiline minRows={2} size="small" />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField label="Tom de voz" value={brandKit.toneOfVoice || ''} onChange={(e) => patchKit({ toneOfVoice: e.target.value })} fullWidth multiline minRows={2} size="small" placeholder="Ex.: confiante, didático, direto, sem jargão..." />
                 </Grid>
               </Grid>
 
-              <TextField label="Uso de logo" value={brandKit.logoUsage || ''} onChange={(e) => patchKit({ logoUsage: e.target.value })} fullWidth multiline minRows={2} />
+              <Divider />
+
               <Grid container spacing={1.5}>
-                <Grid item xs={12} md={6}>
-                  <TextField label="Palavras que usar" value={brandKit.wordsToUse || ''} onChange={(e) => patchKit({ wordsToUse: e.target.value })} fullWidth />
+                <Grid item xs={12}>
+                  <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.08em' }}>
+                    Visual e tipografia
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField label="Estilo visual" value={brandKit.visualStyle || ''} onChange={(e) => patchKit({ visualStyle: e.target.value })} fullWidth multiline minRows={3} size="small" placeholder="Fotografia vs ilustração, texturas, composição, mood, o que evitar..." />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <ColorField label="Cor primária" value={brandKit.primaryColor || ''} onChange={(v) => patchKit({ primaryColor: v })} placeholder="#F74211" />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <ColorField label="Cor secundária" value={brandKit.secondaryColor || ''} onChange={(v) => patchKit({ secondaryColor: v })} />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <ColorField label="Cor de acento" value={brandKit.accentColor || ''} onChange={(v) => patchKit({ accentColor: v })} />
                 </Grid>
                 <Grid item xs={12} md={6}>
-                  <TextField label="Palavras que evitar" value={brandKit.wordsToAvoid || ''} onChange={(e) => patchKit({ wordsToAvoid: e.target.value })} fullWidth />
+                  <TextField label="Fonte títulos" value={brandKit.fontHeadline || ''} onChange={(e) => patchKit({ fontHeadline: e.target.value })} fullWidth size="small" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Fonte corpo" value={brandKit.fontBody || ''} onChange={(e) => patchKit({ fontBody: e.target.value })} fullWidth size="small" />
                 </Grid>
               </Grid>
-              <TextField label="Hashtags padrão" value={brandKit.hashtags || ''} onChange={(e) => patchKit({ hashtags: e.target.value })} fullWidth placeholder="#marca, #campanha" />
-              <TextField label="Regras extras para IA" value={brandKit.promptGuardrails || ''} onChange={(e) => patchKit({ promptGuardrails: e.target.value })} fullWidth multiline minRows={2} />
+
+              <Divider />
+
+              <Grid container spacing={1.5}>
+                <Grid item xs={12}>
+                  <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: '0.08em' }}>
+                    Regras para a IA
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField label="Uso de logo" value={brandKit.logoUsage || ''} onChange={(e) => patchKit({ logoUsage: e.target.value })} fullWidth multiline minRows={2} size="small" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Palavras que usar" value={brandKit.wordsToUse || ''} onChange={(e) => patchKit({ wordsToUse: e.target.value })} fullWidth size="small" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <TextField label="Palavras que evitar" value={brandKit.wordsToAvoid || ''} onChange={(e) => patchKit({ wordsToAvoid: e.target.value })} fullWidth size="small" />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField label="Hashtags padrão" value={brandKit.hashtags || ''} onChange={(e) => patchKit({ hashtags: e.target.value })} fullWidth size="small" placeholder="#marca, #campanha" />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField label="Guardrails extras" value={brandKit.promptGuardrails || ''} onChange={(e) => patchKit({ promptGuardrails: e.target.value })} fullWidth multiline minRows={2} size="small" placeholder="Ex.: nunca usar fotos de banco genérico, evitar vermelho saturado..." />
+                </Grid>
+              </Grid>
 
               <Divider />
 
