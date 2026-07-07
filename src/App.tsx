@@ -51,8 +51,15 @@ import InstagramBusinessCallback from './pages/InstagramBusinessCallback';
 import InstagramBusinessDemo from './pages/InstagramBusinessDemo';
 
 // Layout compartilhado para todas as páginas protegidas
+import ApprovalOnlyGuard from './components/ApprovalOnlyGuard';
+import { ApprovalOnlyTourProvider } from './contexts/ApprovalOnlyTourContext';
+
 const PageLayout = ({ children }: { children: React.ReactNode }) => (
-  <AppShell>{children}</AppShell>
+  <ApprovalOnlyTourProvider>
+    <AppShell>
+      <ApprovalOnlyGuard>{children}</ApprovalOnlyGuard>
+    </AppShell>
+  </ApprovalOnlyTourProvider>
 );
 
 // Layout sem cabeçalho para páginas de callback

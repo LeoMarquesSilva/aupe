@@ -154,7 +154,13 @@ export function mapDbPlanToCard(plan: DbPlanInput): LandingPlanCard {
  */
 export function mapAndSortPlansFromDb(plans: DbPlanInput[]): LandingPlanCard[] {
   return plans
-    .filter((p) => p.active !== false && p.plan_code && p.plan_code !== 'LEGACY')
+    .filter(
+      (p) =>
+        p.active !== false &&
+        p.plan_code &&
+        p.plan_code !== 'LEGACY' &&
+        p.plan_code !== 'APROVACAO_ONLY'
+    )
     .map(mapDbPlanToCard)
     .sort(
       (a, b) =>

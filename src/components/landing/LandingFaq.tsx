@@ -10,12 +10,13 @@ const LandingFaq: React.FC = () => (
     component="section"
     id="faq"
     sx={{
-      py: { xs: 10, md: 14 },
+      py: { xs: 8, md: 11 },
       position: 'relative',
+      bgcolor: '#fff7f3',
     }}
   >
     <Container maxWidth="md">
-      <Box sx={{ textAlign: 'center', mb: 8 }}>
+      <Box sx={{ textAlign: 'center', mb: { xs: 4, md: 6 } }}>
         <Typography
           variant="h2"
           sx={{
@@ -23,15 +24,12 @@ const LandingFaq: React.FC = () => (
             fontSize: { xs: '2.25rem', md: '3.25rem' },
             fontWeight: 800,
             mb: 2,
-            background: INSYT_COLORS.gradientPrimary,
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
+            color: '#0a0f2d',
           }}
         >
           Dúvidas sobre a operação
         </Typography>
-        <Typography variant="h6" sx={{ color: INSYT_COLORS.gray400, maxWidth: 560, mx: 'auto', fontWeight: 400 }}>
+        <Typography variant="h6" sx={{ color: '#525663', maxWidth: 560, mx: 'auto', fontWeight: 400 }}>
           Entenda como funcionam agendamento, aprovação e compartilhamento com o cliente
         </Typography>
       </Box>
@@ -47,24 +45,23 @@ const LandingFaq: React.FC = () => (
           >
             <Accordion
               sx={{
-                background: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
+                background: '#ffffff',
+                border: '1px solid rgba(82, 86, 99, 0.12)',
                 borderRadius: `${GLASS.radius.inner} !important`,
                 mb: 2,
-                backdropFilter: `blur(${GLASS.surface.blur})`,
-                boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.05) inset',
+                boxShadow: '0 12px 34px -30px rgba(10, 15, 45, 0.35)',
                 '&:before': {
                   display: 'none',
                 },
                 '&.Mui-expanded': {
-                  background: 'rgba(255, 255, 255, 0.09)',
-                  borderColor: 'rgba(247, 66, 17, 0.25)',
-                  boxShadow: '0 8px 24px rgba(247, 66, 17, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.08) inset',
+                  background: '#ffffff',
+                  borderColor: 'rgba(247, 66, 17, 0.28)',
+                  boxShadow: '0 18px 44px -32px rgba(247, 66, 17, 0.42)',
                 },
               }}
             >
               <AccordionSummary
-                expandIcon={<ExpandMoreIcon sx={{ color: INSYT_COLORS.primaryLight }} />}
+                expandIcon={<ExpandMoreIcon sx={{ color: INSYT_COLORS.primary }} />}
                 sx={{
                   py: 2,
                   px: 3,
@@ -76,8 +73,8 @@ const LandingFaq: React.FC = () => (
                 <Typography
                   variant="h6"
                   sx={{
-                    color: INSYT_COLORS.gray100,
-                    fontWeight: 600,
+                    color: '#0a0f2d',
+                    fontWeight: 800,
                     fontSize: '1.05rem',
                   }}
                 >
@@ -85,7 +82,7 @@ const LandingFaq: React.FC = () => (
                 </Typography>
               </AccordionSummary>
               <AccordionDetails sx={{ px: 3, pb: 3 }}>
-                <Typography variant="body1" sx={{ color: INSYT_COLORS.gray400, lineHeight: 1.8 }}>
+                <Typography variant="body1" sx={{ color: '#525663', lineHeight: 1.8 }}>
                   {faq.answer}
                 </Typography>
               </AccordionDetails>

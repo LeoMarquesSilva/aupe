@@ -64,11 +64,12 @@ serve(async (req) => {
       );
     }
 
-    const { priceId, items, organizationId, userId } = body as {
+    const { priceId, items, organizationId, userId, trialPeriodDays } = body as {
       priceId?: string;
       items?: Array<{ priceId: string; quantity?: number }>;
       organizationId?: string;
       userId?: string;
+      trialPeriodDays?: number;
     };
 
     if (!organizationId || !userId) {
@@ -104,6 +105,11 @@ serve(async (req) => {
     }
 
     const line_items = normalized.map((it) => ({ price: it.priceId, quantity: it.quantity }));
+    const normalizedTrialDays = Number(trialPeriodDays ?? 0);
+    const safeTrialPeriodDays =
+      Number.isFinite(normalizedTrialDays) && normalizedTrialDays > 0
+        ? Math.min(Math.floor(normalizedTrialDays), 30)
+        : undefined;
 
     const origin = req.headers.get('origin') || req.headers.get('referer') || 'http://localhost:3000';
 
@@ -119,9 +125,11 @@ serve(async (req) => {
         user_id: userId,
       },
       subscription_data: {
+        ...(safeTrialPeriodDays ? { trial_period_days: safeTrialPeriodDays } : {}),
         metadata: {
           organization_id: organizationId,
           user_id: userId,
+          ...(safeTrialPeriodDays ? { trial_period_days: String(safeTrialPeriodDays) } : {}),
         },
       },
       customer_email: undefined,

@@ -45,9 +45,33 @@ import {
   SubscriptionPlan,
 } from '../../services/subscriptionService';
 import { GLASS } from '../../theme/glassTokens';
+import {
+  organizationProductModeService,
+  OrganizationProductMode,
+} from '../../services/organizationProductModeService';
+
+import {
+  formatBRLFromCents,
+  getApprovalContractMonthlyCents,
+  getApprovalPricePerClientCents,
+} from '../../utils/subscriptionDisplay';
 
 const formatBRL = (cents: number): string =>
   `R$ ${(cents / 100).toFixed(2).replace('.', ',')}`;
+
+const formatPlanMenuLabel = (p: SubscriptionPlan): string => {
+  if (p.plan_code === 'APROVACAO_ONLY') {
+    const unit = formatBRLFromCents(getApprovalPricePerClientCents(p));
+    const total = formatBRLFromCents(
+      getApprovalContractMonthlyCents(p.max_clients, getApprovalPricePerClientCents(p))
+    );
+    return `${p.name} — ${unit}/cliente — ${total}/mês (${p.max_clients} clientes)`;
+  }
+  if (p.is_enterprise_contact) {
+    return `${p.name} — contrato manual`;
+  }
+  return `${p.name} — ${formatBRL(p.amount)}`;
+};
 
 const toDateInput = (iso: string | null | undefined): string => {
   if (!iso) return '';
@@ -92,6 +116,8 @@ const LiberationsTab: React.FC<LiberationsTabProps> = ({
     addonId: '',
     qty: 1,
   });
+  const [productMode, setProductMode] = useState<OrganizationProductMode>('full');
+  const [savingProductMode, setSavingProductMode] = useState(false);
 
   const loadCatalog = useCallback(async () => {
     try {
@@ -140,7 +166,34 @@ const LiberationsTab: React.FC<LiberationsTabProps> = ({
 
   useEffect(() => {
     loadForOrg(selectedOrg);
+    if (selectedOrg?.product_mode === 'approval_only') {
+      setProductMode('approval_only');
+    } else {
+      setProductMode('full');
+    }
   }, [selectedOrg, loadForOrg]);
+
+  const handleSaveProductMode = async () => {
+    if (!selectedOrg) return;
+    setSavingProductMode(true);
+    setError(null);
+    setInfo(null);
+    try {
+      await organizationProductModeService.adminSetMode(selectedOrg.id, productMode);
+      organizationProductModeService.clearCache();
+      setInfo(
+        productMode === 'approval_only'
+          ? 'Modo só aprovação ativado. Demais áreas do sistema ficam bloqueadas para esta organização.'
+          : 'Modo produto completo restaurado.'
+      );
+      onAnyChange?.();
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Erro ao salvar modo do produto';
+      setError(message);
+    } finally {
+      setSavingProductMode(false);
+    }
+  };
 
   const planById = useMemo(() => {
     const m = new Map<string, SubscriptionPlan>();
@@ -156,6 +209,16 @@ const LiberationsTab: React.FC<LiberationsTabProps> = ({
       (a) => !a.scope_plan_code || a.scope_plan_code === currentPlanCode,
     );
   }, [catalog, currentPlan]);
+
+  const syncProductModeFromPlan = async (planId: string) => {
+    if (!selectedOrg) return;
+    const plan = planById.get(planId);
+    if (plan?.plan_code === 'APROVACAO_ONLY') {
+      await organizationProductModeService.adminSetMode(selectedOrg.id, 'approval_only');
+      setProductMode('approval_only');
+      organizationProductModeService.clearCache();
+    }
+  };
 
   const handleCreateSubscription = async () => {
     if (!selectedOrg || !subForm.plan_id) return;
@@ -175,6 +238,7 @@ const LiberationsTab: React.FC<LiberationsTabProps> = ({
         current_period_end: end.toISOString(),
         cancel_at_period_end: false,
       });
+      await syncProductModeFromPlan(subForm.plan_id);
       setSubscription(created);
       setInfo('Subscription criada com sucesso (liberação manual).');
       onAnyChange?.();
@@ -199,6 +263,7 @@ const LiberationsTab: React.FC<LiberationsTabProps> = ({
           ? new Date(subForm.current_period_end).toISOString()
           : subscription.current_period_end,
       });
+      await syncProductModeFromPlan(subForm.plan_id);
       setInfo('Subscription atualizada.');
       onAnyChange?.();
       await loadForOrg(selectedOrg);
@@ -320,6 +385,60 @@ const LiberationsTab: React.FC<LiberationsTabProps> = ({
         </Box>
       ) : (
         <Stack spacing={3}>
+          {/* BLOCO: Modo do produto */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 2, md: 3 },
+              border: `1px solid ${GLASS.border.outer}`,
+              borderRadius: GLASS.radius.card,
+              background: GLASS.surface.bg,
+              backdropFilter: `blur(${GLASS.surface.blur})`,
+            }}
+          >
+            <Typography variant="h6" sx={{ mb: 1, color: GLASS.text.heading }}>
+              Modo do produto
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Use &quot;Só aprovação&quot; para clientes que contrataram apenas o fluxo de aprovação
+              (ex.: agências com limite fixo de marcas). O limite de clientes vem do plano abaixo.
+            </Typography>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Modo</InputLabel>
+                  <Select
+                    value={productMode}
+                    label="Modo"
+                    onChange={(e) =>
+                      setProductMode(e.target.value as OrganizationProductMode)
+                    }
+                  >
+                    <MenuItem value="full">Produto completo</MenuItem>
+                    <MenuItem value="approval_only">Só aprovação</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  disabled={savingProductMode}
+                  onClick={handleSaveProductMode}
+                  startIcon={savingProductMode ? <CircularProgress size={18} /> : <SaveIcon />}
+                  sx={{
+                    bgcolor: GLASS.accent.orange,
+                    '&:hover': { bgcolor: GLASS.accent.orangeDark },
+                    borderRadius: GLASS.radius.button,
+                    height: 56,
+                  }}
+                >
+                  Salvar modo
+                </Button>
+              </Grid>
+            </Grid>
+          </Paper>
+
           {/* BLOCO: Subscription */}
           <Paper
             elevation={0}
@@ -352,7 +471,7 @@ const LiberationsTab: React.FC<LiberationsTabProps> = ({
                       >
                         {plans.map((p) => (
                           <MenuItem key={p.id} value={p.id}>
-                            {p.name} — {formatBRL(p.amount)}
+                            {formatPlanMenuLabel(p)}
                           </MenuItem>
                         ))}
                       </Select>
@@ -402,7 +521,7 @@ const LiberationsTab: React.FC<LiberationsTabProps> = ({
                       >
                         {plans.map((p) => (
                           <MenuItem key={p.id} value={p.id}>
-                            {p.name} — {formatBRL(p.amount)}
+                            {formatPlanMenuLabel(p)}
                           </MenuItem>
                         ))}
                       </Select>

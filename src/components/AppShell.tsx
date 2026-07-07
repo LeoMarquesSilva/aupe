@@ -30,6 +30,7 @@ import {
   Slideshow as ReelsIcon,
   ThumbUp as ApprovalsIcon,
   AutoAwesome as BrandImageIcon,
+  MenuBook as TourIcon,
 } from '@mui/icons-material';
 import { PanelLeft } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -38,8 +39,15 @@ import { AppShellLayoutContext } from '../contexts/AppShellLayoutContext';
 import { roleService } from '../services/roleService';
 import { subscriptionService } from '../services/subscriptionService';
 import { supabase } from '../services/supabaseClient';
+import {
+  organizationProductModeService,
+  OrganizationProductMode,
+} from '../services/organizationProductModeService';
 import { GLASS } from '../theme/glassTokens';
 import { resolveAgencyLogoSrc } from '../services/imageUrlService';
+import { useApprovalOnlyTour } from '../contexts/ApprovalOnlyTourContext';
+import ApprovalOnlyProductTour from './ApprovalOnlyProductTour';
+import { hasCompletedApprovalOnlyTour } from '../config/approvalOnlyTourSteps';
 
 const APP_NAME = 'INSYT';
 const SIDEBAR_WIDTH = 248;
@@ -53,6 +61,10 @@ type NavItem = {
   icon: React.ReactNode;
   match: (pathname: string) => boolean;
   adminOnly?: boolean;
+  /** Oculto no modo só aprovação */
+  fullProductOnly?: boolean;
+  /** Âncora para o tour guiado (`data-tour`) */
+  tourAnchor?: string;
 };
 
 interface AppShellProps {
@@ -65,6 +77,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const location = useLocation();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { user, signOut } = useAuth();
+  const { isOpen: tourOpen, startTour, closeTour } = useApprovalOnlyTour();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [createMenuAnchorEl, setCreateMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -72,6 +85,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [workspaceName, setWorkspaceName] = useState<string | null>(null);
   const [agencyLogoUrl, setAgencyLogoUrl] = useState<string | null>(null);
+  const [productMode, setProductMode] = useState<OrganizationProductMode>('full');
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem('sidebar-collapsed') === 'true';
   });
@@ -120,6 +134,28 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
     loadWorkspace();
   }, [user]);
 
+  useEffect(() => {
+    const loadMode = async () => {
+      if (!user) return;
+      try {
+        const mode = await organizationProductModeService.getCurrentMode();
+        setProductMode(mode);
+      } catch {
+        setProductMode('full');
+      }
+    };
+    loadMode();
+  }, [user]);
+
+  const isApprovalOnly = productMode === 'approval_only';
+
+  useEffect(() => {
+    if (!user || !isApprovalOnly) return;
+    if (hasCompletedApprovalOnlyTour(user.id)) return;
+    const timer = window.setTimeout(() => startTour(), 900);
+    return () => window.clearTimeout(timer);
+  }, [user, isApprovalOnly, startTour]);
+
   const navItems: NavItem[] = useMemo(
     () => [
       {
@@ -127,18 +163,21 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
         to: '/',
         icon: <HomeIcon fontSize="small" />,
         match: (pathname) => pathname === '/',
+        fullProductOnly: true,
       },
       {
         label: 'Clientes',
         to: '/clients',
         icon: <PeopleIcon fontSize="small" />,
         match: (pathname) => pathname === '/clients' || pathname.startsWith('/client/'),
+        fullProductOnly: true,
       },
       {
         label: 'Calendário',
         to: '/calendar',
         icon: <CalendarIcon fontSize="small" />,
         match: (pathname) => pathname.startsWith('/calendar'),
+        fullProductOnly: true,
       },
       {
         label: 'Aprovação',
@@ -151,18 +190,21 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
         to: '/share-links',
         icon: <LinkIcon fontSize="small" />,
         match: (pathname) => pathname.startsWith('/share-links'),
+        fullProductOnly: true,
       },
       {
         label: 'Estúdio de imagens',
         to: '/create-brand-image',
         icon: <BrandImageIcon fontSize="small" />,
         match: (pathname) => pathname.startsWith('/create-brand-image'),
+        fullProductOnly: true,
       },
       {
         label: 'Configurações',
         to: '/settings',
         icon: <SettingsIcon fontSize="small" />,
         match: (pathname) => pathname.startsWith('/settings'),
+        tourAnchor: 'nav-settings',
       },
       {
         label: 'Painel Admin',
@@ -170,12 +212,15 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
         icon: <AdminIcon fontSize="small" />,
         match: (pathname) => pathname.startsWith('/admin'),
         adminOnly: true,
+        fullProductOnly: true,
       },
     ],
     []
   );
 
-  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
+  const visibleNavItems = navItems.filter(
+    (item) => (!item.adminOnly || isAdmin) && (!isApprovalOnly || !item.fullProductOnly)
+  );
 
   const getInitials = (email?: string) => email?.split('@')[0]?.slice(0, 2).toUpperCase() || 'U';
 
@@ -264,7 +309,8 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
 
       <Box sx={{ mx: collapsed && !isMobile ? 1 : 2, height: '1px', bgcolor: GLASS.border.subtle, transition: TRANSITION }} />
 
-      {/* New content button */}
+      {/* New content button — oculto no modo só aprovação */}
+      {!isApprovalOnly && (
       <Box sx={{ px: collapsed && !isMobile ? 1 : 1.75, py: 1.5, transition: TRANSITION }}>
         <Tooltip title={collapsed && !isMobile ? 'Novo conteúdo' : ''} placement="right" arrow>
           <Box
@@ -318,6 +364,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
           </Box>
         </Tooltip>
       </Box>
+      )}
 
       {/* Navigation */}
       <List
@@ -336,6 +383,7 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
           const navButton = (
             <ListItemButton
               key={item.to}
+              data-tour={item.tourAnchor}
               selected={active}
               onClick={() => handleNavigate(item.to)}
               sx={{
@@ -395,6 +443,48 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
           return navButton;
         })}
       </List>
+
+      {isApprovalOnly && (
+        <Box sx={{ px: collapsed && !isMobile ? 0.75 : 1.25, pb: 0.5 }}>
+          {collapsed && !isMobile ? (
+            <Tooltip title="Tour guiado" placement="right" arrow>
+              <ListItemButton
+                onClick={startTour}
+                sx={{
+                  borderRadius: '12px',
+                  justifyContent: 'center',
+                  px: 1.5,
+                  '&:hover': { backgroundColor: GLASS.sidebar.bgHover },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 0, color: 'rgba(255, 255, 255, 0.55)', justifyContent: 'center' }}>
+                  <TourIcon fontSize="small" />
+                </ListItemIcon>
+              </ListItemButton>
+            </Tooltip>
+          ) : (
+            <ListItemButton
+              onClick={startTour}
+              sx={{
+                borderRadius: '12px',
+                '&:hover': { backgroundColor: GLASS.sidebar.bgHover },
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 30, color: 'rgba(255, 255, 255, 0.55)' }}>
+                <TourIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText
+                primary="Tour guiado"
+                primaryTypographyProps={{
+                  fontSize: '0.85rem',
+                  fontWeight: 430,
+                  color: 'rgba(255, 255, 255, 0.7)',
+                }}
+              />
+            </ListItemButton>
+          )}
+        </Box>
+      )}
 
       <Box sx={{ mx: collapsed && !isMobile ? 1 : 2, height: '1px', bgcolor: GLASS.border.subtle, transition: TRANSITION }} />
 
@@ -660,6 +750,10 @@ const AppShell: React.FC<AppShellProps> = ({ children }) => {
           <ListItemText primary="Sair" />
         </MenuItem>
       </Menu>
+
+      {isApprovalOnly && (
+        <ApprovalOnlyProductTour open={tourOpen} onClose={closeTour} />
+      )}
     </Box>
   );
 };

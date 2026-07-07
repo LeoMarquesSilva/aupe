@@ -11,6 +11,11 @@ export const LOGO_PRIMARY = publicAsset(
   'Fundo transparente [digital]/logo-insyt-fundo-transparente-04.png'
 );
 
+/** Logo com lettering escuro/cinza, para fundos claros. */
+export const LOGO_ON_LIGHT = publicAsset(
+  'Fundo transparente [digital]/logo-insyt-fundo-transparente-03.png'
+);
+
 /** Variações para strip de confiança / marcas (opcional). */
 export const LOGO_ALT_MARKS = [
   publicAsset('Fundo transparente [digital]/logo-insyt-fundo-transparente-01.png'),

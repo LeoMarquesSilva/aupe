@@ -48,6 +48,8 @@ import {
   WhatsApp as WhatsAppIcon,
   AutoAwesome as AutoAwesomeIcon,
   PhotoCamera as PhotoCameraIcon,
+  ThumbUp as ThumbUpIcon,
+  ContactSupport as ContactSupportIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../services/supabaseClient';
@@ -56,6 +58,18 @@ import { Subscription, subscriptionService } from '../services/subscriptionServi
 import { organizationLogoService } from '../services/organizationLogoService';
 import { ImageUrlService } from '../services/imageUrlService';
 import { subscriptionLimitsService } from '../services/subscriptionLimitsService';
+import { ENTERPRISE_CONTACT_URL } from '../config/stripeProducts';
+import {
+  getApprovalContractMonthlyCents,
+  getApprovalPricePerClientCents,
+  getApprovalPricingSummary,
+  getClientLimitCaption,
+  getClientLimitLabel,
+  getSubscriptionPlanLabel,
+  getSubscriptionPlanSubtitle,
+  formatBRLFromCents,
+  isApprovalOnlySubscription,
+} from '../utils/subscriptionDisplay';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -498,7 +512,7 @@ const Settings: React.FC = () => {
         >
           <Tab icon={<PersonIcon />} iconPosition="start" label="Perfil" />
           <Tab icon={<PhotoCameraIcon />} iconPosition="start" label="Marca da agência" />
-          <Tab icon={<CreditCardIcon />} iconPosition="start" label="Assinatura" />
+          <Tab icon={<CreditCardIcon />} iconPosition="start" label="Assinatura" data-tour="settings-subscription-tab" />
           <Tab icon={<SecurityIcon />} iconPosition="start" label="Segurança" />
           <Tab icon={<WhatsAppIcon />} iconPosition="start" label="Notificações WhatsApp" />
           <Tab icon={<ExtensionIcon />} iconPosition="start" label="Add-ons" />
@@ -722,7 +736,26 @@ const Settings: React.FC = () => {
               <CircularProgress size={40} sx={{ color: GLASS.accent.orange }} />
             </Box>
           ) : subscription && subscriptionLimits ? (
-            <Grid container spacing={4} sx={{ px: { xs: 0, sm: 2 } }}>
+            (() => {
+              const plan = subscription.plan;
+              const isApprovalOnly = isApprovalOnlySubscription(plan, subscriptionLimits.productMode);
+              const clientsRemaining = Math.max(
+                0,
+                (subscriptionLimits.maxClients === 999999
+                  ? 999999
+                  : subscriptionLimits.maxClients) - subscriptionLimits.currentClients
+              );
+              const atClientLimit =
+                subscriptionLimits.maxClients !== 999999 &&
+                subscriptionLimits.currentClients >= subscriptionLimits.maxClients;
+              const pricePerClientCents = getApprovalPricePerClientCents(plan);
+              const contractMonthlyCents = getApprovalContractMonthlyCents(
+                subscriptionLimits.maxClients,
+                pricePerClientCents
+              );
+
+              return (
+            <Grid container spacing={4} sx={{ px: { xs: 0, sm: 2 } }} data-tour="settings-subscription-panel">
               <Grid item xs={12} lg={5}>
                 <Card
                   elevation={0}
@@ -730,16 +763,31 @@ const Settings: React.FC = () => {
                 >
                   <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-                      <CreditCardIcon sx={{ color: GLASS.accent.orange, fontSize: 26 }} />
+                      {isApprovalOnly ? (
+                        <ThumbUpIcon sx={{ color: GLASS.accent.orange, fontSize: 26 }} />
+                      ) : (
+                        <CreditCardIcon sx={{ color: GLASS.accent.orange, fontSize: 26 }} />
+                      )}
                       <Typography variant="h6" sx={{ fontWeight: 600 }}>Plano atual</Typography>
                     </Box>
-                    <Box sx={{ mb: 2 }}>
+                    <Box sx={{ mb: 1.5 }}>
                       <Chip
-                        label={subscription.plan?.name ? subscription.plan.name.charAt(0).toUpperCase() + subscription.plan.name.slice(1) : 'N/A'}
-                        color="primary"
+                        label={getSubscriptionPlanLabel(plan, subscriptionLimits.productMode)}
+                        color={isApprovalOnly ? 'warning' : 'primary'}
                         sx={{ fontSize: '1rem', fontWeight: 600, py: 1.5, px: 2, borderRadius: 2 }}
                       />
                     </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      {getSubscriptionPlanSubtitle(plan, subscriptionLimits.productMode)}
+                    </Typography>
+                    {isApprovalOnly && (
+                      <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
+                        <strong>{formatBRLFromCents(pricePerClientCents)}</strong> por cliente/mês.
+                        Seu contrato inclui até <strong>{subscriptionLimits.maxClients}</strong> clientes
+                        ({formatBRLFromCents(contractMonthlyCents)}/mês).
+                        Para ampliar, fale com nossa equipe.
+                      </Alert>
+                    )}
                     <List disablePadding sx={{ '& .MuiListItem-root': { py: 1.5, px: 0 } }}>
                         <ListItem>
                           <ListItemIcon>
@@ -764,8 +812,32 @@ const Settings: React.FC = () => {
                               <CalendarIcon />
                             </ListItemIcon>
                             <ListItemText
-                              primary="Próxima Cobrança"
+                              primary={isApprovalOnly || plan?.is_enterprise_contact ? 'Vigência do contrato' : 'Próxima cobrança'}
                               secondary={format(new Date(subscription.current_period_end), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                            />
+                          </ListItem>
+                        )}
+
+                        {isApprovalOnly && (
+                          <ListItem>
+                            <ListItemIcon>
+                              <CreditCardIcon />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary="Valor do contrato"
+                              secondary={`${formatBRLFromCents(pricePerClientCents)} × ${subscriptionLimits.maxClients} clientes = ${formatBRLFromCents(contractMonthlyCents)}/mês`}
+                            />
+                          </ListItem>
+                        )}
+
+                        {isApprovalOnly && (
+                          <ListItem>
+                            <ListItemIcon>
+                              <PersonIcon />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary="Clientes no plano"
+                              secondary={`${subscriptionLimits.currentClients} cadastrados de ${subscriptionLimits.maxClients} inclusos`}
                             />
                           </ListItem>
                         )}
@@ -800,10 +872,21 @@ const Settings: React.FC = () => {
                         )}
                       </List>
                   </CardContent>
-                  <CardActions sx={{ px: { xs: 2, sm: 3 }, py: 2, borderTop: `1px solid ${GLASS.border.outer}`, bgcolor: GLASS.surface.bgFooter }}>
-                    <Button variant="outlined" onClick={() => navigate('/plans')} startIcon={<TrendingUpIcon />} sx={{ borderColor: GLASS.accent.orange, color: GLASS.accent.orange, borderRadius: GLASS.radius.button, '&:hover': { borderColor: GLASS.accent.orangeDark, bgcolor: 'rgba(247, 66, 17,0.06)' } }}>
-                      Ver planos
-                    </Button>
+                  <CardActions sx={{ px: { xs: 2, sm: 3 }, py: 2, borderTop: `1px solid ${GLASS.border.outer}`, bgcolor: GLASS.surface.bgFooter, gap: 1, flexWrap: 'wrap' }}>
+                    {isApprovalOnly ? (
+                      <Button
+                        variant="outlined"
+                        onClick={() => window.open(ENTERPRISE_CONTACT_URL, '_blank', 'noopener,noreferrer')}
+                        startIcon={<ContactSupportIcon />}
+                        sx={{ borderColor: GLASS.accent.orange, color: GLASS.accent.orange, borderRadius: GLASS.radius.button, '&:hover': { borderColor: GLASS.accent.orangeDark, bgcolor: 'rgba(247, 66, 17,0.06)' } }}
+                      >
+                        Falar com a equipe
+                      </Button>
+                    ) : (
+                      <Button variant="outlined" onClick={() => navigate('/plans')} startIcon={<TrendingUpIcon />} sx={{ borderColor: GLASS.accent.orange, color: GLASS.accent.orange, borderRadius: GLASS.radius.button, '&:hover': { borderColor: GLASS.accent.orangeDark, bgcolor: 'rgba(247, 66, 17,0.06)' } }}>
+                        Ver planos
+                      </Button>
+                    )}
                   </CardActions>
                 </Card>
               </Grid>
@@ -820,11 +903,41 @@ const Settings: React.FC = () => {
                     </Box>
 
                     {subscriptionLimits.error ? (
-                      <Alert severity="error" sx={{ borderRadius: 2 }}>
+                      <Alert severity="error" sx={{ borderRadius: 2, mb: 2 }}>
                         {subscriptionLimits.error}
                       </Alert>
-                    ) : (
-                      <Box>
+                    ) : null}
+
+                    {isApprovalOnly && (
+                      <Box
+                        sx={{
+                          mb: 3,
+                          p: 2.5,
+                          borderRadius: GLASS.radius.inner,
+                          border: `1px solid ${GLASS.border.outer}`,
+                          bgcolor: 'rgba(247, 66, 17, 0.06)',
+                        }}
+                      >
+                        <Typography variant="h4" sx={{ fontWeight: 700, color: GLASS.accent.orange, lineHeight: 1.1 }}>
+                          {subscriptionLimits.currentClients}
+                          <Typography component="span" variant="h6" color="text.secondary" sx={{ fontWeight: 500 }}>
+                            {' '}/ {subscriptionLimits.maxClients}
+                          </Typography>
+                        </Typography>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 0.5 }}>
+                          clientes cadastrados
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                          {atClientLimit
+                            ? 'Você atingiu o limite do seu contrato.'
+                            : clientsRemaining === 999999
+                              ? 'Sem limite de cadastro.'
+                              : `Você ainda pode cadastrar ${clientsRemaining} cliente${clientsRemaining === 1 ? '' : 's'}.`}
+                        </Typography>
+                      </Box>
+                    )}
+
+                    <Box>
                         <Box
                           sx={{
                             mb: 3,
@@ -836,8 +949,12 @@ const Settings: React.FC = () => {
                         >
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1, mb: 2 }}>
                             <Box>
-                              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>Contas Instagram</Typography>
-                              <Typography variant="caption" color="text.secondary">Contas conectadas à sua organização</Typography>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                {getClientLimitLabel(plan, subscriptionLimits.productMode)}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {getClientLimitCaption(plan, subscriptionLimits.productMode)}
+                              </Typography>
                             </Box>
                             <Typography variant="h6" sx={{ fontWeight: 600, color: GLASS.accent.orange }}>
                               {subscriptionLimits.currentClients} / {subscriptionLimits.maxClients === 999999 ? '∞' : subscriptionLimits.maxClients}
@@ -859,8 +976,14 @@ const Settings: React.FC = () => {
                           {subscriptionLimits.maxClients === 999999 && (
                             <Chip label="Ilimitado" color="success" size="small" sx={{ mt: 1, fontWeight: 500 }} />
                           )}
+                          {atClientLimit && isApprovalOnly && (
+                            <Alert severity="warning" sx={{ mt: 2, borderRadius: 2 }}>
+                              Limite atingido. Entre em contato para liberar mais clientes no seu contrato.
+                            </Alert>
+                          )}
                         </Box>
 
+                        {!isApprovalOnly && (
                         <Box
                           sx={{
                             mb: 3,
@@ -896,6 +1019,7 @@ const Settings: React.FC = () => {
                             <Chip label="Ilimitado" color="success" size="small" sx={{ mt: 1, fontWeight: 500 }} />
                           )}
                         </Box>
+                        )}
 
                         {subscription.plan && (
                           <Box
@@ -913,12 +1037,26 @@ const Settings: React.FC = () => {
                             </Typography>
                             <List disablePadding sx={{ color: 'inherit', '& .MuiListItem-root': { py: 0.75, px: 0 } }}>
                               <ListItem>
-                                <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><InstagramIcon fontSize="small" /></ListItemIcon>
+                                <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><CreditCardIcon fontSize="small" /></ListItemIcon>
                                 <ListItemText
-                                  primary={`Até ${subscription.plan.max_clients === 999999 ? 'ilimitadas' : subscription.plan.max_clients} contas Instagram`}
+                                  primary={`${formatBRLFromCents(pricePerClientCents)} por cliente/mês`}
                                   primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }}
                                 />
                               </ListItem>
+                              <ListItem>
+                                <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}>
+                                  {isApprovalOnly ? <ThumbUpIcon fontSize="small" /> : <InstagramIcon fontSize="small" />}
+                                </ListItemIcon>
+                                <ListItemText
+                                  primary={
+                                    isApprovalOnly
+                                      ? `Até ${subscription.plan.max_clients} clientes para aprovação`
+                                      : `Até ${subscription.plan.max_clients === 999999 ? 'ilimitadas' : subscription.plan.max_clients} contas Instagram`
+                                  }
+                                  primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }}
+                                />
+                              </ListItem>
+                              {!isApprovalOnly && (
                               <ListItem>
                                 <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><ArticleIcon fontSize="small" /></ListItemIcon>
                                 <ListItemText
@@ -926,10 +1064,24 @@ const Settings: React.FC = () => {
                                   primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }}
                                 />
                               </ListItem>
+                              )}
+                              {isApprovalOnly && (
+                              <ListItem>
+                                <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><CheckCircleIcon fontSize="small" /></ListItemIcon>
+                                <ListItemText
+                                  primary="Fluxo de aprovação com links para o cliente"
+                                  primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }}
+                                />
+                              </ListItem>
+                              )}
                               <ListItem>
                                 <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><PersonIcon fontSize="small" /></ListItemIcon>
                                 <ListItemText
-                                  primary={`Até ${subscription.plan.max_profiles || 'N/A'} usuários`}
+                                  primary={
+                                    isApprovalOnly
+                                      ? `${subscriptionLimits.currentClients} de ${subscription.plan.max_clients} clientes em uso`
+                                      : `Até ${subscription.plan.max_profiles || 'N/A'} usuários`
+                                  }
                                   primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }}
                                 />
                               </ListItem>
@@ -937,12 +1089,22 @@ const Settings: React.FC = () => {
                           </Box>
                         )}
                       </Box>
-                    )}
                   </CardContent>
-                  <CardActions sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 2, borderTop: `1px solid ${GLASS.border.outer}`, bgcolor: GLASS.surface.bgFooter, gap: 1.5 }}>
-                    <Button variant="contained" onClick={() => navigate('/plans')} startIcon={<TrendingUpIcon />} sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}>
-                      Fazer upgrade
-                    </Button>
+                  <CardActions sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 2, borderTop: `1px solid ${GLASS.border.outer}`, bgcolor: GLASS.surface.bgFooter, gap: 1.5, flexWrap: 'wrap' }}>
+                    {isApprovalOnly ? (
+                      <Button
+                        variant="contained"
+                        onClick={() => window.open(ENTERPRISE_CONTACT_URL, '_blank', 'noopener,noreferrer')}
+                        startIcon={<ContactSupportIcon />}
+                        sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}
+                      >
+                        Solicitar mais clientes
+                      </Button>
+                    ) : (
+                      <Button variant="contained" onClick={() => navigate('/plans')} startIcon={<TrendingUpIcon />} sx={{ bgcolor: GLASS.accent.orange, '&:hover': { bgcolor: GLASS.accent.orangeDark }, borderRadius: GLASS.radius.button }}>
+                        Fazer upgrade
+                      </Button>
+                    )}
                     <Button variant="outlined" onClick={loadSubscription} startIcon={<RefreshIcon />} sx={{ borderColor: GLASS.accent.orange, color: GLASS.accent.orange, borderRadius: GLASS.radius.button, '&:hover': { borderColor: GLASS.accent.orangeDark, bgcolor: 'rgba(247, 66, 17,0.06)' } }}>
                       Atualizar
                     </Button>
@@ -950,6 +1112,8 @@ const Settings: React.FC = () => {
                 </Card>
               </Grid>
             </Grid>
+              );
+            })()
           ) : (
             <Box sx={{ px: { xs: 0, sm: 2 } }}>
               <Card

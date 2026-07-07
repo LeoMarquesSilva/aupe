@@ -5,6 +5,7 @@
 import { supabase } from './supabaseClient';
 import { subscriptionService, Subscription } from './subscriptionService';
 import { roleService } from './roleService';
+import { organizationProductModeService, OrganizationProductMode } from './organizationProductModeService';
 
 export interface SubscriptionLimits {
   canCreateClient: boolean;
@@ -14,6 +15,7 @@ export interface SubscriptionLimits {
   currentPostsThisMonth: number;
   maxPostsPerMonth: number;
   subscription: Subscription | null;
+  productMode?: OrganizationProductMode;
   error?: string;
 }
 
@@ -21,6 +23,8 @@ export interface LimitCheckResult {
   allowed: boolean;
   message?: string;
   limits?: SubscriptionLimits;
+  /** Quando true, exibir diálogo de contato em vez de upgrade de plano. */
+  contactRequired?: boolean;
 }
 
 /** Extrai clients_count e posts_count da resposta da RPC (array, objeto ou coluna nomeada). */
@@ -65,8 +69,24 @@ class SubscriptionLimitsService {
 
       const organizationId = (profile as any).organization_id;
 
-      // 2. Contagem via RPC (sempre cedo, para ter números reais em qualquer plano)
+      let productMode: OrganizationProductMode = 'full';
+      try {
+        productMode = await organizationProductModeService.getCurrentMode();
+      } catch {
+        productMode = 'full';
+      }
+
+      // Contagem real de clientes (fonte de verdade — independente de RPC)
       let currentClients = 0;
+      const { count: clientsCount, error: clientsCountErr } = await supabase
+        .from('clients')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId);
+      if (!clientsCountErr && clientsCount !== null) {
+        currentClients = clientsCount;
+      }
+
+      // Posts do mês via RPC com fallback
       let currentPostsThisMonth = 0;
       const { data: myUsage, error: myErr } = await supabase.rpc('get_my_organization_usage_counts');
       if (myErr) {
@@ -75,26 +95,30 @@ class SubscriptionLimitsService {
       const raw = Array.isArray(myUsage) ? myUsage[0] : myUsage;
       const parsed = parseUsageRpcResponse(raw);
       if (parsed) {
-        currentClients = parsed.clients_count;
+        if (currentClients === 0) currentClients = parsed.clients_count;
         currentPostsThisMonth = parsed.posts_count;
       }
-      if (currentClients === 0 && currentPostsThisMonth === 0) {
+      if (currentPostsThisMonth === 0) {
         const { data: usageCounts, error: rpcError } = await supabase.rpc('get_organization_usage_counts', { p_organization_id: organizationId });
         if (rpcError) console.warn('[subscriptionLimits] RPC get_organization_usage_counts (fallback) failed:', rpcError.message);
         const raw2 = Array.isArray(usageCounts) ? usageCounts[0] : usageCounts;
         const parsed2 = parseUsageRpcResponse(raw2);
         if (parsed2) {
-          currentClients = parsed2.clients_count;
+          if (currentClients === 0) currentClients = parsed2.clients_count;
           currentPostsThisMonth = parsed2.posts_count;
         }
       }
-      if (currentClients === 0 && currentPostsThisMonth === 0) {
-        const resClients = await supabase.from('clients').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId);
-        currentClients = resClients.count ?? 0;
+      if (currentPostsThisMonth === 0) {
         const now = new Date();
         const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
         const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
-        const resPosts = await supabase.from('scheduled_posts').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).gte('scheduled_date', start.toISOString()).lte('scheduled_date', end.toISOString()).eq('grandfathered', false);
+        const resPosts = await supabase
+          .from('scheduled_posts')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId)
+          .gte('scheduled_date', start.toISOString())
+          .lte('scheduled_date', end.toISOString())
+          .eq('grandfathered', false);
         currentPostsThisMonth = resPosts.count ?? 0;
       }
 
@@ -167,12 +191,13 @@ class SubscriptionLimitsService {
         return {
           canCreateClient: false,
           canSchedulePost: false,
-          currentClients: 0,
+          currentClients,
           maxClients: 0,
-          currentPostsThisMonth: 0,
+          currentPostsThisMonth,
           maxPostsPerMonth: 0,
           subscription,
-          error: 'Plano não encontrado.'
+          productMode,
+          error: 'Plano não encontrado.',
         };
       }
 
@@ -188,7 +213,8 @@ class SubscriptionLimitsService {
           maxClients: 999999,
           currentPostsThisMonth,
           maxPostsPerMonth: 999999,
-          subscription
+          subscription,
+          productMode,
         };
       }
 
@@ -208,7 +234,8 @@ class SubscriptionLimitsService {
         maxClients,
         currentPostsThisMonth,
         maxPostsPerMonth,
-        subscription
+        subscription,
+        productMode,
       };
     } catch (error: any) {
       console.error('❌ Erro ao obter limites:', error);
@@ -240,10 +267,14 @@ class SubscriptionLimitsService {
     }
 
     if (!limits.canCreateClient) {
+      const isApprovalOnly = limits.productMode === 'approval_only';
       return {
         allowed: false,
-        message: `Limite de contas Instagram atingido (${limits.currentClients}/${limits.maxClients}). Faça upgrade do seu plano para adicionar mais contas.`,
-        limits
+        contactRequired: isApprovalOnly,
+        message: isApprovalOnly
+          ? `Você atingiu o limite de ${limits.maxClients} clientes do seu plano (${limits.currentClients}/${limits.maxClients}). Entre em contato conosco para liberar mais clientes.`
+          : `Limite de contas Instagram atingido (${limits.currentClients}/${limits.maxClients}). Faça upgrade do seu plano para adicionar mais contas.`,
+        limits,
       };
     }
 

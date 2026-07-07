@@ -15,6 +15,8 @@ export interface Organization {
   active: boolean;
   /** Public URL for agency branding (sidebar, shared links, etc.) */
   agency_logo_url?: string | null;
+  /** full = produto completo; approval_only = apenas fluxo de aprovação */
+  product_mode?: 'full' | 'approval_only';
   created_at: string;
   updated_at: string;
 }

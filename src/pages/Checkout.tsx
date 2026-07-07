@@ -18,6 +18,8 @@ import { roleService } from '../services/roleService';
 import { GLASS } from '../theme/glassTokens';
 import { ENTERPRISE_CONTACT_URL } from '../config/stripeProducts';
 
+const SELF_SERVICE_TRIAL_DAYS = 3;
+
 const Checkout: React.FC = () => {
   const [searchParams] = useSearchParams();
   const planId = searchParams.get('plan');
@@ -90,7 +92,8 @@ const Checkout: React.FC = () => {
         await stripeService.startCheckout(
           [{ priceId: plan.stripe_price_id, quantity: 1 }],
           organizationId,
-          user.id
+          user.id,
+          { trialPeriodDays: SELF_SERVICE_TRIAL_DAYS }
         );
 
         // Se chegou aqui, o redirecionamento já aconteceu

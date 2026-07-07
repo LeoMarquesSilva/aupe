@@ -19,6 +19,14 @@ import {
 } from '@mui/icons-material';
 import { Client } from '../types';
 import { clientService } from '../services/supabaseClient';
+import { clientLogoService } from '../services/clientLogoService';
+import ClientLogoField from './ClientLogoField';
+import {
+  deriveInternalInstagramSlug,
+  getClientInstagramDisplay,
+  isClientInstagramConnected,
+  isPlaceholderInstagramHandle,
+} from '../utils/clientDisplay';
 import { GLASS } from '../theme/glassTokens';
 
 interface EditClientDialogProps {
@@ -37,6 +45,8 @@ const EditClientDialog: React.FC<EditClientDialogProps> = ({
   const [name, setName] = useState<string>('');
   const [instagram, setInstagram] = useState<string>('');
   const [logoUrl, setLogoUrl] = useState<string>('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [removeLogo, setRemoveLogo] = useState(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,18 +54,32 @@ const EditClientDialog: React.FC<EditClientDialogProps> = ({
   useEffect(() => {
     if (client && open) {
       setName(client.name || '');
-      setInstagram(client.instagram || '');
+      const connected = isClientInstagramConnected(client);
+      const ig = client.instagram || '';
+      setInstagram(
+        connected || !isPlaceholderInstagramHandle(ig, client.name, connected)
+          ? ig.replace(/^@+/, '')
+          : ''
+      );
       setLogoUrl(client.logoUrl || '');
+      setLogoFile(null);
+      setRemoveLogo(false);
       setError(null);
     }
   }, [client, open]);
 
+  const isConnected = client ? isClientInstagramConnected(client) : false;
+
   const handleSave = async () => {
     if (!client) return;
 
-    // Validação
-    if (!name.trim() || !instagram.trim()) {
-      setError('Nome e usuário do Instagram são obrigatórios');
+    if (!name.trim()) {
+      setError('Nome do cliente é obrigatório');
+      return;
+    }
+
+    if (isConnected && !instagram.trim()) {
+      setError('Usuário do Instagram é obrigatório para clientes conectados');
       return;
     }
 
@@ -63,14 +87,29 @@ const EditClientDialog: React.FC<EditClientDialogProps> = ({
     setError(null);
 
     try {
+      const trimmedName = name.trim();
+      const trimmedInstagram = instagram.trim().replace(/^@+/, '');
       const updatedClient: Client = {
         ...client,
-        name: name.trim(),
-        instagram: instagram.trim(),
-        logoUrl: logoUrl.trim() || undefined
+        name: trimmedName,
+        instagram: trimmedInstagram || deriveInternalInstagramSlug(trimmedName),
+        logoUrl: removeLogo ? undefined : logoUrl.trim() || undefined,
       };
 
-      const savedClient = await clientService.updateClient(updatedClient);
+      let savedClient = await clientService.updateClient(updatedClient);
+
+      if (removeLogo && client.logoUrl) {
+        await clientLogoService.clearClientLogo(client.id, client.logoUrl);
+        savedClient = { ...savedClient, logoUrl: undefined };
+      } else if (logoFile) {
+        const newLogoUrl = await clientLogoService.uploadClientLogo(
+          client.id,
+          logoFile,
+          client.logoUrl
+        );
+        savedClient = { ...savedClient, logoUrl: newLogoUrl };
+      }
+
       onClientUpdated(savedClient);
       onClose();
     } catch (err: any) {
@@ -120,6 +159,21 @@ const EditClientDialog: React.FC<EditClientDialogProps> = ({
         )}
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+          <ClientLogoField
+            name={name}
+            previewUrl={removeLogo ? null : logoUrl}
+            file={logoFile}
+            onFileChange={(file) => {
+              setLogoFile(file);
+              if (file) {
+                setRemoveLogo(false);
+              } else if (logoUrl) {
+                setRemoveLogo(true);
+              }
+            }}
+            disabled={loading}
+          />
+
           <TextField
             fullWidth
             label="Nome do Cliente"
@@ -136,23 +190,24 @@ const EditClientDialog: React.FC<EditClientDialogProps> = ({
             variant="outlined"
             value={instagram}
             onChange={(e) => setInstagram(e.target.value)}
-            required
+            required={isConnected}
             disabled={loading}
+            placeholder={isConnected ? undefined : 'Opcional — conecte depois se precisar publicar'}
+            helperText={
+              isConnected
+                ? 'Cliente conectado ao Instagram'
+                : 'Opcional no fluxo só de aprovação. O nome acima é o que aparece nos links enviados ao cliente.'
+            }
             InputProps={{
               startAdornment: <InputAdornment position="start">@</InputAdornment>,
             }}
           />
 
-          <TextField
-            fullWidth
-            label="URL do Logo"
-            variant="outlined"
-            value={logoUrl}
-            onChange={(e) => setLogoUrl(e.target.value)}
-            disabled={loading}
-            placeholder="https://exemplo.com/logo.png"
-            helperText="Opcional: URL para o logo do cliente"
-          />
+          {client && getClientInstagramDisplay(client) && (
+            <Typography variant="caption" color="text.secondary">
+              Exibição atual: {getClientInstagramDisplay(client)}
+            </Typography>
+          )}
         </Box>
       </DialogContent>
 

@@ -10,8 +10,8 @@ import {
   CircularProgress,
   Divider,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { useLocation } from 'react-router-dom';
-import { useAppShellLayout } from '../../contexts/AppShellLayoutContext';
 import CheckIcon from '@mui/icons-material/Check';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { motion } from 'framer-motion';
@@ -67,30 +67,8 @@ const LandingPricing: React.FC<LandingPricingProps> = ({
   currentPlanName = null,
 }) => {
   const { pathname } = useLocation();
-  const shellLayout = useAppShellLayout();
   /** Página de planos dentro do AppShell (#f6f6f6) — sem faixa escura própria; cards claros como o restante do produto. */
   const isProductShell = pathname === '/plans';
-
-  const planCardColumnWidth = (popular: boolean) => {
-    if (!isProductShell) {
-      return {
-        xs: popular ? 'min(90vw, 340px)' : 'min(86vw, 300px)',
-        sm: popular ? 320 : 290,
-        md: popular ? 318 : 286,
-      };
-    }
-    if (shellLayout.isMobileShell) {
-      return {
-        xs: popular ? 'min(calc(100vw - 28px), 340px)' : 'min(calc(100vw - 28px), 300px)',
-        sm: popular ? 'clamp(268px, 86vw, 330px)' : 'clamp(248px, 82vw, 300px)',
-      };
-    }
-    return {
-      xs: popular ? 'min(calc(100vw - 24px), 340px)' : 'min(calc(100vw - 28px), 300px)',
-      sm: popular ? 'clamp(268px, min(46%, 360px), 334px)' : 'clamp(248px, min(42%, 328px), 302px)',
-      md: popular ? 'clamp(274px, min(34%, 400px), 340px)' : 'clamp(254px, min(30%, 368px), 308px)',
-    };
-  };
 
   const resolvedCurrentPlanName =
     (currentSubscriptionPlanId && plans.find((p) => p.id === currentSubscriptionPlanId)?.name) || currentPlanName || null;
@@ -100,10 +78,10 @@ const LandingPricing: React.FC<LandingPricingProps> = ({
     component="section"
     id="precos"
     sx={{
-      py: isProductShell ? { xs: 6, md: 8 } : { xs: 10, md: 16 },
+      py: isProductShell ? { xs: 6, md: 8 } : { xs: 8, md: 12 },
       position: 'relative',
       overflow: 'visible',
-      bgcolor: 'transparent',
+      bgcolor: isProductShell ? 'transparent' : '#0a0f2d',
       color: isProductShell ? 'text.primary' : '#fff',
       '@keyframes insytOrangeGlow': {
         '0%, 100%': { boxShadow: '0 20px 60px -10px rgba(247, 66, 17, 0.45), 0 0 0 1px rgba(247, 66, 17, 0.35) inset' },
@@ -165,7 +143,7 @@ const LandingPricing: React.FC<LandingPricingProps> = ({
                 lineHeight: 1.15,
               }}
             >
-              Planos para sua operação
+              Planos para validar e escalar sua operação
             </Typography>
             <Typography
               variant="body2"
@@ -177,7 +155,7 @@ const LandingPricing: React.FC<LandingPricingProps> = ({
                 fontSize: { xs: '0.95rem', sm: '1.02rem', md: '1.08rem' },
               }}
             >
-              Escolha o plano certo para o seu momento. Aumente contas e volume de posts conforme cresce.
+              Comece com 3 dias grátis nos planos self-service. Aumente contas e volume conforme a carteira cresce.
             </Typography>
           </Box>
           {resolvedCurrentPlanName && (
@@ -222,13 +200,8 @@ const LandingPricing: React.FC<LandingPricingProps> = ({
         </Box>
       ) : (
         <Box
-          className="grain-overlay premium-header-bg"
           sx={{
-            p: { xs: 2.5, md: 3.5 },
-            borderRadius: GLASS.radius.card,
-            border: '1px solid rgba(255, 255, 255, 0.18)',
-            boxShadow: '0 16px 38px -24px rgba(10, 15, 45, 0.8)',
-            mb: { xs: 5, md: 8 },
+            mb: { xs: 4, md: 6 },
             textAlign: 'center',
             maxWidth: 880,
             mx: 'auto',
@@ -241,35 +214,35 @@ const LandingPricing: React.FC<LandingPricingProps> = ({
               fontWeight: 700,
               mb: 1.5,
               textTransform: 'uppercase',
-              color: 'rgba(255, 255, 255, 0.88)',
+              color: 'rgba(255, 255, 255, 0.64)',
             }}
           >
             Preços
           </Typography>
           <Typography
             variant="h4"
-            className="premium-header-title"
             sx={{
               fontFamily: '"Cabinet Grotesk", "Poppins", sans-serif',
               letterSpacing: '-0.02em',
-              fontSize: { xs: '1.5rem', sm: '1.75rem', md: '2.1rem' },
+              fontSize: { xs: '1.85rem', sm: '2.2rem', md: '2.75rem' },
               mb: 1.25,
               lineHeight: 1.2,
+              color: '#fff',
             }}
-          >
-            Planos para sua operação
+            >
+              Planos com 3 dias grátis para começar
           </Typography>
           <Typography
             variant="body2"
-            className="premium-header-subtitle"
             sx={{
               maxWidth: 620,
               mx: 'auto',
               lineHeight: 1.65,
-              fontSize: { xs: '0.9rem', md: '1rem' },
+              fontSize: { xs: '0.95rem', md: '1.06rem' },
+              color: 'rgba(255, 255, 255, 0.72)',
             }}
           >
-            Escolha o plano certo para o seu momento. Aumente contas e volume de posts conforme cresce.
+            Teste o fluxo completo de calendário, aprovação e dashboard antes da cobrança recorrente.
           </Typography>
         </Box>
       )}
@@ -291,7 +264,7 @@ const LandingPricing: React.FC<LandingPricingProps> = ({
         <Box
           sx={{
             pt: { xs: 3, md: 6 },
-            pb: { xs: 2, md: 6 },
+            pb: { xs: 2, md: 3 },
             overflow: 'visible',
           }}
         >
@@ -299,52 +272,23 @@ const LandingPricing: React.FC<LandingPricingProps> = ({
             role="region"
             aria-label="Planos disponíveis"
             sx={{
-              display: 'flex',
-              flexDirection: 'row',
-              flexWrap: 'nowrap',
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: '1fr',
+                sm: 'repeat(2, minmax(0, 1fr))',
+                lg: `repeat(${Math.min(Math.max(plans.length, 1), 4)}, minmax(0, 1fr))`,
+              },
               alignItems: 'stretch',
               width: '100%',
               maxWidth: '100%',
               minWidth: 0,
               boxSizing: 'border-box',
-              gap: { xs: 2, sm: 2.25, md: 2.75 },
-              overflowX: 'auto',
+              gap: { xs: 2, sm: 2.25, md: 2.5 },
+              overflowX: 'visible',
               overflowY: 'visible',
-              pt: { xs: 5, sm: 5.5, md: 6 },
-              scrollSnapType: { xs: 'x mandatory', md: 'x proximity' },
-              WebkitOverflowScrolling: 'touch',
-              scrollbarGutter: 'stable',
-              mx: isProductShell ? 0 : { xs: -1, sm: -1.5 },
-              px: isProductShell ? 0 : { xs: 1, sm: 1.5 },
-              pb: 2,
+              pt: { xs: 4, sm: 4.5, md: 5 },
+              pb: { xs: 1, md: 2 },
               transition: 'gap 0.2s ease-out',
-              scrollbarWidth: 'thin',
-              scrollbarColor: isProductShell
-                ? `${GLASS.accent.orange} rgba(10, 15, 45, 0.14)`
-                : `${GLASS.accent.orangeLight} rgba(255, 255, 255, 0.16)`,
-              '&::-webkit-scrollbar': {
-                height: 11,
-              },
-              '&::-webkit-scrollbar-track': {
-                marginInline: { xs: '10px', sm: '14px', md: '18px' },
-                background: isProductShell
-                  ? 'linear-gradient(180deg, rgba(10, 15, 45, 0.09) 0%, rgba(10, 15, 45, 0.04) 100%)'
-                  : 'linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.05) 100%)',
-                borderRadius: 999,
-                border: isProductShell
-                  ? `1px solid ${GLASS.border.subtle}`
-                  : '1px solid rgba(255, 255, 255, 0.14)',
-              },
-              '&::-webkit-scrollbar-thumb': {
-                borderRadius: 999,
-                background: `linear-gradient(90deg, ${GLASS.accent.orangeLight} 0%, ${GLASS.accent.orange} 38%, ${GLASS.accent.orangeDark} 100%)`,
-                border: '2px solid rgba(255, 255, 255, 0.45)',
-                boxShadow: '0 1px 4px rgba(247, 66, 17, 0.35)',
-              },
-              '&::-webkit-scrollbar-thumb:hover': {
-                background: `linear-gradient(90deg, ${GLASS.accent.orange} 0%, ${GLASS.accent.orangeDark} 100%)`,
-                boxShadow: '0 2px 8px rgba(247, 66, 17, 0.45)',
-              },
             }}
           >
             {plans.map((plan, index) => {
@@ -358,11 +302,8 @@ const LandingPricing: React.FC<LandingPricingProps> = ({
                 <Box
                   key={plan.id}
                   sx={{
-                    flex: '0 0 auto',
-                    width: planCardColumnWidth(plan.popular),
-                    maxWidth: plan.popular ? 340 : 308,
-                    scrollSnapAlign: 'center',
-                    scrollSnapStop: { xs: 'always', md: 'normal' },
+                    width: '100%',
+                    minWidth: 0,
                     display: 'flex',
                     alignItems: 'stretch',
                     // Área extra só no card em destaque, para o badge não depender só do padding da faixa
@@ -537,6 +478,22 @@ const LandingPricing: React.FC<LandingPricingProps> = ({
                                     border: `1px solid rgba(247, 66, 17, 0.35)`,
                                   }
                                 : {}),
+                            }}
+                          />
+                        )}
+                        {!isContact && !isCurrentPlan && !isProductShell && (
+                          <Chip
+                            label="3 DIAS GRÁTIS"
+                            size="small"
+                            sx={{
+                              mt: 1.25,
+                              height: 24,
+                              color: INSYT_COLORS.primaryLight,
+                              bgcolor: 'rgba(247, 66, 17, 0.13)',
+                              border: `1px solid ${alpha(INSYT_COLORS.primary, 0.3)}`,
+                              fontWeight: 800,
+                              fontSize: '0.64rem',
+                              letterSpacing: '0.12em',
                             }}
                           />
                         )}
@@ -776,7 +733,7 @@ const LandingPricing: React.FC<LandingPricingProps> = ({
                                   }),
                         }}
                       >
-                        {isCurrentPlan ? 'Plano atual' : isContact ? 'Falar com vendas' : 'Escolher plano'}
+                        {isCurrentPlan ? 'Plano atual' : isContact ? 'Falar com vendas' : 'Começar teste grátis'}
                       </Button>
                     </Card>
                   </motion.div>

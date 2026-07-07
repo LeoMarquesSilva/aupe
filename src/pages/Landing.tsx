@@ -8,11 +8,9 @@ import { mapAndSortPlansFromDb } from '../config/planPresentation';
 import {
   LandingNav,
   LandingHero,
-  LandingAnalyticsPreview,
   LandingFeatures,
   LandingPricing,
   LandingFaq,
-  LandingPostTypes,
   LandingCta,
   LandingFooter,
   type LandingPlanCard,
@@ -75,20 +73,21 @@ const Landing: React.FC = () => {
   };
 
   const handleGetStartedGeneric = async () => {
-    await handleGetStarted();
+    const defaultPlan = plans.find((plan) => plan.popular && !plan.isContactOnly) || plans.find((plan) => !plan.isContactOnly);
+    await handleGetStarted(defaultPlan?.id);
   };
 
-  const scrollToPrecos = () => {
-    document.getElementById('precos')?.scrollIntoView({ behavior: 'smooth' });
+  const handleTalkToSales = () => {
+    window.open(ENTERPRISE_CONTACT_URL, '_blank', 'noopener,noreferrer');
   };
 
   return (
     <Box
       sx={{
-        bgcolor: '#0F172A',
+        bgcolor: '#f6f6f6',
         minHeight: '100vh',
         position: 'relative',
-        overflow: 'hidden',
+        overflowX: 'hidden',
         fontFamily: '"Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif',
         '& *': {
           fontFamily: 'inherit',
@@ -98,55 +97,22 @@ const Landing: React.FC = () => {
         },
       }}
     >
-      <Box
-        sx={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: `
-            radial-gradient(circle at 20% 50%, rgba(247, 66, 17, 0.1) 0%, transparent 50%),
-            radial-gradient(circle at 80% 80%, rgba(6, 182, 212, 0.08) 0%, transparent 50%),
-            radial-gradient(circle at 40% 20%, rgba(52, 211, 153, 0.08) 0%, transparent 50%),
-            #0F172A
-          `,
-          zIndex: 0,
-        }}
-      />
-      <Box
-        sx={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundImage: `
-            linear-gradient(rgba(247, 66, 17, 0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(247, 66, 17, 0.03) 1px, transparent 1px)
-          `,
-          backgroundSize: '50px 50px',
-          zIndex: 0,
-        }}
-      />
-
       <Box sx={{ position: 'relative', zIndex: 1 }}>
         <LandingNav
           isMobile={isMobile}
           mobileOpen={mobileOpen}
           onDrawerToggle={handleDrawerToggle}
           onGetStarted={handleGetStartedGeneric}
+          onTalkToSales={handleTalkToSales}
         />
 
-        <LandingHero onGetStarted={handleGetStartedGeneric} onViewDemo={scrollToPrecos} />
+        <LandingHero onGetStarted={handleGetStartedGeneric} onTalkToSales={handleTalkToSales} />
 
-        <LandingAnalyticsPreview />
         <LandingFeatures />
         <LandingPricing plans={plans} loadingPlans={loadingPlans} onSelectPlan={(id) => handleGetStarted(id)} />
         <LandingFaq />
-        <LandingPostTypes />
-        <LandingCta onGetStarted={handleGetStartedGeneric} />
-        <LandingFooter />
+        <LandingCta onGetStarted={handleGetStartedGeneric} onTalkToSales={handleTalkToSales} />
+        <LandingFooter onGetStarted={handleGetStartedGeneric} onTalkToSales={handleTalkToSales} />
       </Box>
     </Box>
   );

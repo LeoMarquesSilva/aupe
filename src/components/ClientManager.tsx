@@ -35,6 +35,7 @@ import { getAuthorizationUrl, InstagramAuthData } from '../services/instagramAut
 import { subscriptionLimitsService } from '../services/subscriptionLimitsService';
 import SubscriptionLimitsAlert from './SubscriptionLimitsAlert';
 import { GLASS } from '../theme/glassTokens';
+import { deriveInternalInstagramSlug, getClientInstagramDisplay } from '../utils/clientDisplay';
 
 interface ClientManagerProps {
   clients: Client[];
@@ -96,7 +97,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
     }
   };
 
-  const handleAddClient = async () => {
+  const handleAddClient = async (connectInstagram = true) => {
     if (!name) {
       setError('Nome do cliente é obrigatório');
       return;
@@ -106,19 +107,17 @@ const ClientManager: React.FC<ClientManagerProps> = ({
     setError(null);
 
     try {
-      // ✅ VALIDAÇÃO: Verificar limites de subscription
       const limitCheck = await subscriptionLimitsService.canCreateClient();
       
       if (!limitCheck.allowed) {
-        setError(limitCheck.message || 'Não é possível adicionar mais contas Instagram. Faça upgrade do seu plano.');
+        setError(limitCheck.message || 'Não é possível adicionar mais clientes. Faça upgrade do seu plano.');
         setLoading(false);
         return;
       }
 
-      // O @ do Instagram passa a vir da API após o OAuth.
       const clientData = {
         name,
-        instagram: name.trim().toLowerCase().replace(/\s+/g, '_'),
+        instagram: deriveInternalInstagramSlug(name),
         logoUrl,
         appId,
         accessToken,
@@ -146,7 +145,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
       setAccessToken('');
       setUserId('');
 
-      if (createdClient?.id) {
+      if (createdClient?.id && connectInstagram) {
         startInstagramOAuthForClient(createdClient.id);
       }
 
@@ -267,16 +266,25 @@ const ClientManager: React.FC<ClientManagerProps> = ({
             fullWidth
             label="Instagram"
             variant="outlined"
-            value="Será preenchido automaticamente após conectar via OAuth"
+            value="Opcional — conecte depois se precisar publicar automaticamente"
             disabled
           />
           
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2, flexWrap: 'wrap' }}>
+            <Button
+              variant="outlined"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={() => handleAddClient(false)}
+              disabled={loading || !name}
+            >
+              {loading ? <CircularProgress size={24} /> : 'Criar sem Instagram'}
+            </Button>
             <Button
               variant="contained"
               color="primary"
               startIcon={<AddIcon />}
-              onClick={handleAddClient}
+              onClick={() => handleAddClient(true)}
               disabled={loading || !name}
             >
               {loading ? <CircularProgress size={24} /> : 'Criar e conectar Instagram'}
@@ -408,7 +416,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                         } 
                         secondary={
                           <Typography component="span" variant="body2">
-                            @{client.instagram}
+                            {getClientInstagramDisplay(client) ?? 'Só aprovação — sem Instagram'}
                           </Typography>
                         }
                       />
@@ -473,17 +481,26 @@ const ClientManager: React.FC<ClientManagerProps> = ({
                 fullWidth
                 label="Instagram"
                 variant="outlined"
-                value="Será preenchido automaticamente após conectar via OAuth"
+                value="Opcional — conecte depois se precisar publicar automaticamente"
                 disabled
               />
             </Box>
             
-            <Box sx={{ flex: '1 1 100%', display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+            <Box sx={{ flex: '1 1 100%', display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2, flexWrap: 'wrap' }}>
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<AddIcon />}
+                onClick={() => handleAddClient(false)}
+                disabled={loading || !name}
+              >
+                {loading ? <CircularProgress size={24} /> : 'Criar sem Instagram'}
+              </Button>
               <Button
                 variant="contained"
                 color="primary"
                 startIcon={<AddIcon />}
-                onClick={handleAddClient}
+                onClick={() => handleAddClient(true)}
                 disabled={loading || !name}
               >
                 {loading ? <CircularProgress size={24} /> : 'Criar e conectar Instagram'}
@@ -492,7 +509,7 @@ const ClientManager: React.FC<ClientManagerProps> = ({
           </Box>
           
           <Typography variant="body2" color="text.secondary" sx={{ mt: 4 }}>
-            Ao criar, o OAuth do Instagram abrirá automaticamente. O @ e a foto serão preenchidos pela API após a autorização.
+            Use &quot;Criar sem Instagram&quot; para clientes que só precisam aprovar conteúdo. O nome informado aparece nos links de aprovação.
           </Typography>
         </Box>
       )}

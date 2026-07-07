@@ -20,6 +20,10 @@ export interface CheckoutLineItem {
   quantity?: number;
 }
 
+export interface CheckoutOptions {
+  trialPeriodDays?: number;
+}
+
 export class StripeService {
   /**
    * Criar sessão de checkout para subscription.
@@ -28,7 +32,8 @@ export class StripeService {
   async createCheckoutSession(
     priceIdOrItems: string | CheckoutLineItem[],
     organizationId: string,
-    userId: string
+    userId: string,
+    options: CheckoutOptions = {}
   ): Promise<CheckoutSession> {
     try {
       const body: Record<string, unknown> = { organizationId, userId };
@@ -36,6 +41,9 @@ export class StripeService {
         body.items = priceIdOrItems;
       } else {
         body.priceId = priceIdOrItems;
+      }
+      if (options.trialPeriodDays && options.trialPeriodDays > 0) {
+        body.trialPeriodDays = options.trialPeriodDays;
       }
 
       const { data, error } = await supabase.functions.invoke('stripe-checkout', {
@@ -110,10 +118,11 @@ export class StripeService {
   async startCheckout(
     priceIdOrItems: string | CheckoutLineItem[],
     organizationId: string,
-    userId: string
+    userId: string,
+    options: CheckoutOptions = {}
   ): Promise<void> {
     try {
-      const session = await this.createCheckoutSession(priceIdOrItems, organizationId, userId);
+      const session = await this.createCheckoutSession(priceIdOrItems, organizationId, userId, options);
 
       if (session.url) {
         window.location.href = session.url;

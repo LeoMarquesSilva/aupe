@@ -8,9 +8,15 @@ import {
   VideoLibrary as VideoIcon,
   Collections as CollectionsIcon,
   DataObject as DataObjectIcon,
-  Speed as SpeedIcon,
   Security as SecurityIcon,
   CloudQueue as CloudIcon,
+  Approval as ApprovalIcon,
+  CalendarMonth as CalendarIcon,
+  InsertLink as LinkIcon,
+  Groups as GroupsIcon,
+  Bolt as BoltIcon,
+  TaskAlt as TaskIcon,
+  Paid as PaidIcon,
 } from '@mui/icons-material';
 import { GLASS } from '../../theme/glassTokens';
 
@@ -44,60 +50,119 @@ export const INSYT_COLORS = {
 };
 
 export const analyticsData = [
-  { name: 'Jan', value: 4000, engagement: 2400 },
-  { name: 'Fev', value: 3000, engagement: 1398 },
-  { name: 'Mar', value: 5000, engagement: 3000 },
-  { name: 'Abr', value: 4500, engagement: 2780 },
-  { name: 'Mai', value: 6000, engagement: 3890 },
-  { name: 'Jun', value: 5500, engagement: 3200 },
+  { name: 'Jan', value: 42, engagement: 24 },
+  { name: 'Fev', value: 58, engagement: 31 },
+  { name: 'Mar', value: 74, engagement: 45 },
+  { name: 'Abr', value: 88, engagement: 53 },
+  { name: 'Mai', value: 116, engagement: 69 },
+  { name: 'Jun', value: 132, engagement: 82 },
 ];
 
 export const performanceData = [
-  { name: 'Seg', posts: 12, reach: 8500 },
-  { name: 'Ter', posts: 15, reach: 10200 },
-  { name: 'Qua', posts: 18, reach: 12800 },
-  { name: 'Qui', posts: 14, reach: 9600 },
-  { name: 'Sex', posts: 20, reach: 15000 },
-  { name: 'Sáb', posts: 8, reach: 6200 },
-  { name: 'Dom', posts: 10, reach: 7800 },
+  { name: 'Seg', posts: 12, reach: 36 },
+  { name: 'Ter', posts: 15, reach: 52 },
+  { name: 'Qua', posts: 18, reach: 68 },
+  { name: 'Qui', posts: 14, reach: 64 },
+  { name: 'Sex', posts: 20, reach: 91 },
+  { name: 'Sáb', posts: 8, reach: 44 },
+  { name: 'Dom', posts: 10, reach: 57 },
+];
+
+export const trustSignals = [
+  'Teste grátis por 3 dias',
+  'Links de aprovação com validade',
+  'Instagram Graph API',
+  'Planos para multi-conta',
+];
+
+export const agencyPains = [
+  {
+    label: 'Antes',
+    title: 'Aprovação espalhada em conversas',
+    description: 'Cliente aprova no WhatsApp, gestor comenta em outro canal e o time perde o histórico do que foi combinado.',
+  },
+  {
+    label: 'Depois',
+    title: 'Fluxo com rastreabilidade',
+    description: 'Cada peça passa por revisão interna, aprovação do cliente e status de publicação dentro da mesma operação.',
+  },
+  {
+    label: 'Resultado',
+    title: 'Mais contas sem perder controle',
+    description: 'A agência ganha uma rotina previsível para calendário, formatos, links externos e dashboards compartilháveis.',
+  },
 ];
 
 export const features = [
   {
-    icon: React.createElement(DataObjectIcon, { sx: icon48 }),
-    title: 'Agendamento automático no Instagram',
+    icon: React.createElement(CalendarIcon, { sx: icon48 }),
+    eyebrow: 'Calendário operacional',
+    title: 'Agendamento no Instagram sem planilha paralela',
     description:
-      'Agende post, carrossel, reels e stories em uma operação única. O sistema dispara no horário programado e acompanha o status até a publicação.',
+      'Planeje post, carrossel, reels e stories por cliente. O time acompanha status, horário, formato e fila de publicação em uma visão única.',
     gradient: `linear-gradient(135deg, ${GLASS.accent.orange} 0%, #06B6D4 100%)`,
   },
   {
-    icon: React.createElement(SpeedIcon, { sx: icon48 }),
-    title: 'Aprovação interna e aprovação do cliente',
+    icon: React.createElement(ApprovalIcon, { sx: icon48 }),
+    eyebrow: 'Aprovação dupla',
+    title: 'Revisão do time e aprovação do cliente no mesmo fluxo',
     description:
-      'Centralize revisão do time e aprovação externa no mesmo fluxo. Gere links com validade para gestor e cliente, com histórico de aprovações e pedidos de ajuste.',
+      'Gere links com token e validade para aprovar, reprovar ou solicitar ajustes sem criar usuário extra para cada cliente.',
     gradient: `linear-gradient(135deg, ${GLASS.accent.orangeDark} 0%, ${GLASS.accent.orangeLight} 100%)`,
   },
   {
     icon: React.createElement(AnalyticsIcon, { sx: icon48 }),
-    title: 'Dashboard compartilhável por link',
+    eyebrow: 'Relatório compartilhável',
+    title: 'Dashboard por link para reduzir cobrança manual',
     description:
-      'Compartilhe métricas com o cliente sem criar usuário. Links temporários podem ser revogados a qualquer momento e mostram apenas dados do dashboard.',
+      'Compartilhe métricas com leitura controlada, sem convidar o cliente para a operação interna da agência.',
     gradient: `linear-gradient(135deg, #06B6D4 0%, ${GLASS.accent.orange} 100%)`,
   },
   {
-    icon: React.createElement(SecurityIcon, { sx: icon48 }),
-    title: 'Operação multi-conta com governança',
+    icon: React.createElement(GroupsIcon, { sx: icon48 }),
+    eyebrow: 'Governança multi-conta',
+    title: 'Clientes, acessos e histórico em uma base organizada',
     description:
-      'Gerencie múltiplos clientes com previsibilidade: calendário, aprovação e publicação no mesmo sistema, com regras de acesso e rastreabilidade por organização.',
+      'Organize múltiplas contas de Instagram por organização, com limites por plano, permissões e histórico de decisões.',
     gradient: `linear-gradient(135deg, ${GLASS.accent.orange} 0%, #06B6D4 100%)`,
   },
 ];
 
 export const stats = [
-  { value: 4, suffix: '', label: 'Formatos de conteúdo', icon: React.createElement(AutoAwesomeIcon) },
-  { value: 2, suffix: '', label: 'Níveis de aprovação', icon: React.createElement(SecurityIcon) },
-  { value: 1, suffix: '', label: 'Fluxo único de operação', icon: React.createElement(ScheduleIcon) },
-  { value: 24, suffix: '/7', label: 'Motor de agendamento', icon: React.createElement(CloudIcon) },
+  { value: 3, suffix: ' dias', label: 'de teste grátis', icon: React.createElement(BoltIcon) },
+  { value: 4, suffix: '', label: 'formatos de conteúdo', icon: React.createElement(AutoAwesomeIcon) },
+  { value: 2, suffix: '', label: 'camadas de aprovação', icon: React.createElement(SecurityIcon) },
+  { value: 24, suffix: '/7', label: 'fila de agendamento', icon: React.createElement(CloudIcon) },
+];
+
+export const workflowSteps = [
+  {
+    icon: React.createElement(ScheduleIcon),
+    title: 'Planejar',
+    description: 'Monte calendário por cliente, formato e data.',
+  },
+  {
+    icon: React.createElement(ApprovalIcon),
+    title: 'Aprovar',
+    description: 'Envie links para revisão interna e cliente.',
+  },
+  {
+    icon: React.createElement(DataObjectIcon),
+    title: 'Publicar',
+    description: 'Acompanhe status até a postagem no Instagram.',
+  },
+  {
+    icon: React.createElement(LinkIcon),
+    title: 'Reportar',
+    description: 'Compartilhe métricas por link controlado.',
+  },
+];
+
+export const productHighlights = [
+  { label: 'Hoje', value: '18 peças', detail: 'aguardando aprovação' },
+  { label: 'Fila', value: '42 posts', detail: 'agendados no mês' },
+  { label: 'Clientes', value: '9 contas', detail: 'com links ativos' },
+  { label: 'Trial', value: '3 dias', detail: 'para testar o fluxo' },
 ];
 
 export const postTypes = [
@@ -127,45 +192,109 @@ export const postTypes = [
   },
 ];
 
+export const featureSections = [
+  {
+    id: 'agendamento',
+    eyebrow: 'Agendamento de postagens',
+    title: 'Planeje Reels, carrosséis, stories e posts no mesmo calendário',
+    description:
+      'Organize a produção do mês por cliente, formato e data. Cada conteúdo fica com status claro para o time acompanhar o que está em rascunho, aprovado, agendado ou publicado.',
+    bullets: [
+      'Calendário para post, carrossel, reels e stories',
+      'Fila de publicação com status por conteúdo',
+      'Organização por cliente e conta de Instagram',
+      'Visão simples para prever volume e rotina do mês',
+    ],
+    visualTitle: 'Calendário editorial',
+    visualItems: ['Reels', 'Carrossel', 'Story', 'Post'],
+    tone: 'light',
+  },
+  {
+    id: 'aprovacao',
+    eyebrow: 'Aprovação de post',
+    title: 'Aprovação interna e envio ao cliente sem perder histórico',
+    description:
+      'Centralize a revisão do time e depois envie o conteúdo para aprovação do cliente por link. O fluxo reduz conversas soltas e deixa claro o que foi aprovado, reprovado ou solicitado para ajuste.',
+    bullets: [
+      'Revisão interna antes de enviar ao cliente',
+      'Link de aprovação com token e validade',
+      'Aprovar, reprovar ou pedir ajuste sem login extra',
+      'Histórico de decisões para reduzir ruído operacional',
+    ],
+    visualTitle: 'Fluxo de aprovação',
+    visualItems: ['Revisão interna', 'Link para cliente', 'Ajustes', 'Aprovado'],
+    tone: 'warm',
+  },
+  {
+    id: 'dashboard-cliente',
+    eyebrow: 'Dashboard do cliente',
+    title: 'Dados do cliente em tempo real para envio e visualização',
+    description:
+      'Compartilhe um dashboard de leitura com o cliente para acompanhar resultados sem expor a área interna da agência. O link facilita prestação de contas e reduz cobranças manuais por relatório.',
+    bullets: [
+      'Dashboard compartilhável por link',
+      'Visualização somente leitura para o cliente',
+      'Dados atualizados para acompanhamento da operação',
+      'Links com controle de acesso e possibilidade de revogação',
+    ],
+    visualTitle: 'Dashboard compartilhável',
+    visualItems: ['Alcance', 'Engajamento', 'Posts', 'Link ativo'],
+    tone: 'navy',
+  },
+];
+
 export const faqs = [
   {
-    question: 'O que é o INSYT?',
+    question: 'Para quem o INSYT foi criado?',
     answer:
-      'INSYT é uma plataforma para operação de conteúdo no Instagram. Você agenda publicações, controla aprovação interna e do cliente e compartilha dashboard por link em um único fluxo.',
+      'Para agências, gestores de social media e times que operam múltiplas contas de Instagram e precisam organizar planejamento, aprovação, publicação e métricas em um fluxo profissional.',
   },
   {
-    question: 'Como funciona o agendamento?',
+    question: 'Como funciona o teste grátis de 3 dias?',
     answer:
-      'Você define cliente, formato, legenda e horário. O sistema envia o conteúdo para a fila de publicação e executa automaticamente no Instagram, com acompanhamento de status em cada etapa.',
+      'Você escolhe um plano self-service, cria a conta e entra no checkout com trial de 3 dias. Durante o trial, a assinatura fica como teste no sistema e você pode validar a operação antes da cobrança recorrente.',
   },
   {
-    question: 'Quais tipos de conteúdo posso agendar?',
+    question: 'Preciso cadastrar cliente para ele aprovar?',
     answer:
-      'A plataforma suporta post, carrossel, reels e stories. Todos os formatos entram no mesmo calendário e seguem o mesmo fluxo de aprovação e agendamento.',
+      'Não. O cliente pode acessar links de aprovação ou dashboard com token e validade, sem login adicional. A agência mantém controle dos links ativos e pode revogar quando necessário.',
   },
   {
-    question: 'Como funciona a aprovação de conteúdo?',
+    question: 'Quais formatos de Instagram entram no fluxo?',
     answer:
-      'Você pode revisar internamente com o gestor e, depois, enviar para aprovação do cliente. Cada etapa usa links com token e validade, permitindo aprovar ou solicitar ajustes sem login adicional.',
+      'A operação contempla post, carrossel, reels e stories. Todos seguem o mesmo calendário e podem passar pelo fluxo de revisão e aprovação.',
   },
   {
-    question: 'Posso compartilhar métricas com o cliente?',
+    question: 'O plano Enterprise também tem checkout?',
     answer:
-      'Sim. O sistema gera links de dashboard somente leitura para o cliente acompanhar desempenho. Esses links têm expiração e podem ser revogados pelo time quando necessário.',
-  },
-  {
-    question: 'Posso gerenciar múltiplas contas?',
-    answer:
-      'Sim. O INSYT foi projetado para operação multi-cliente, com organização por conta, histórico de conteúdo, aprovações e visão centralizada de links ativos.',
+      'Não no fluxo padrão. Planos consultivos abrem contato via WhatsApp para ajustar volume, implantação e condições comerciais com a equipe.',
   },
   {
     question: 'Os dados e links são seguros?',
     answer:
-      'Os links de aprovação e dashboard usam token aleatório e validade definida. O compartilhamento expõe apenas dados necessários para visualização e pode ser revogado a qualquer momento.',
+      'Os links usam tokens aleatórios, validade e escopo limitado. O cliente visualiza apenas o necessário para aprovar ou acompanhar resultados, enquanto a operação interna segue protegida por login.',
   },
   {
-    question: 'Há limite de posts agendados?',
+    question: 'Posso cancelar se não fizer sentido para minha operação?',
     answer:
-      'O limite depende do plano contratado. A capacidade mensal e os recursos disponíveis aparecem na seção de planos para facilitar a escolha da operação ideal.',
+      'Sim. O modelo é por assinatura mensal nos planos self-service. A ideia do trial é permitir que sua agência valide o fluxo antes de assumir a rotina paga.',
+  },
+  {
+    question: 'O que muda entre os planos?',
+    answer:
+      'Os planos variam por volume de contas, posts, usuários e recursos inclusos. O card de cada plano mostra os limites e indica quando o fluxo de aprovação já está incluso.',
+  },
+];
+
+export const conversionCards = [
+  {
+    icon: React.createElement(TaskIcon),
+    title: 'Comece validando um cliente',
+    description: 'Use o trial para montar o primeiro calendário, enviar uma aprovação e testar o dashboard compartilhável.',
+  },
+  {
+    icon: React.createElement(PaidIcon),
+    title: 'Escolha o plano depois do teste',
+    description: 'O checkout cria a assinatura com 3 dias de trial para planos self-service. Enterprise segue por WhatsApp.',
   },
 ];

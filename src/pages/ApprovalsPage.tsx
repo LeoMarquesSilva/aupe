@@ -46,13 +46,14 @@ import {
   VideoLibrary as VideoIcon,
   Schedule as ScheduleIcon,
   CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
   Delete as DeleteIcon,
   Send as SendIcon,
   Link as LinkIcon,
   ViewColumn as KanbanIcon,
   Search as SearchIcon,
   AssignmentInd as GestorLinkIcon,
+  Add as AddIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material';
 import * as TabsRadix from '@radix-ui/react-tabs';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -77,8 +78,16 @@ import ApprovalUploadDrawer from '../components/ApprovalUploadDrawer';
 import ApprovalKanban from '../components/ApprovalKanban';
 import ApprovalPostDetailModal from '../components/ApprovalPostDetailModal';
 import ApprovalEditDrawer from '../components/ApprovalEditDrawer';
+import CreateClientDialog from '../components/CreateClientDialog';
+import EditClientDialog from '../components/EditClientDialog';
+import ClientLimitContactDialog from '../components/ClientLimitContactDialog';
+import { subscriptionLimitsService } from '../services/subscriptionLimitsService';
 import { GLASS } from '../theme/glassTokens';
 import { appShellContainerSx } from '../theme/appShellLayout';
+import {
+  getClientInstagramDisplay,
+  isClientInstagramConnected,
+} from '../utils/clientDisplay';
 import type { ApprovalKanbanPostInput } from '../components/ApprovalKanban';
 
 export type { ApprovalKanbanPostInput };
@@ -167,6 +176,10 @@ const ApprovalsPage: React.FC = () => {
       return true;
     }
   });
+  const [createClientOpen, setCreateClientOpen] = useState(false);
+  const [editClientOpen, setEditClientOpen] = useState(false);
+  const [limitContactOpen, setLimitContactOpen] = useState(false);
+  const [limitContactInfo, setLimitContactInfo] = useState({ current: 0, max: 0 });
 
   useEffect(() => {
     try {
@@ -206,6 +219,34 @@ const ApprovalsPage: React.FC = () => {
       setError(e instanceof Error ? e.message : 'Erro ao carregar clientes.');
     }
   }, []);
+
+  const handleClientCreated = (newClient: Client) => {
+    setClients((prev) => [...prev, newClient]);
+    setSelectedClientId(newClient.id);
+  };
+
+  const handleClientUpdated = (updatedClient: Client) => {
+    setClients((prev) => prev.map((c) => (c.id === updatedClient.id ? updatedClient : c)));
+  };
+
+  const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
+
+  const handleOpenCreateClient = async () => {
+    const check = await subscriptionLimitsService.canCreateClient();
+    if (!check.allowed) {
+      if (check.contactRequired && check.limits) {
+        setLimitContactInfo({
+          current: check.limits.currentClients,
+          max: check.limits.maxClients,
+        });
+        setLimitContactOpen(true);
+        return;
+      }
+      setError(check.message || 'Não é possível adicionar mais clientes.');
+      return;
+    }
+    setCreateClientOpen(true);
+  };
 
   const fetchLinks = useCallback(async () => {
     setLinksLoading(true);
@@ -393,6 +434,17 @@ const ApprovalsPage: React.FC = () => {
       return next;
     });
   }, [posts]);
+
+  useEffect(() => {
+    const onTourSelectClient = () => {
+      setSelectedClientId((current) => {
+        if (current) return current;
+        return clients[0]?.id ?? '';
+      });
+    };
+    window.addEventListener('approval-tour:select-first-client', onTourSelectClient);
+    return () => window.removeEventListener('approval-tour:select-first-client', onTourSelectClient);
+  }, [clients]);
 
   const togglePost = (postId: string) => {
     setSelectedPostIds((prev) => {
@@ -679,7 +731,13 @@ const ApprovalsPage: React.FC = () => {
           Envie os posts para aprovação: selecione o cliente e os posts e gere o link.
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <FormControl fullWidth size="small" sx={{ mb: 2, minWidth: 200, flex: 1 }} variant="outlined">
+          <FormControl
+            data-tour="approval-client-select"
+            fullWidth
+            size="small"
+            sx={{ mb: 2, minWidth: 200, flex: 1 }}
+            variant="outlined"
+          >
             <InputLabel id="approval-client-select-label">Cliente</InputLabel>
             <Select
               labelId="approval-client-select-label"
@@ -689,6 +747,7 @@ const ApprovalsPage: React.FC = () => {
               renderValue={(selected) => {
                 const client = clients.find((c) => c.id === selected);
                 if (!client) return 'Selecione um cliente';
+                const igDisplay = getClientInstagramDisplay(client);
                 return (
                   <Box sx={{ display: 'flex', alignItems: 'center' }}>
                     <Avatar
@@ -701,9 +760,11 @@ const ApprovalsPage: React.FC = () => {
                     <Typography component="span">
                       {client.name}
                     </Typography>
-                    <Typography component="span" sx={{ ml: 1, color: 'text.secondary', fontSize: '0.875rem' }}>
-                      {client.instagram ? `@${client.instagram}` : ''}
-                    </Typography>
+                    {igDisplay && (
+                      <Typography component="span" sx={{ ml: 1, color: 'text.secondary', fontSize: '0.875rem' }}>
+                        {igDisplay}
+                      </Typography>
+                    )}
                   </Box>
                 );
               }}
@@ -712,12 +773,13 @@ const ApprovalsPage: React.FC = () => {
                 <em>Selecione um cliente</em>
               </MenuItem>
               {clients.map((client) => {
-                const isConnected = !!(client.instagramAccountId && client.accessToken && client.username);
+                const isConnected = isClientInstagramConnected(client);
+                const igDisplay = getClientInstagramDisplay(client);
                 return (
                   <MenuItem key={client.id} value={client.id}>
                     <ListItemAvatar sx={{ minWidth: 40 }}>
                       <Badge
-                        color={isConnected ? 'success' : 'error'}
+                        color={isConnected ? 'success' : 'default'}
                         variant="dot"
                         overlap="circular"
                         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
@@ -733,7 +795,7 @@ const ApprovalsPage: React.FC = () => {
                     </ListItemAvatar>
                     <ListItemText
                       primary={client.name}
-                      secondary={client.instagram ? `@${client.instagram}` : ''}
+                      secondary={igDisplay ?? 'Só aprovação — sem Instagram'}
                       primaryTypographyProps={{ variant: 'body1' }}
                       secondaryTypographyProps={{ variant: 'body2' }}
                     />
@@ -748,9 +810,8 @@ const ApprovalsPage: React.FC = () => {
                     ) : (
                       <Chip
                         size="small"
-                        color="error"
-                        label="Não conectado"
-                        icon={<ErrorIcon />}
+                        variant="outlined"
+                        label="Só aprovação"
                         sx={{ ml: 1 }}
                       />
                     )}
@@ -759,6 +820,28 @@ const ApprovalsPage: React.FC = () => {
               })}
             </Select>
           </FormControl>
+          <Button
+            data-tour="approval-new-client"
+            variant="outlined"
+            size="medium"
+            startIcon={<AddIcon />}
+            onClick={handleOpenCreateClient}
+            sx={{ mb: 2, textTransform: 'none' }}
+          >
+            Novo cliente
+          </Button>
+          {selectedClientId && (
+            <Button
+              data-tour="approval-edit-client"
+              variant="outlined"
+              size="medium"
+              startIcon={<EditIcon />}
+              onClick={() => setEditClientOpen(true)}
+              sx={{ mb: 2, textTransform: 'none' }}
+            >
+              Editar nome
+            </Button>
+          )}
           {selectedClientId && (
             <Button
               variant="outlined"
@@ -1427,6 +1510,26 @@ const ApprovalsPage: React.FC = () => {
           setPostForEdit(null);
           fetchAllApprovalPosts();
         }}
+      />
+
+      <CreateClientDialog
+        open={createClientOpen}
+        onClose={() => setCreateClientOpen(false)}
+        onClientCreated={handleClientCreated}
+      />
+
+      <EditClientDialog
+        open={editClientOpen}
+        client={selectedClient}
+        onClose={() => setEditClientOpen(false)}
+        onClientUpdated={handleClientUpdated}
+      />
+
+      <ClientLimitContactDialog
+        open={limitContactOpen}
+        onClose={() => setLimitContactOpen(false)}
+        currentClients={limitContactInfo.current}
+        maxClients={limitContactInfo.max}
       />
     </>
   );

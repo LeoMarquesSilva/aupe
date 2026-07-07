@@ -61,6 +61,11 @@ import {
   Subscription, 
   SubscriptionPlan
 } from '../services/subscriptionService';
+import {
+  formatBRLFromCents,
+  getApprovalContractMonthlyCents,
+  getApprovalPricePerClientCents,
+} from '../utils/subscriptionDisplay';
 
 // TabPanel component
 interface TabPanelProps {
@@ -792,7 +797,14 @@ const SuperAdminDashboard: React.FC = () => {
                     </TableCell>
                     <TableCell>{plan.name}</TableCell>
                     <TableCell>
-                      {plan.is_enterprise_contact ? (
+                      {plan.plan_code === 'APROVACAO_ONLY' ? (
+                        <>
+                          {formatBRLFromCents(getApprovalPricePerClientCents(plan))}/cliente
+                          <Typography variant="caption" display="block" color="text.secondary">
+                            {formatBRLFromCents(getApprovalContractMonthlyCents(plan.max_clients, getApprovalPricePerClientCents(plan)))}/mês
+                          </Typography>
+                        </>
+                      ) : plan.is_enterprise_contact ? (
                         <Chip label="A consultar" size="small" color="warning" variant="outlined" />
                       ) : (
                         <>R$ {(plan.amount / 100).toFixed(2).replace('.', ',')}</>
@@ -812,7 +824,9 @@ const SuperAdminDashboard: React.FC = () => {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      {plan.is_enterprise_contact ? (
+                      {plan.plan_code === 'APROVACAO_ONLY' ? (
+                        <Chip label="Só aprovação" size="small" color="info" variant="outlined" />
+                      ) : plan.is_enterprise_contact ? (
                         <Chip label="Contato" size="small" color="secondary" variant="outlined" />
                       ) : (
                         <Chip label="Self-service" size="small" variant="outlined" />

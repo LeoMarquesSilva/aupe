@@ -44,6 +44,7 @@ import {
   PostMediaPreview,
 } from '../components/PublicApprovalPostMedia';
 import { GLASS } from '../theme/glassTokens';
+import { getPublicClientHandleLabel } from '../utils/clientDisplay';
 
 export { POST_TYPE, getFirstImageUrl, getImageUrls, PostMediaPreview } from '../components/PublicApprovalPostMedia';
 
@@ -164,7 +165,10 @@ const ClientApprovalView: React.FC = () => {
   };
 
   const clientPhotoUrl = data?.client?.profilePicture ?? data?.client?.logoUrl;
-  const username = data?.client?.instagram?.replace(/^@/, '') || data?.client?.name || 'cliente';
+  const clientHandleLabel = data?.client
+    ? getPublicClientHandleLabel(data.client)
+    : 'Cliente';
+  const clientAvatarLetter = (data?.client?.name || clientHandleLabel).charAt(0).toUpperCase();
 
   const renderHeader = (expiresAt?: string) => (
     <Box
@@ -352,10 +356,10 @@ const ClientApprovalView: React.FC = () => {
                   src={clientPhotoUrl ? ImageUrlService.getPublicUrl(clientPhotoUrl) : undefined}
                   sx={{ width: 40, height: 40 }}
                 >
-                  {username.charAt(0).toUpperCase()}
+                  {clientAvatarLetter}
                 </Avatar>
                 <Typography variant="subtitle1" fontWeight={600} sx={{ flex: 1, minWidth: 0 }}>
-                  @{username}
+                  {clientHandleLabel}
                 </Typography>
                 {(post.postingPlatform ?? 'instagram') === 'linkedin' ? (
                   <Box

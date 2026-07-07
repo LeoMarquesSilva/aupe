@@ -1,42 +1,45 @@
 import React from 'react';
-import { Box, Container, Typography, Card, Grid } from '@mui/material';
+import { Box, Container, Typography, Card, Grid, Chip } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { motion } from 'framer-motion';
-import { AreaChart, Area, LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { GLASS } from '../../theme/glassTokens';
-import { INSYT_COLORS, analyticsData, performanceData } from './LandingContent';
-import { VECTOR_MARK_ICON } from './landingAssets';
+import { INSYT_COLORS, agencyPains, workflowSteps } from './LandingContent';
 
 const LandingAnalyticsPreview: React.FC = () => (
   <Box
     component="section"
     sx={{
-      py: { xs: 10, md: 14 },
+      py: { xs: 7, md: 10 },
       position: 'relative',
     }}
   >
-    <Box
-      aria-hidden
+    <Container
+      maxWidth={false}
       sx={{
-        position: 'absolute',
-        top: '40%',
-        left: '2%',
-        width: { xs: 56, md: 80 },
-        height: { xs: 56, md: 80 },
-        opacity: 0.08,
-        pointerEvents: 'none',
+        maxWidth: 1360,
+        mx: 'auto',
+        px: { xs: 2.5, md: 3 },
       }}
     >
-      <Box component="img" src={VECTOR_MARK_ICON} alt="" sx={{ width: '100%', height: '100%' }} />
-    </Box>
-    <Container maxWidth="lg">
       <motion.div
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
         transition={{ duration: 0.75 }}
       >
-        <Box sx={{ textAlign: 'center', mb: 8 }}>
+        <Box id="workflow" sx={{ textAlign: 'center', mb: { xs: 4, md: 6 }, scrollMarginTop: 96 }}>
+          <Chip
+            label="Como funciona"
+            sx={{
+              mb: 2,
+              bgcolor: '#fff',
+              color: INSYT_COLORS.primary,
+              border: `1px solid ${alpha(INSYT_COLORS.primary, 0.18)}`,
+              fontWeight: 800,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+            }}
+          />
           <Typography
             variant="h2"
             sx={{
@@ -44,116 +47,108 @@ const LandingAnalyticsPreview: React.FC = () => (
               fontSize: { xs: '2.25rem', md: '3.25rem' },
               fontWeight: 800,
               mb: 2,
-              background: INSYT_COLORS.gradientPrimary,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
+              color: '#0a0f2d',
             }}
           >
-            Dashboard para decisões rápidas
+            Uma rotina clara para cada cliente
           </Typography>
           <Typography
             variant="h6"
-            sx={{ color: INSYT_COLORS.gray400, maxWidth: 560, mx: 'auto', fontWeight: 400 }}
+            sx={{ color: '#525663', maxWidth: 720, mx: 'auto', fontWeight: 400, lineHeight: 1.6 }}
           >
-            Acompanhe desempenho, compartilhe resultados com o cliente e ajuste o calendário com base em dados
+            O INSYT organiza a operação em etapas simples, para o time saber o que falta aprovar, publicar e reportar.
           </Typography>
         </Box>
 
         <Card
+          elevation={0}
           sx={{
-            background: 'rgba(255, 255, 255, 0.06)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: GLASS.radius.card,
-            p: { xs: 2, md: 4 },
-            backdropFilter: `blur(${GLASS.surface.blurStrong})`,
-            boxShadow: '0 20px 60px rgba(247, 66, 17, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.05) inset',
+            bgcolor: '#ffffff',
+            border: '1px solid rgba(82, 86, 99, 0.12)',
+            borderRadius: { xs: 4, md: 5 },
+            p: { xs: 2.25, md: 3 },
+            boxShadow: '0 18px 50px -34px rgba(10, 15, 45, 0.45)',
+            mb: { xs: 3, md: 4 },
           }}
         >
-          <Grid container spacing={4}>
-            <Grid item xs={12} md={8}>
-              <Typography
-                variant="h6"
-                sx={{
-                  color: INSYT_COLORS.gray200,
-                  mb: 3,
-                  fontWeight: 600,
-                }}
-              >
-                Alcance e cadência semanal
-              </Typography>
-              <Box sx={{ height: 280, width: '100%' }}>
-                <ResponsiveContainer>
-                  <AreaChart data={performanceData}>
-                    <defs>
-                      <linearGradient id="colorReachLanding" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={INSYT_COLORS.primary} stopOpacity={0.8} />
-                        <stop offset="95%" stopColor={INSYT_COLORS.primary} stopOpacity={0.1} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="name" stroke={INSYT_COLORS.gray400} />
-                    <YAxis stroke={INSYT_COLORS.gray400} />
-                    <Tooltip
-                      contentStyle={{
-                        background: INSYT_COLORS.gray800,
-                        border: `1px solid ${alpha(INSYT_COLORS.primary, 0.3)}`,
-                        borderRadius: 8,
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="reach"
-                      stroke={INSYT_COLORS.primary}
-                      fill="url(#colorReachLanding)"
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Typography
-                variant="h6"
-                sx={{
-                  color: INSYT_COLORS.gray200,
-                  mb: 3,
-                  fontWeight: 600,
-                }}
-              >
-                Evolução mensal
-              </Typography>
-              <Box sx={{ height: 280, width: '100%' }}>
-                <ResponsiveContainer>
-                  <LineChart data={analyticsData}>
-                    <XAxis dataKey="name" stroke={INSYT_COLORS.gray400} />
-                    <YAxis stroke={INSYT_COLORS.gray400} />
-                    <Tooltip
-                      contentStyle={{
-                        background: INSYT_COLORS.gray800,
-                        border: `1px solid ${alpha(INSYT_COLORS.primary, 0.3)}`,
-                        borderRadius: 8,
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="value"
-                      stroke={INSYT_COLORS.secondary}
-                      strokeWidth={3}
-                      dot={{ fill: INSYT_COLORS.secondary, r: 4 }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="engagement"
-                      stroke={INSYT_COLORS.accent}
-                      strokeWidth={3}
-                      dot={{ fill: INSYT_COLORS.accent, r: 4 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </Box>
-            </Grid>
+          <Grid container spacing={2.25}>
+            {workflowSteps.map((step, index) => (
+              <Grid item xs={12} md={3} key={step.title}>
+                <Box
+                  sx={{
+                    height: '100%',
+                    p: { xs: 2.25, md: 2.5 },
+                    borderRadius: 3,
+                    bgcolor: index === 1 ? 'rgba(247, 66, 17, 0.06)' : '#fbfbfb',
+                    border: `1px solid ${index === 1 ? alpha(INSYT_COLORS.primary, 0.22) : 'rgba(82, 86, 99, 0.1)'}`,
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      color: INSYT_COLORS.primary,
+                      fontWeight: 900,
+                      fontFamily: '"Cabinet Grotesk", "Poppins", sans-serif',
+                      fontSize: '1.25rem',
+                      mb: 2,
+                    }}
+                  >
+                    0{index + 1}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      color: '#0a0f2d',
+                      fontWeight: 800,
+                      fontSize: '1.1rem',
+                      mb: 1,
+                    }}
+                  >
+                    {step.title}
+                  </Typography>
+                  <Typography sx={{ color: '#525663', lineHeight: 1.65, fontSize: '0.92rem' }}>
+                    {step.description}
+                  </Typography>
+                </Box>
+              </Grid>
+            ))}
           </Grid>
         </Card>
+
+        <Grid container spacing={2.5}>
+          {agencyPains.map((item, index) => (
+            <Grid item xs={12} md={4} key={item.title}>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.45, delay: index * 0.08 }}
+              >
+                <Card
+                  elevation={0}
+                  sx={{
+                    height: '100%',
+                    p: { xs: 2.5, md: 3 },
+                    bgcolor: '#ffffff',
+                    border: `1px solid ${index === 1 ? alpha(INSYT_COLORS.primary, 0.2) : 'rgba(82, 86, 99, 0.12)'}`,
+                    borderRadius: GLASS.radius.card,
+                    boxShadow: index === 1
+                      ? '0 18px 42px -28px rgba(247, 66, 17, 0.45)'
+                      : '0 12px 34px -30px rgba(10, 15, 45, 0.42)',
+                  }}
+                >
+                  <Typography sx={{ color: INSYT_COLORS.primary, fontWeight: 800, fontSize: '0.75rem', letterSpacing: '0.16em', textTransform: 'uppercase', mb: 1.5 }}>
+                    {item.label}
+                  </Typography>
+                  <Typography sx={{ color: '#0a0f2d', fontFamily: '"Cabinet Grotesk", "Poppins", sans-serif', fontWeight: 800, fontSize: '1.35rem', mb: 1.5, lineHeight: 1.15 }}>
+                    {item.title}
+                  </Typography>
+                  <Typography sx={{ color: '#525663', lineHeight: 1.75 }}>
+                    {item.description}
+                  </Typography>
+                </Card>
+              </motion.div>
+            </Grid>
+          ))}
+        </Grid>
       </motion.div>
     </Container>
   </Box>
