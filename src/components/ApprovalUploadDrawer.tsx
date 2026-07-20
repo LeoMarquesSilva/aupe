@@ -235,7 +235,7 @@ const ApprovalUploadDrawer: React.FC<ApprovalUploadDrawerProps> = ({
 
             {contentType === 'reels' && (
               <>
-                <VideoUploader video={video} onChange={setVideo} />
+                <VideoUploader video={video} onChange={setVideo} allowAnyVideoFormat />
                 <Typography variant="subtitle2" sx={{ mt: 0.5 }}>
                   Capa (opcional)
                 </Typography>

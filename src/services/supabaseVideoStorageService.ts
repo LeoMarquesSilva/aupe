@@ -15,6 +15,8 @@ export interface VideoProcessingOptions {
   maxDuration?: number; // em segundos
   quality?: 'low' | 'medium' | 'high';
   generateThumbnail?: boolean;
+  /** Fluxos sem publicação automática, como aprovação, podem armazenar qualquer formato. */
+  allowAnyFormat?: boolean;
 }
 
 export class SupabaseVideoStorageService {
@@ -46,7 +48,10 @@ export class SupabaseVideoStorageService {
       this.validateVideoFile(file, options);
 
       // Gerar nome único para o arquivo
-      const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'mp4';
+      const lastDotIndex = file.name.lastIndexOf('.');
+      const fileExtension = lastDotIndex > 0
+        ? file.name.slice(lastDotIndex + 1).toLowerCase()
+        : (options.allowAnyFormat ? 'bin' : 'mp4');
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExtension}`;
       // ✅ Pasta 'videos' dentro do bucket existente
       const filePath = `${userId}/videos/${new Date().getFullYear()}/${new Date().getMonth() + 1}/${fileName}`;
@@ -63,7 +68,7 @@ export class SupabaseVideoStorageService {
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false,
-          contentType: file.type
+          contentType: file.type || 'application/octet-stream'
         });
 
       if (error) {
@@ -140,7 +145,7 @@ export class SupabaseVideoStorageService {
    */
   private validateVideoFile(file: File, options: VideoProcessingOptions = {}): void {
     // Verificar tipo de arquivo
-    if (!this.ALLOWED_TYPES.includes(file.type)) {
+    if (!options.allowAnyFormat && !this.ALLOWED_TYPES.includes(file.type)) {
       throw new Error(`Tipo de arquivo não suportado. Use: ${this.ALLOWED_TYPES.join(', ')}`);
     }
 

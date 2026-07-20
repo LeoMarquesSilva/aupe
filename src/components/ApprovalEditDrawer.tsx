@@ -263,7 +263,7 @@ const ApprovalEditDrawer: React.FC<ApprovalEditDrawerProps> = ({
 
         {contentType === 'reels' && (
           <>
-            <VideoUploader video={video} onChange={setVideo} />
+            <VideoUploader video={video} onChange={setVideo} allowAnyVideoFormat />
             <Typography variant="subtitle2">
               Capa (opcional)
             </Typography>
