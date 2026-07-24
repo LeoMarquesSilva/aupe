@@ -82,6 +82,7 @@ import CreateClientDialog from '../components/CreateClientDialog';
 import EditClientDialog from '../components/EditClientDialog';
 import ClientLimitContactDialog from '../components/ClientLimitContactDialog';
 import { subscriptionLimitsService } from '../services/subscriptionLimitsService';
+import { organizationProductModeService } from '../services/organizationProductModeService';
 import { GLASS } from '../theme/glassTokens';
 import { appShellContainerSx } from '../theme/appShellLayout';
 import {
@@ -180,6 +181,22 @@ const ApprovalsPage: React.FC = () => {
   const [editClientOpen, setEditClientOpen] = useState(false);
   const [limitContactOpen, setLimitContactOpen] = useState(false);
   const [limitContactInfo, setLimitContactInfo] = useState({ current: 0, max: 0 });
+  const [isApprovalOnlyMode, setIsApprovalOnlyMode] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    organizationProductModeService
+      .getCurrentMode()
+      .then((mode) => {
+        if (!cancelled) setIsApprovalOnlyMode(mode === 'approval_only');
+      })
+      .catch(() => {
+        if (!cancelled) setIsApprovalOnlyMode(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -1487,6 +1504,7 @@ const ApprovalsPage: React.FC = () => {
         open={!!selectedPostForModal}
         post={selectedPostForModal}
         onClose={() => setSelectedPostForModal(null)}
+        approvalOnlyMode={isApprovalOnlyMode}
         onScheduleSuccess={fetchAllApprovalPosts}
         onRemoveFromApproval={fetchAllApprovalPosts}
         onDeletePost={fetchAllApprovalPosts}

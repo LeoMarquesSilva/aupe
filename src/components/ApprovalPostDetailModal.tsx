@@ -45,6 +45,7 @@ interface ApprovalPostDetailModalProps {
   onDeletePost?: () => void;
   onEditRequest?: () => void;
   onInternalApprovalSuccess?: () => void;
+  approvalOnlyMode?: boolean;
 }
 
 const getThumbnailUrl = (post: ApprovalKanbanPostInput): string | null => {
@@ -103,6 +104,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
   onDeletePost,
   onEditRequest,
   onInternalApprovalSuccess,
+  approvalOnlyMode = false,
 }) => {
   const theme = useTheme();
   const [creatorLabel, setCreatorLabel] = useState<string>('—');
@@ -160,7 +162,7 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
 
   const handleSchedulePost = async () => {
     if (!post || !scheduleDate || scheduling) return;
-    if ((post.postType ?? post.post_type) === 'roteiro') return;
+    if (!approvalOnlyMode && (post.postType ?? post.post_type) === 'roteiro') return;
     if (scheduleDate === (post.scheduledDate ?? post.scheduled_date ?? '')) return;
     setScheduling(true);
     setScheduleError(null);
@@ -169,7 +171,9 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
       const isAlreadyScheduledInQueue = post.approvalStatus === 'approved' && post.forApprovalOnly === false;
       await postService.updateScheduledPost(post.id, {
         scheduledDate: scheduleDate,
-        ...(isLinkedIn
+        // Regra do produto: no módulo "Só Aprovação", a data é apenas referência.
+        // Nunca mover o conteúdo para a fila de publicação.
+        ...(approvalOnlyMode || isLinkedIn
           ? {}
           : isAlreadyScheduledInQueue
             ? {}
@@ -530,7 +534,49 @@ const ApprovalPostDetailModal: React.FC<ApprovalPostDetailModalProps> = ({
             </Box>
           )}
 
-          {isApproved && !isRoteiro && !isLinkedIn && (
+          {approvalOnlyMode && (
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                border: `1px solid ${alpha(theme.palette.info.main, 0.4)}`,
+                bgcolor: alpha(theme.palette.info.main, 0.06),
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                Data prevista do conteúdo
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                Altere a data e o horário usados como referência na aprovação. Isso não agenda publicação automática.
+              </Typography>
+              <DateTimePicker
+                scheduledDate={scheduleDate || (post.scheduledDate ?? post.scheduled_date ?? new Date().toISOString())}
+                onChange={setScheduleDate}
+              />
+              {scheduleError && (
+                <Alert severity="error" sx={{ mt: 1.5 }}>
+                  {scheduleError}
+                </Alert>
+              )}
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={scheduling ? <CircularProgress size={18} color="inherit" /> : <ScheduleIcon />}
+                onClick={handleSchedulePost}
+                disabled={scheduling || !scheduleDate || !hasScheduleChanged}
+                fullWidth
+                sx={{ mt: 1.5, textTransform: 'none' }}
+              >
+                {scheduling
+                  ? 'Salvando…'
+                  : !hasScheduleChanged
+                    ? 'Sem alterações de data'
+                    : 'Salvar nova data'}
+              </Button>
+            </Box>
+          )}
+
+          {!approvalOnlyMode && isApproved && !isRoteiro && !isLinkedIn && (
             <Box
               sx={{
                 p: 2,
