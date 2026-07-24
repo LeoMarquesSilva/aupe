@@ -42,6 +42,8 @@ interface VideoUploaderProps {
   maxFileSize?: number; // em MB
   maxDuration?: number; // em segundos
   acceptedFormats?: string[];
+  /** Permite armazenar qualquer formato no fluxo de aprovação, sem validar compatibilidade com o Instagram. */
+  allowAnyVideoFormat?: boolean;
   showPreview?: boolean;
   disabled?: boolean;
 }
@@ -52,6 +54,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
   maxFileSize = 2048,
   maxDuration = 90,
   acceptedFormats = ['video/mp4', 'video/mov', 'video/quicktime', 'video/webm', 'video/avi'],
+  allowAnyVideoFormat = false,
   showPreview = true,
   disabled = false
 }) => {
@@ -154,7 +157,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
     };
 
     // Verificar se é um arquivo de vídeo
-    if (!file.type.startsWith('video/')) {
+    if (!allowAnyVideoFormat && !file.type.startsWith('video/')) {
       validation.valid = false;
       validation.error = 'Por favor, selecione um arquivo de vídeo válido';
       return validation;
@@ -172,12 +175,14 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
     }
 
     // Verificar formato (mais flexível)
-    const isAcceptedFormat = acceptedFormats.some(format => 
-      file.type === format || file.type.includes(format.split('/')[1])
-    );
-    
-    if (!isAcceptedFormat) {
-      validation.warnings.push(`Formato ${file.type} pode não ser totalmente compatível`);
+    if (!allowAnyVideoFormat) {
+      const isAcceptedFormat = acceptedFormats.some(format =>
+        file.type === format || file.type.includes(format.split('/')[1])
+      );
+
+      if (!isAcceptedFormat) {
+        validation.warnings.push(`Formato ${file.type} pode não ser totalmente compatível`);
+      }
     }
 
     // Avisos baseados no tamanho
@@ -230,7 +235,8 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
       const uploadResult: VideoUploadResult = await supabaseVideoStorageService.uploadVideo(file, user.id, {
         maxSize: maxFileSize,
         maxDuration: maxDuration,
-        generateThumbnail: true
+        generateThumbnail: true,
+        allowAnyFormat: allowAnyVideoFormat
       });
 
       clearInterval(progressInterval);
@@ -268,7 +274,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
     } finally {
       setIsUploading(false);
     }
-  }, [maxFileSize, maxDuration, onChange]);
+  }, [allowAnyVideoFormat, maxFileSize, maxDuration, onChange]);
 
   // Função para processar arquivo selecionado (com detecção de formato)
   const handleFileSelect = useCallback(async (file: File) => {
@@ -276,26 +282,28 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
 
     if (!validateFile(file)) return;
 
-    // Detectar formato/codec do vídeo antes do upload
-    try {
-      const formatInfo = await detectVideoFormat(file);
-      devLog('🔍 Formato detectado:', formatInfo);
+    // A compatibilidade com o Instagram só é obrigatória nos fluxos de publicação.
+    if (!allowAnyVideoFormat) {
+      try {
+        const formatInfo = await detectVideoFormat(file);
+        devLog('🔍 Formato detectado:', formatInfo);
 
-      if (!formatInfo.isCompatible) {
-        // HEVC detectado — mostrar dialog de conversão
-        setPendingFile(file);
-        setDetectedFormat(formatInfo);
-        setConversionDialogOpen(true);
-        return;
+        if (!formatInfo.isCompatible) {
+          // HEVC detectado — mostrar dialog de conversão
+          setPendingFile(file);
+          setDetectedFormat(formatInfo);
+          setConversionDialogOpen(true);
+          return;
+        }
+      } catch (err) {
+        // Se a detecção falhar, prosseguir normalmente
+        devWarn('Falha na detecção de formato, prosseguindo com upload:', err);
       }
-    } catch (err) {
-      // Se a detecção falhar, prosseguir normalmente
-      devWarn('Falha na detecção de formato, prosseguindo com upload:', err);
     }
 
     await uploadFile(file);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maxFileSize, maxDuration, onChange, uploadFile]);
+  }, [allowAnyVideoFormat, maxFileSize, maxDuration, onChange, uploadFile]);
 
   // Callback quando o arquivo convertido está pronto
   const handleConvertedFileReady = useCallback(async (convertedFile: File) => {
@@ -369,14 +377,16 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
     if (disabled || isUploading) return;
 
     const files = Array.from(e.dataTransfer.files);
-    const videoFile = files.find(file => file.type.startsWith('video/'));
+    const videoFile = allowAnyVideoFormat
+      ? files[0]
+      : files.find(file => file.type.startsWith('video/'));
     
     if (videoFile) {
       handleFileSelect(videoFile);
     } else {
       setError('Por favor, selecione um arquivo de vídeo válido');
     }
-  }, [disabled, isUploading, handleFileSelect]);
+  }, [allowAnyVideoFormat, disabled, isUploading, handleFileSelect]);
 
   // Função para lidar com seleção de arquivo
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -471,7 +481,7 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
       <input
         ref={fileInputRef}
         type="file"
-        accept="video/*"
+        accept={allowAnyVideoFormat ? undefined : 'video/*'}
         onChange={handleFileInput}
         style={{ display: 'none' }}
         disabled={disabled || isUploading}
@@ -528,7 +538,9 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
                 Clique ou arraste um vídeo aqui
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Formatos aceitos: MP4, MOV, WEBM, AVI
+                {allowAnyVideoFormat
+                  ? 'Qualquer formato de vídeo é aceito para aprovação'
+                  : 'Formatos aceitos: MP4, MOV, WEBM, AVI'}
               </Typography>
               <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
                 <Chip size="small" label={`Máx. ${getFormattedSizeLimit()}`} color="primary" />
@@ -704,7 +716,9 @@ const VideoUploader: React.FC<VideoUploaderProps> = ({
             <strong>Erro:</strong> {error}
           </Typography>
           <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
-            Verifique se o arquivo é um vídeo válido e não excede {getFormattedSizeLimit()}.
+            {allowAnyVideoFormat
+              ? `Verifique se o arquivo não excede ${getFormattedSizeLimit()}.`
+              : `Verifique se o arquivo é um vídeo válido e não excede ${getFormattedSizeLimit()}.`}
           </Typography>
         </Alert>
       )}
