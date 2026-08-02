@@ -228,6 +228,96 @@ export async function createApprovalRequest(
   };
 }
 
+/**
+ * Adiciona posts a um link de aprovação de cliente JÁ EXISTENTE (mesmo token/URL).
+ * O link é dinâmico: a página pública lê a tabela de junção em tempo real, então
+ * os posts adicionados aparecem no mesmo link já enviado ao cliente, sem gerar novo URL.
+ *
+ * Não altera os posts que já estavam no link (mantêm status de aprovação atual);
+ * apenas os novos posts entram como "aguardando aprovação".
+ */
+export async function addPostsToApprovalRequest(
+  requestId: string,
+  postIds: string[]
+): Promise<{ added: number }> {
+  if (!requestId) {
+    throw new Error('Link de aprovação inválido.');
+  }
+  const normalizedPostIds = [...new Set(postIds.filter(Boolean))];
+  if (normalizedPostIds.length === 0) {
+    throw new Error('Selecione ao menos um post para adicionar ao link.');
+  }
+
+  const now = new Date().toISOString();
+
+  // O link ainda precisa estar ativo (não expirado).
+  const { data: requestRow, error: requestError } = await supabase
+    .from('approval_requests')
+    .select('id, client_id, expires_at')
+    .eq('id', requestId)
+    .gt('expires_at', now)
+    .single();
+  if (requestError || !requestRow) {
+    throw new Error('Link inválido ou expirado. Atualize a lista e tente novamente.');
+  }
+
+  // Todos os posts precisam pertencer ao mesmo cliente do link.
+  const { data: postRows, error: postsError } = await supabase
+    .from('scheduled_posts')
+    .select('id, client_id')
+    .in('id', normalizedPostIds);
+  if (postsError) throw postsError;
+  const mismatched = (postRows ?? []).filter((p) => p.client_id !== requestRow.client_id);
+  if ((postRows?.length ?? 0) !== normalizedPostIds.length || mismatched.length > 0) {
+    throw new Error('Um ou mais posts não pertencem ao cliente deste link.');
+  }
+
+  // Pré-aprovação interna (quando exigida) precisa estar concluída.
+  await assertPostsReadyForClientApproval(normalizedPostIds);
+
+  // Nenhum dos posts pode já estar em um link de cliente ativo (inclusive este).
+  const alreadyLinked = await getPostIdsInActiveLinks(requestRow.client_id);
+  const conflicting = normalizedPostIds.filter((id) => alreadyLinked.has(id));
+  if (conflicting.length > 0) {
+    throw new Error('Um ou mais posts já estão em um link de aprovação ativo. Atualize a lista e tente novamente.');
+  }
+
+  // Próximo sort_order (após os posts já existentes no link).
+  const { data: existingJunction, error: junctionFetchError } = await supabase
+    .from('approval_request_posts')
+    .select('sort_order')
+    .eq('approval_request_id', requestId)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+  if (junctionFetchError) throw junctionFetchError;
+  const startOrder = ((existingJunction?.[0]?.sort_order as number | undefined) ?? -1) + 1;
+
+  const inserts = normalizedPostIds.map((scheduledPostId, index) => ({
+    approval_request_id: requestId,
+    scheduled_post_id: scheduledPostId,
+    sort_order: startOrder + index,
+  }));
+
+  const { error: insertError } = await supabase
+    .from('approval_request_posts')
+    .insert(inserts);
+  if (insertError) throw insertError;
+
+  const { error: updateError } = await supabase
+    .from('scheduled_posts')
+    .update({
+      requires_approval: true,
+      approval_status: 'pending',
+      approval_feedback: null,
+      approval_feedback_attachments: [],
+      approval_responded_at: null,
+    })
+    .in('id', normalizedPostIds);
+  if (updateError) throw updateError;
+
+  return { added: normalizedPostIds.length };
+}
+
 export interface CreateInternalApprovalLinkResult {
   id: string;
   token: string;

@@ -54,6 +54,7 @@ import {
   AssignmentInd as GestorLinkIcon,
   Add as AddIcon,
   Edit as EditIcon,
+  PostAdd as PostAddIcon,
 } from '@mui/icons-material';
 import * as TabsRadix from '@radix-ui/react-tabs';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -78,6 +79,7 @@ import ApprovalUploadDrawer from '../components/ApprovalUploadDrawer';
 import ApprovalKanban from '../components/ApprovalKanban';
 import ApprovalPostDetailModal from '../components/ApprovalPostDetailModal';
 import ApprovalEditDrawer from '../components/ApprovalEditDrawer';
+import AddPostsToLinkDialog from '../components/AddPostsToLinkDialog';
 import CreateClientDialog from '../components/CreateClientDialog';
 import EditClientDialog from '../components/EditClientDialog';
 import ClientLimitContactDialog from '../components/ClientLimitContactDialog';
@@ -182,6 +184,7 @@ const ApprovalsPage: React.FC = () => {
   const [limitContactOpen, setLimitContactOpen] = useState(false);
   const [limitContactInfo, setLimitContactInfo] = useState({ current: 0, max: 0 });
   const [isApprovalOnlyMode, setIsApprovalOnlyMode] = useState(false);
+  const [addPostsLink, setAddPostsLink] = useState<ActiveApprovalLinkWithClient | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -1439,6 +1442,17 @@ const ApprovalsPage: React.FC = () => {
                       </TableCell>
                     )}
                     <TableCell align="right">
+                      {item.kind === 'client' && (
+                        <Tooltip title="Adicionar posts a este link">
+                          <IconButton
+                            size="small"
+                            onClick={() => setAddPostsLink(item.link)}
+                            sx={{ color: GLASS.accent.orange }}
+                          >
+                            <PostAddIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                       <Tooltip title="Abrir link">
                         <IconButton size="small" onClick={() => openLink(item)} sx={{ color: GLASS.accent.orange }}>
                           <OpenIcon fontSize="small" />
@@ -1548,6 +1562,19 @@ const ApprovalsPage: React.FC = () => {
         onClose={() => setLimitContactOpen(false)}
         currentClients={limitContactInfo.current}
         maxClients={limitContactInfo.max}
+      />
+
+      <AddPostsToLinkDialog
+        open={!!addPostsLink}
+        onClose={() => setAddPostsLink(null)}
+        requestId={addPostsLink?.id ?? null}
+        clientId={addPostsLink?.clientId ?? null}
+        clientName={addPostsLink?.clientName ?? 'cliente'}
+        onAdded={() => {
+          fetchLinks();
+          fetchAllApprovalPosts();
+          refreshActiveLinkPostIds();
+        }}
       />
     </>
   );
