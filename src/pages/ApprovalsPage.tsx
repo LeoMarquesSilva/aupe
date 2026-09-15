@@ -36,6 +36,8 @@ import {
   ListItemText,
   TextField,
   InputAdornment,
+  Menu,
+  MenuItem,
 } from '@mui/material';
 import {
   ContentCopy as CopyIcon,
@@ -55,6 +57,8 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   PostAdd as PostAddIcon,
+  MoreTime as MoreTimeIcon,
+  History as HistoryIcon,
 } from '@mui/icons-material';
 import * as TabsRadix from '@radix-ui/react-tabs';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -65,6 +69,11 @@ import { Client, isApprovalStatus, normalizeApprovalStatus } from '../types';
 import {
   listAllActiveApprovalLinks,
   listAllActiveInternalApprovalLinks,
+  listExpiredApprovalLinks,
+  listExpiredInternalApprovalLinks,
+  extendApprovalLinkExpiry,
+  APPROVAL_LINK_EXTEND_DAYS,
+  type ApprovalLinkListScope,
   ActiveApprovalLinkWithClient,
   ActiveInternalApprovalLinkListItem,
   deleteApprovalLink,
@@ -159,10 +168,18 @@ const ApprovalsPage: React.FC = () => {
   const [selectedPostForModal, setSelectedPostForModal] = useState<ApprovalKanbanPostInput | null>(null);
 
   const [unifiedLinks, setUnifiedLinks] = useState<UnifiedActiveApprovalLinkRow[]>([]);
+  const [expiredLinks, setExpiredLinks] = useState<UnifiedActiveApprovalLinkRow[]>([]);
+  const [linksScope, setLinksScope] = useState<ApprovalLinkListScope>('active');
   const [linksLoading, setLinksLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deletingLinkId, setDeletingLinkId] = useState<string | null>(null);
+  const [extendingLinkId, setExtendingLinkId] = useState<string | null>(null);
+  const [extendMenu, setExtendMenu] = useState<{
+    anchor: HTMLElement;
+    item: UnifiedActiveApprovalLinkRow;
+  } | null>(null);
   const [activeTab, setActiveTab] = useState<string>('step1');
   const [postIdsInActiveLinks, setPostIdsInActiveLinks] = useState<Set<string>>(new Set());
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
@@ -268,24 +285,34 @@ const ApprovalsPage: React.FC = () => {
     setCreateClientOpen(true);
   };
 
+  const mergeLinkRows = (
+    clientData: ActiveApprovalLinkWithClient[],
+    internalData: ActiveInternalApprovalLinkListItem[],
+    sortBy: 'createdAt' | 'expiresAt'
+  ): UnifiedActiveApprovalLinkRow[] =>
+    [
+      ...clientData.map((link) => ({ kind: 'client' as const, link })),
+      ...internalData.map((link) => ({ kind: 'gestor' as const, link })),
+    ].sort(
+      (a, b) => new Date(b.link[sortBy]).getTime() - new Date(a.link[sortBy]).getTime()
+    );
+
   const fetchLinks = useCallback(async () => {
     setLinksLoading(true);
     setError(null);
     try {
-      const [clientData, internalData] = await Promise.all([
+      const [clientData, internalData, clientExpired, internalExpired] = await Promise.all([
         listAllActiveApprovalLinks(),
         listAllActiveInternalApprovalLinks(),
+        listExpiredApprovalLinks(),
+        listExpiredInternalApprovalLinks(),
       ]);
-      const merged: UnifiedActiveApprovalLinkRow[] = [
-        ...clientData.map((link) => ({ kind: 'client' as const, link })),
-        ...internalData.map((link) => ({ kind: 'gestor' as const, link })),
-      ].sort(
-        (a, b) => new Date(b.link.createdAt).getTime() - new Date(a.link.createdAt).getTime()
-      );
-      setUnifiedLinks(merged);
+      setUnifiedLinks(mergeLinkRows(clientData, internalData, 'createdAt'));
+      setExpiredLinks(mergeLinkRows(clientExpired, internalExpired, 'expiresAt'));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao carregar links.');
       setUnifiedLinks([]);
+      setExpiredLinks([]);
     } finally {
       setLinksLoading(false);
     }
@@ -553,6 +580,29 @@ const ApprovalsPage: React.FC = () => {
     }
   };
 
+  const handleExtendLink = async (item: UnifiedActiveApprovalLinkRow, extraDays: number) => {
+    const rid = linkRowId(item);
+    setExtendMenu(null);
+    setExtendingLinkId(rid);
+    setError(null);
+    setSuccess(null);
+    try {
+      await extendApprovalLinkExpiry(item.kind, item.link.id, extraDays);
+      await fetchLinks();
+      await refreshActiveLinkPostIds();
+      await refreshInternalLinkPostIds();
+      setLinksScope('active');
+      setSuccess(`Link renovado por mais ${extraDays} dias. Comentários e respostas dos posts foram mantidos.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao renovar o link.');
+    } finally {
+      setExtendingLinkId(null);
+    }
+  };
+
+  const displayedLinks = linksScope === 'active' ? unifiedLinks : expiredLinks;
+  const isExpiredScope = linksScope === 'expired';
+
   const pendingPosts = posts;
   const eligiblePosts = pendingPosts.filter(
     (post) => !postIdsInActiveLinks.has(post.id) && isInternalApprovalReady(post)
@@ -673,6 +723,11 @@ const ApprovalsPage: React.FC = () => {
           {error && (
             <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
               {error}
+            </Alert>
+          )}
+          {success && (
+            <Alert severity="success" onClose={() => setSuccess(null)} sx={{ mb: 2 }}>
+              {success}
             </Alert>
           )}
 
@@ -1248,10 +1303,12 @@ const ApprovalsPage: React.FC = () => {
       <Box sx={{ pt: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 2 }}>
         <Box>
           <Typography variant="subtitle1" fontWeight={600}>
-            Links de aprovação ativos
+            Links de aprovação
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Links de cliente (aprovação externa) e de gestor (revisão interna) ativos; copie ou revogue quando precisar.
+            {isExpiredScope
+              ? 'Links que já venceram nos últimos 90 dias. Renove para o mesmo URL voltar a funcionar — comentários e respostas dos posts permanecem.'
+              : 'Links de cliente (aprovação externa) e de gestor (revisão interna) ativos; copie, estenda ou revogue quando precisar.'}
           </Typography>
         </Box>
         <Button
@@ -1269,11 +1326,56 @@ const ApprovalsPage: React.FC = () => {
         </Button>
       </Box>
 
+      <Box
+        sx={{
+          display: 'inline-flex',
+          p: 0.5,
+          mb: 2,
+          borderRadius: 999,
+          border: `1px solid ${GLASS.border.outer}`,
+          bgcolor: GLASS.surface.bg,
+          gap: 0.5,
+        }}
+      >
+        <Button
+          size="small"
+          onClick={() => setLinksScope('active')}
+          startIcon={<LinkIcon sx={{ fontSize: 16 }} />}
+          sx={{
+            textTransform: 'none',
+            borderRadius: 999,
+            px: 1.75,
+            fontWeight: 600,
+            color: linksScope === 'active' ? GLASS.accent.orange : GLASS.text.muted,
+            bgcolor: linksScope === 'active' ? 'rgba(247, 66, 17, 0.1)' : 'transparent',
+            '&:hover': { bgcolor: linksScope === 'active' ? 'rgba(247, 66, 17, 0.14)' : alpha(theme.palette.text.primary, 0.04) },
+          }}
+        >
+          Ativos ({unifiedLinks.length})
+        </Button>
+        <Button
+          size="small"
+          onClick={() => setLinksScope('expired')}
+          startIcon={<HistoryIcon sx={{ fontSize: 16 }} />}
+          sx={{
+            textTransform: 'none',
+            borderRadius: 999,
+            px: 1.75,
+            fontWeight: 600,
+            color: linksScope === 'expired' ? GLASS.accent.orange : GLASS.text.muted,
+            bgcolor: linksScope === 'expired' ? 'rgba(247, 66, 17, 0.1)' : 'transparent',
+            '&:hover': { bgcolor: linksScope === 'expired' ? 'rgba(247, 66, 17, 0.14)' : alpha(theme.palette.text.primary, 0.04) },
+          }}
+        >
+          Expirados ({expiredLinks.length})
+        </Button>
+      </Box>
+
       {linksLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
           <CircularProgress />
         </Box>
-      ) : unifiedLinks.length === 0 ? (
+      ) : displayedLinks.length === 0 ? (
         <Paper
           elevation={0}
           sx={{
@@ -1287,12 +1389,22 @@ const ApprovalsPage: React.FC = () => {
             boxShadow: GLASS.shadow.cardInset,
           }}
         >
-          <ThumbUpIcon sx={{ fontSize: 48, color: theme.palette.text.disabled, mb: 1 }} />
+          {isExpiredScope ? (
+            <HistoryIcon sx={{ fontSize: 48, color: theme.palette.text.disabled, mb: 1 }} />
+          ) : (
+            <ThumbUpIcon sx={{ fontSize: 48, color: theme.palette.text.disabled, mb: 1 }} />
+          )}
           <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
-            Nenhum link ativo
+            {isExpiredScope ? 'Nenhum link expirado' : 'Nenhum link ativo'}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Gere um link para o <strong>cliente</strong> (Passo 1–2) ou um link para o <strong>gestor</strong> (revisão interna). Ambos aparecem aqui enquanto não expirarem.
+            {isExpiredScope
+              ? 'Não há links vencidos nos últimos 90 dias.'
+              : (
+                <>
+                  Gere um link para o <strong>cliente</strong> (Passo 1–2) ou um link para o <strong>gestor</strong> (revisão interna). Ambos aparecem aqui enquanto não expirarem.
+                </>
+              )}
           </Typography>
         </Paper>
       ) : (
@@ -1330,7 +1442,7 @@ const ApprovalsPage: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {unifiedLinks.map((item) => {
+              {displayedLinks.map((item) => {
                 const rid = linkRowId(item);
                 const isGestor = item.kind === 'gestor';
                 const link = item.link;
@@ -1430,9 +1542,24 @@ const ApprovalsPage: React.FC = () => {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">
-                        {format(parseISO(link.expiresAt), isMobile ? 'dd/MM/yy' : "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                        <Typography variant="body2">
+                          {format(parseISO(link.expiresAt), isMobile ? 'dd/MM/yy' : "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                        </Typography>
+                        {isExpiredScope && (
+                          <Chip
+                            label="Expirado"
+                            size="small"
+                            sx={{
+                              height: 20,
+                              fontSize: '0.65rem',
+                              fontWeight: 600,
+                              bgcolor: alpha(theme.palette.error.main, 0.12),
+                              color: theme.palette.error.dark,
+                            }}
+                          />
+                        )}
+                      </Box>
                     </TableCell>
                     {!isMobile && (
                       <TableCell>
@@ -1442,7 +1569,21 @@ const ApprovalsPage: React.FC = () => {
                       </TableCell>
                     )}
                     <TableCell align="right">
-                      {item.kind === 'client' && (
+                      <Tooltip title={isExpiredScope ? 'Renovar validade' : 'Estender validade'}>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => setExtendMenu({ anchor: e.currentTarget, item })}
+                          disabled={extendingLinkId === rid}
+                          sx={{ color: GLASS.accent.orange }}
+                        >
+                          {extendingLinkId === rid ? (
+                            <CircularProgress size={18} />
+                          ) : (
+                            <MoreTimeIcon fontSize="small" />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                      {item.kind === 'client' && !isExpiredScope && (
                         <Tooltip title="Adicionar posts a este link">
                           <IconButton
                             size="small"
@@ -1576,6 +1717,23 @@ const ApprovalsPage: React.FC = () => {
           refreshActiveLinkPostIds();
         }}
       />
+
+      <Menu
+        anchorEl={extendMenu?.anchor ?? null}
+        open={!!extendMenu}
+        onClose={() => setExtendMenu(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        {APPROVAL_LINK_EXTEND_DAYS.map((days) => (
+          <MenuItem
+            key={days}
+            onClick={() => extendMenu && handleExtendLink(extendMenu.item, days)}
+          >
+            +{days} dias
+          </MenuItem>
+        ))}
+      </Menu>
     </>
   );
 };

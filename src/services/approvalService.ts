@@ -6,6 +6,34 @@ const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
 /** In dev, use relative path so CRA proxy avoids CORS. In prod, use full Supabase URL. */
 const functionsBase = process.env.NODE_ENV === 'development' ? '' : supabaseUrl;
 const APPROVAL_EXPIRY_OPTIONS = new Set([7, 15, 30]);
+export const APPROVAL_LINK_EXTEND_DAYS = [7, 15, 30] as const;
+export type ApprovalLinkListScope = 'active' | 'expired';
+const EXPIRED_LINKS_LOOKBACK_DAYS = 90;
+
+function expiryScopeBounds(): { nowIso: string; lookbackIso: string } {
+  const now = new Date();
+  const lookback = new Date(now);
+  lookback.setDate(lookback.getDate() - EXPIRED_LINKS_LOOKBACK_DAYS);
+  return { nowIso: now.toISOString(), lookbackIso: lookback.toISOString() };
+}
+
+async function loadCreatorLabels(
+  creatorIds: string[]
+): Promise<Record<string, { full_name: string | null; email: string }>> {
+  if (creatorIds.length === 0) return {};
+  const { data: profilesData } = await supabase
+    .from('profiles')
+    .select('id, full_name, email')
+    .in('id', creatorIds);
+  if (!profilesData) return {};
+  return profilesData.reduce(
+    (acc, p) => {
+      acc[p.id] = { full_name: p.full_name ?? null, email: p.email ?? '' };
+      return acc;
+    },
+    {} as Record<string, { full_name: string | null; email: string }>
+  );
+}
 
 /** Payload for saving content created on the Approval page (for approval only, not for posting). */
 export interface SaveContentForApprovalPayload {
@@ -597,17 +625,24 @@ export interface ActiveApprovalLinkWithClient {
   createdByLabel: string;
 }
 
-/**
- * Lista todos os links de aprovação ativos (para a página de links compartilhados).
- */
-export async function listAllActiveApprovalLinks(): Promise<ActiveApprovalLinkWithClient[]> {
-  const now = new Date().toISOString();
+async function listApprovalLinksByScope(
+  scope: ApprovalLinkListScope
+): Promise<ActiveApprovalLinkWithClient[]> {
+  const { nowIso, lookbackIso } = expiryScopeBounds();
 
-  const { data: rows, error } = await supabase
+  let query = supabase
     .from('approval_requests')
-    .select('id, client_id, token, expires_at, label, created_at, created_by, clients(name, instagram, profile_picture, logo_url)')
-    .gt('expires_at', now)
-    .order('created_at', { ascending: false });
+    .select('id, client_id, token, expires_at, label, created_at, created_by, clients(name, instagram, profile_picture, logo_url)');
+
+  query =
+    scope === 'active'
+      ? query.gt('expires_at', nowIso)
+      : query.lte('expires_at', nowIso).gte('expires_at', lookbackIso);
+
+  const { data: rows, error } = await query.order(
+    scope === 'active' ? 'created_at' : 'expires_at',
+    { ascending: false }
+  );
 
   if (error) throw error;
 
@@ -626,22 +661,7 @@ export async function listAllActiveApprovalLinks(): Promise<ActiveApprovalLinkWi
   }>;
 
   const creatorIds = [...new Set(typedRows.map((r) => r.created_by).filter(Boolean))] as string[];
-  let creatorMap: Record<string, { full_name: string | null; email: string }> = {};
-  if (creatorIds.length > 0) {
-    const { data: profilesData } = await supabase
-      .from('profiles')
-      .select('id, full_name, email')
-      .in('id', creatorIds);
-    if (profilesData) {
-      creatorMap = profilesData.reduce(
-        (acc, p) => {
-          acc[p.id] = { full_name: p.full_name ?? null, email: p.email ?? '' };
-          return acc;
-        },
-        {} as Record<string, { full_name: string | null; email: string }>
-      );
-    }
-  }
+  const creatorMap = await loadCreatorLabels(creatorIds);
 
   const base = typeof window !== 'undefined' ? window.location.origin : '';
   return typedRows.map((row) => {
@@ -664,6 +684,16 @@ export async function listAllActiveApprovalLinks(): Promise<ActiveApprovalLinkWi
       createdByLabel,
     };
   });
+}
+
+/** Lista todos os links de aprovação de cliente ativos. */
+export async function listAllActiveApprovalLinks(): Promise<ActiveApprovalLinkWithClient[]> {
+  return listApprovalLinksByScope('active');
+}
+
+/** Links de cliente expirados nos últimos 90 dias. */
+export async function listExpiredApprovalLinks(): Promise<ActiveApprovalLinkWithClient[]> {
+  return listApprovalLinksByScope('expired');
 }
 
 export interface ActiveInternalApprovalLinkListItem {
@@ -769,16 +799,13 @@ function summarizeInternalLinkClients(junction: InternalLinkPostRow[] | null | u
   };
 }
 
-/**
- * Lista links ativos de pré-aprovação interna (gestor), em paralelo aos links de cliente.
- */
-export async function listAllActiveInternalApprovalLinks(): Promise<ActiveInternalApprovalLinkListItem[]> {
-  const now = new Date().toISOString();
+async function listInternalApprovalLinksByScope(
+  scope: ApprovalLinkListScope
+): Promise<ActiveInternalApprovalLinkListItem[]> {
+  const { nowIso, lookbackIso } = expiryScopeBounds();
 
-  const { data: rows, error } = await supabase
-    .from('internal_approval_links')
-    .select(
-      `
+  let query = supabase.from('internal_approval_links').select(
+    `
       id,
       token,
       expires_at,
@@ -792,9 +819,17 @@ export async function listAllActiveInternalApprovalLinks(): Promise<ActiveIntern
         )
       )
     `
-    )
-    .gt('expires_at', now)
-    .order('created_at', { ascending: false });
+  );
+
+  query =
+    scope === 'active'
+      ? query.gt('expires_at', nowIso)
+      : query.lte('expires_at', nowIso).gte('expires_at', lookbackIso);
+
+  const { data: rows, error } = await query.order(
+    scope === 'active' ? 'created_at' : 'expires_at',
+    { ascending: false }
+  );
 
   if (error) throw error;
 
@@ -809,22 +844,7 @@ export async function listAllActiveInternalApprovalLinks(): Promise<ActiveIntern
   }>;
 
   const creatorIds = [...new Set(typedRows.map((r) => r.created_by).filter(Boolean))] as string[];
-  let creatorMap: Record<string, { full_name: string | null; email: string }> = {};
-  if (creatorIds.length > 0) {
-    const { data: profilesData } = await supabase
-      .from('profiles')
-      .select('id, full_name, email')
-      .in('id', creatorIds);
-    if (profilesData) {
-      creatorMap = profilesData.reduce(
-        (acc, p) => {
-          acc[p.id] = { full_name: p.full_name ?? null, email: p.email ?? '' };
-          return acc;
-        },
-        {} as Record<string, { full_name: string | null; email: string }>
-      );
-    }
-  }
+  const creatorMap = await loadCreatorLabels(creatorIds);
 
   return typedRows.map((row) => {
     const creator = row.created_by ? creatorMap[row.created_by] : null;
@@ -847,6 +867,46 @@ export async function listAllActiveInternalApprovalLinks(): Promise<ActiveIntern
       clientPhotoUrl,
     };
   });
+}
+
+/** Lista links ativos de pré-aprovação interna (gestor). */
+export async function listAllActiveInternalApprovalLinks(): Promise<ActiveInternalApprovalLinkListItem[]> {
+  return listInternalApprovalLinksByScope('active');
+}
+
+/** Links internos expirados nos últimos 90 dias. */
+export async function listExpiredInternalApprovalLinks(): Promise<ActiveInternalApprovalLinkListItem[]> {
+  return listInternalApprovalLinksByScope('expired');
+}
+
+/**
+ * Renova a validade de um link de cliente ou gestor.
+ * A nova data é agora + extraDays (7, 15 ou 30). Comentários e respostas dos posts permanecem.
+ */
+export async function extendApprovalLinkExpiry(
+  kind: 'client' | 'gestor',
+  linkId: string,
+  extraDays: number
+): Promise<{ expiresAt: string }> {
+  if (!APPROVAL_EXPIRY_OPTIONS.has(extraDays)) {
+    throw new Error('Validade inválida. Use 7, 15 ou 30 dias.');
+  }
+  if (!linkId) {
+    throw new Error('Link inválido.');
+  }
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + extraDays);
+  const table = kind === 'gestor' ? 'internal_approval_links' : 'approval_requests';
+  const { data, error } = await supabase
+    .from(table)
+    .update({ expires_at: expiresAt.toISOString() })
+    .eq('id', linkId)
+    .select('expires_at')
+    .single();
+  if (error || !data?.expires_at) {
+    throw new Error(error?.message || 'Falha ao renovar o link.');
+  }
+  return { expiresAt: data.expires_at };
 }
 
 /**
