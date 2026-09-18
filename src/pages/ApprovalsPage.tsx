@@ -37,7 +37,6 @@ import {
   TextField,
   InputAdornment,
   Menu,
-  MenuItem,
 } from '@mui/material';
 import {
   ContentCopy as CopyIcon,
